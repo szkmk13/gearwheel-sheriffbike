@@ -1,0 +1,6 @@
+/CLAUDE.md
+/.claude/
+/.venv/
+.env
+/db.sqlite3
+/.idea/
