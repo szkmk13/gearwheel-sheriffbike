@@ -22,6 +22,9 @@ pillow==12.2.0
 PyJWT==2.12.1
 pytesseract==0.3.13
 PyYAML==6.0.3
+qrcode==8.2
+colorama==0.4.6
+django-vite==3.1.0
 referencing==0.37.0
 rpds-py==0.30.0
 sqlparse==0.5.5

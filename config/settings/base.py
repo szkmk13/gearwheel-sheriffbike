@@ -1,3 +1,5 @@
+import datetime
+
 import environ
 from pathlib import Path
 
@@ -23,6 +25,7 @@ INSTALLED_APPS = [
     'django_filters',
     'corsheaders',
     'drf_spectacular',
+    'django_vite',
     # local
     'apps.customers',
     'apps.orders',
@@ -78,8 +81,18 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+DJANGO_VITE = {
+    'default': {
+        'dev_mode': DEBUG,
+        'dev_server_port': 5173,
+        'manifest_path': BASE_DIR / 'static' / 'frontend' / '.vite' / 'manifest.json',
+        'static_url_prefix': 'frontend',
+    }
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -93,7 +106,7 @@ SPECTACULAR_SETTINGS = {
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'apps.customers.auth.CookieJWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -112,3 +125,9 @@ GROQ_API_KEY = env('GROQ_API_KEY', default='')
 OCR_BACKEND = env('OCR_BACKEND', default='groq')
 
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(minutes=15),
+    'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': False,
+}

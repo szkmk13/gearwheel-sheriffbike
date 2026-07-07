@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 
 
@@ -25,6 +27,7 @@ class Bike(models.Model):
         ('electric', 'Electric'),
         ('other', 'Other'),
     ]
+    uuid = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE, related_name='bikes')
     brand = models.CharField(max_length=100)
     model = models.CharField(max_length=100, blank=True)
@@ -32,6 +35,7 @@ class Bike(models.Model):
     color = models.CharField(max_length=50, blank=True)
     serial_no = models.CharField(max_length=100, blank=True, db_index=True)
     year = models.PositiveSmallIntegerField(null=True, blank=True)
+    photo = models.ImageField(upload_to='bikes/', blank=True, null=True)
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -40,3 +44,7 @@ class Bike(models.Model):
 
     def __str__(self):
         return f'{self.brand} {self.model} ({self.customer})'
+
+    @property
+    def sheriff_code(self):
+        return f'sheriff-{self.id}-{self.uuid}'

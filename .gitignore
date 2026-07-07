@@ -4,3 +4,4 @@
 .env
 /db.sqlite3
 /.idea/
+/frontend/node_modules/
