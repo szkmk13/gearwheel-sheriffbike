@@ -1,5 +1,6 @@
 from django.conf import settings
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 ACCESS_TOKEN_COOKIE = 'access_token'
 REFRESH_TOKEN_COOKIE = 'refresh_token'
@@ -21,7 +22,14 @@ class CookieJWTAuthentication(JWTAuthentication):
         if raw_token is None:
             return None
 
-        validated_token = self.get_validated_token(raw_token)
+        try:
+            validated_token = self.get_validated_token(raw_token)
+        except (InvalidToken, TokenError):
+            # A stale/expired cookie should behave like no cookie at all (anonymous),
+            # not a hard authentication failure — otherwise every request carrying an
+            # old access_token cookie 401s regardless of the endpoint's permissions.
+            return None
+
         return self.get_user(validated_token), validated_token
 
 

@@ -4,6 +4,7 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
+from rest_framework.permissions import AllowAny
 
 from config.auth_views import (
     CookieTokenObtainPairView,
@@ -14,6 +15,8 @@ from config.auth_views import (
 
 spa_view = TemplateView.as_view(template_name='home.html')
 
+_docs_view_kwargs = {'permission_classes': [AllowAny]} if settings.DEBUG else {}
+
 urlpatterns = [
     path('admin/', admin.site.urls),
 
@@ -23,10 +26,11 @@ urlpatterns = [
     path('api/auth/token/logout/', LogoutView.as_view(), name='token_logout'),
     path('api/auth/me/', MeView.as_view(), name='me'),
 
-    # Docs
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
-    path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
+    # Docs — public in DEBUG for local convenience, otherwise fall back to the
+    # default IsAdminUser permission (schema shouldn't be world-readable in prod).
+    path('api/schema/', SpectacularAPIView.as_view(**_docs_view_kwargs), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema', **_docs_view_kwargs), name='swagger-ui'),
+    path('api/docs/redoc/', SpectacularRedocView.as_view(url_name='schema', **_docs_view_kwargs), name='redoc'),
 
     # Apps
     path('api/customers/', include('apps.customers.urls')),
