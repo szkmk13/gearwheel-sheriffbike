@@ -20,3 +20,9 @@ CORS_ALLOWED_ORIGINS = [
 
 CORS_ALLOW_CREDENTIALS = True
 DEBUG=True
+
+# Temporary: allow unauthenticated access to the API in local dev.
+REST_FRAMEWORK = {
+    **REST_FRAMEWORK,
+    'DEFAULT_PERMISSION_CLASSES': ['rest_framework.permissions.AllowAny'],
+}

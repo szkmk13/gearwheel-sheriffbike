@@ -6,7 +6,6 @@ User = get_user_model()
 
 class RepairOrder(models.Model):
     STATUS_CHOICES = [
-        ('draft', 'Draft'),
         ('accepted', 'Accepted'),
         ('diagnosing', 'Diagnosing'),
         ('waiting_parts', 'Waiting for Parts'),
@@ -23,7 +22,7 @@ class RepairOrder(models.Model):
     ]
     customer = models.ForeignKey('customers.Customer', on_delete=models.PROTECT, related_name='repair_orders')
     bike = models.ForeignKey('customers.Bike', on_delete=models.PROTECT, related_name='repair_orders')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft', db_index=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='accepted', db_index=True)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal')
     description = models.TextField()
     mechanic_notes = models.TextField(blank=True)
@@ -38,7 +37,7 @@ class RepairOrder(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'Order #{self.pk} — {self.customer} ({self.status})'
+        return f'Order #{self.pk} - {self.customer} ({self.status})'
 
 
 class RepairOrderItem(models.Model):

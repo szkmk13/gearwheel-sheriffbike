@@ -26,7 +26,7 @@ class CookieJWTAuthentication(JWTAuthentication):
             validated_token = self.get_validated_token(raw_token)
         except (InvalidToken, TokenError):
             # A stale/expired cookie should behave like no cookie at all (anonymous),
-            # not a hard authentication failure — otherwise every request carrying an
+            # not a hard authentication failure - otherwise every request carrying an
             # old access_token cookie 401s regardless of the endpoint's permissions.
             return None
 

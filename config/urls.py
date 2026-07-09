@@ -2,6 +2,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include, re_path
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from rest_framework.permissions import AllowAny
@@ -13,7 +14,10 @@ from config.auth_views import (
     MeView,
 )
 
-spa_view = TemplateView.as_view(template_name='home.html')
+# ensure_csrf_cookie: the SPA is served from this shell with no server-rendered
+# form, so nothing else would ever set the csrftoken cookie the frontend needs
+# to send back as X-CSRFToken on unsafe API requests.
+spa_view = ensure_csrf_cookie(TemplateView.as_view(template_name='home.html'))
 
 _docs_view_kwargs = {'permission_classes': [AllowAny]} if settings.DEBUG else {}
 
@@ -26,7 +30,7 @@ urlpatterns = [
     path('api/auth/token/logout/', LogoutView.as_view(), name='token_logout'),
     path('api/auth/me/', MeView.as_view(), name='me'),
 
-    # Docs — public in DEBUG for local convenience, otherwise fall back to the
+    # Docs - public in DEBUG for local convenience, otherwise fall back to the
     # default IsAdminUser permission (schema shouldn't be world-readable in prod).
     path('api/schema/', SpectacularAPIView.as_view(**_docs_view_kwargs), name='schema'),
     path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema', **_docs_view_kwargs), name='swagger-ui'),

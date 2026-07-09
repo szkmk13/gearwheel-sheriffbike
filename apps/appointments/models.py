@@ -31,4 +31,4 @@ class Appointment(models.Model):
         ordering = ['start_time']
 
     def __str__(self):
-        return f'{self.title} — {self.start_time:%Y-%m-%d %H:%M}'
+        return f'{self.title} - {self.start_time:%Y-%m-%d %H:%M}'

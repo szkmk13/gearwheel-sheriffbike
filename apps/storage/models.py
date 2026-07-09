@@ -57,4 +57,4 @@ class StorageEvent(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'{self.event_type} — {self.storage_record}'
+        return f'{self.event_type} - {self.storage_record}'

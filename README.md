@@ -40,7 +40,7 @@ python manage.py createsuperuser
 ## Instalacja (frontend)
 
 Frontend (`frontend/`) to osobna aplikacja Vite + React, zintegrowana z Django przez `django-vite`.
-Przy `DEBUG=True` Django oczekuje działającego dev-serwera Vite pod `:5173` — bez niego strona główna (`/`) się nie wyrenderuje.
+Przy `DEBUG=True` Django oczekuje działającego dev-serwera Vite pod `:5173` - bez niego strona główna (`/`) się nie wyrenderuje.
 
 ```bash
 cd frontend
@@ -50,17 +50,17 @@ npm install
 ## Uruchomienie (dwa terminale)
 
 ```bash
-# Terminal 1 — backend (z katalogu głównego repo, z aktywnym .venv)
+# Terminal 1 - backend (z katalogu głównego repo, z aktywnym .venv)
 python manage.py runserver
 
-# Terminal 2 — frontend
+# Terminal 2 - frontend
 cd frontend
 npm run dev
 ```
 
 Aplikacja dostępna pod: http://127.0.0.1:8000
 Panel admina: http://127.0.0.1:8000/admin/
-Dokumentacja API (Swagger): http://127.0.0.1:8000/api/docs/ — wymaga zalogowania jako
+Dokumentacja API (Swagger): http://127.0.0.1:8000/api/docs/ - wymaga zalogowania jako
 superuser (np. przez `/admin/` w tej samej przeglądarce, żeby uzyskać sesję/ciasteczko).
 
 ## Budowanie frontendu na produkcję
