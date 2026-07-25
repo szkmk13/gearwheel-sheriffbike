@@ -42,6 +42,15 @@ class PartViewSet(ModelViewSet):
         qs = part.movements.all()
         return Response(StockMovementSerializer(qs, many=True).data)
 
+    @action(detail=False, methods=['get'], url_path='available')
+    def available(self, request):
+        qs = self.filter_queryset(self.get_queryset().filter(stock_quantity__gt=0))
+        page = self.paginate_queryset(qs)
+        serializer = PartListSerializer(page if page is not None else qs, many=True)
+        if page is not None:
+            return self.get_paginated_response(serializer.data)
+        return Response(serializer.data)
+
 
 class InvoiceViewSet(ModelViewSet):
     queryset = Invoice.objects.select_related('supplier', 'uploaded_by').all()
