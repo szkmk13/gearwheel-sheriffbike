@@ -189,25 +189,31 @@
 }
 .svc-icon svg { display: block; }
 .featured .svc-icon { background: color-mix(in oklab, var(--accent) 26%, transparent); color: #fff; }
-.svc-tag { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-deep); }
-.featured .svc-tag { color: var(--gold); }
-.svc-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.svc-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
 .svc-title { font-size: 19px; font-variation-settings: "wght" 760, "wdth" 106; letter-spacing: -.01em; }
 .svc-price { flex: none; font-size: 14px; font-weight: 700; color: var(--accent-deep); }
 .featured .svc-price { color: var(--gold); }
 .svc-desc { margin-top: 10px; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
 .featured .svc-desc { color: rgba(255,255,255,.75); }
-.svc-details { margin-top: 14px; }
-.svc-summary {
-  list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+.svc-scope { margin-top: 14px; outline: none; }
+.svc-scope-label {
+  cursor: default; display: flex; align-items: center; justify-content: space-between;
   font-size: 12.5px; font-weight: 700; color: var(--ink); padding: 4px 0;
 }
-.svc-summary::-webkit-details-marker { display: none; }
-.featured .svc-summary { color: #fff; }
+.featured .svc-scope-label { color: #fff; }
 .svc-chev { display: inline-flex; transition: transform .2s; color: var(--accent); }
 .featured .svc-chev { color: var(--gold); }
-.svc-details[open] .svc-chev { transform: rotate(90deg); }
-.svc-points { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.svc-card:hover .svc-chev,
+.svc-scope:focus .svc-chev,
+.svc-scope:focus-within .svc-chev { transform: rotate(90deg); }
+.svc-points {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;
+  max-height: 0; opacity: 0; overflow: hidden;
+  transition: max-height .3s ease, opacity .2s ease, margin-top .3s ease;
+}
+.svc-card:hover .svc-points,
+.svc-scope:focus .svc-points,
+.svc-scope:focus-within .svc-points { max-height: 400px; opacity: 1; margin-top: 8px; }
 .svc-points li { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--ink-2); }
 .svc-points li svg { color: var(--accent); flex: none; margin-top: 1px; }
 .featured .svc-points li { color: rgba(255,255,255,.85); }

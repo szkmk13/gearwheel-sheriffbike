@@ -19,24 +19,23 @@ function ServiceCard({ s }) {
     <article className={"svc-card" + (s.featured ? " featured" : "")}>
       {s.featured && <div className="svc-ribbon"><SheriffStar size={12} /> Polecany</div>}
       <div className="svc-icon">{(Icon[s.icon] || Icon.wrench)({ width: 24, height: 24 })}</div>
-      <div className="svc-tag">{s.tag}</div>
       <div className="svc-head-row">
         <h3 className="svc-title">{s.title}</h3>
         {s.price && <span className="svc-price">{s.price}</span>}
       </div>
       <p className="svc-desc">{s.desc}</p>
       {!!(s.points && s.points.length) && (
-        <details className="svc-details">
-          <summary className="svc-summary">
+        <div className="svc-scope" tabIndex={0}>
+          <div className="svc-scope-label">
             <span>Zakres usługi</span>
             <span className="svc-chev">{Icon.arrow({ width: 14, height: 14 })}</span>
-          </summary>
+          </div>
           <ul className="svc-points">
             {s.points.map((p, i) => (
               <li key={i}>{Icon.check({ width: 15, height: 15 })}<span>{p}</span></li>
             ))}
           </ul>
-        </details>
+        </div>
       )}
       <a className="svc-link" href="#rezerwacja" onClick={onBook}>Umów {Icon.arrow({ width: 16, height: 16 })}</a>
     </article>
