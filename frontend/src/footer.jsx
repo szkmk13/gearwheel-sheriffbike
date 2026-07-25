@@ -175,41 +175,54 @@ function Footer({ c }) {
   const ct = c.contact;
   return (
     <footer className="footer" id="kontakt">
-      <div className="wrap footer-inner">
-        <div className="footer-brand">
-          <a className="brand" href="#top">
-            <img className="brand-logo" src={ASSET_BASE + "assets/favicon.png"} alt={c.brand.name} width="44" height="44" />
-            <span className="name" style={{ color: "#fff" }}>{c.brand.name}<small style={{ color: "#9C9387" }}>{c.brand.tagline}</small></span>
-          </a>
-          <p className="footer-blurb">{ct.blurb}</p>
-          <div className="footer-social">
-            {ct.social.facebook && <a href={ct.social.facebook} target="_blank" rel="noopener" aria-label="Facebook">{Icon.fb({ width: 20, height: 20 })}</a>}
-            {ct.social.instagram && <a href={ct.social.instagram} target="_blank" rel="noopener" aria-label="Instagram">{Icon.ig({ width: 20, height: 20 })}</a>}
-            {ct.social.google && <a href={ct.social.google} target="_blank" rel="noopener" aria-label="Google">{Icon.google({ width: 20, height: 20 })}</a>}
+      <div className="wrap footer-top">
+        <div className="footer-inner">
+          <div className="footer-brand">
+            <a className="brand" href="#top">
+              <img className="brand-logo" src={ASSET_BASE + "assets/favicon.png"} alt={c.brand.name} width="44" height="44" />
+              <span className="name" style={{ color: "#fff" }}>{c.brand.name}<small style={{ color: "#9C9387" }}>{c.brand.tagline}</small></span>
+            </a>
+            <p className="footer-blurb">{ct.blurb}</p>
+            <div className="footer-social">
+              {ct.social.facebook && <a href={ct.social.facebook} target="_blank" rel="noopener" aria-label="Facebook">{Icon.fb({ width: 20, height: 20 })}</a>}
+              {ct.social.instagram && <a href={ct.social.instagram} target="_blank" rel="noopener" aria-label="Instagram">{Icon.ig({ width: 20, height: 20 })}</a>}
+              {ct.social.google && <a href={ct.social.google} target="_blank" rel="noopener" aria-label="Google">{Icon.google({ width: 20, height: 20 })}</a>}
+            </div>
+          </div>
+
+          <div className="footer-col">
+            <h5>Kontakt</h5>
+            <a href={ct.social.google || "#"} target="_blank" rel="noopener" className="footer-line">{Icon.pin({ width: 16, height: 16 })} {ct.address}<br/><span>{ct.city}</span></a>
+            <a href={"tel:" + c.brand.phoneHref} className="footer-line">{Icon.phone({ width: 16, height: 16 })} {c.brand.phone}</a>
+          </div>
+
+          <div className="footer-col">
+            <h5>Godziny otwarcia</h5>
+            <div className="footer-hours">
+              {ct.hours.map((row, i) => (
+                <div key={i}><span>{row.d}</span><strong className={row.closed ? "closed" : ""}>{row.h}</strong></div>
+              ))}
+            </div>
+          </div>
+
+          <div className="footer-col">
+            <h5>Usługi</h5>
+            <a href="#uslugi" className="footer-link">Serwis rowerowy</a>
+            <a href="#zima" className="footer-link">Serwis nart i snowboardu</a>
+            <a href="#galeria" className="footer-link">Galeria</a>
+            <a href="#rezerwacja" className="footer-link">Umów wizytę</a>
           </div>
         </div>
 
-        <div className="footer-col">
-          <h5>Kontakt</h5>
-          <a href={ct.social.google || "#"} target="_blank" rel="noopener" className="footer-line">{Icon.pin({ width: 16, height: 16 })} {ct.address}<br/><span>{ct.city}</span></a>
-          <a href={"tel:" + c.brand.phoneHref} className="footer-line">{Icon.phone({ width: 16, height: 16 })} {c.brand.phone}</a>
-        </div>
-
-        <div className="footer-col">
-          <h5>Godziny otwarcia</h5>
-          <div className="footer-hours">
-            {ct.hours.map((row, i) => (
-              <div key={i}><span>{row.d}</span><strong className={row.closed ? "closed" : ""}>{row.h}</strong></div>
-            ))}
-          </div>
-        </div>
-
-        <div className="footer-col">
-          <h5>Usługi</h5>
-          <a href="#uslugi" className="footer-link">Serwis rowerowy</a>
-          <a href="#zima" className="footer-link">Serwis nart i snowboardu</a>
-          <a href="#galeria" className="footer-link">Galeria</a>
-          <a href="#rezerwacja" className="footer-link">Umów wizytę</a>
+        <div className="footer-map">
+          <iframe
+            src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d18610.66088122194!2d18.5526215!3d54.3334291!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x46fd752771307cb3%3A0xbbcd0ea7c51a49a3!2sSheriff%20Bike%20-%20serwis%20rowerowy%20Gda%C5%84sk!5e0!3m2!1spl!2spl!4v1784991164389!5m2!1spl!2spl"
+            style={{ border: 0 }}
+            allowFullScreen
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            title="Mapa - Sheriff Bike Gdańsk"
+          />
         </div>
       </div>
       <div className="wrap footer-bottom">

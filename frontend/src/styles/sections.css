@@ -386,10 +386,15 @@
 /* ============================================================
    FOOTER
    ============================================================ */
-.footer-inner {
-  display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 40px;
+.footer-top {
+  display: grid; grid-template-columns: 1.6fr 1fr; gap: 48px; align-items: stretch;
   padding-block: clamp(54px, 7vw, 84px) 40px;
 }
+.footer-inner {
+  display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 40px;
+}
+.footer-map { min-height: 260px; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.08); }
+.footer-map iframe { display: block; width: 100%; height: 100%; min-height: 260px; }
 .footer-brand { max-width: 320px; }
 .footer-blurb { margin-top: 20px; font-size: 14.5px; color: #B5AB9D; line-height: 1.6; }
 .footer-social { display: flex; gap: 10px; margin-top: 22px; }
@@ -485,7 +490,9 @@
   .svc-grid { grid-template-columns: repeat(2, 1fr); }
   .booking-grid { grid-template-columns: 1fr; }
   .winter-inner { grid-template-columns: 1fr; }
+  .footer-top { grid-template-columns: 1fr; gap: 36px; }
   .footer-inner { grid-template-columns: 1fr 1fr; }
+  .footer-map { min-height: 300px; }
 }
 @media (max-width: 720px) {
   .trust-inner { grid-template-columns: 1fr 1fr; }
