@@ -166,36 +166,49 @@
    ============================================================ */
 .svc-grid {
   margin-top: clamp(40px, 5vw, 64px);
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
 }
 .svc-card {
   position: relative; background: var(--paper-2); border: 1px solid var(--line);
-  border-radius: var(--radius-lg); padding: 30px 28px 26px;
+  border-radius: var(--radius-lg); padding: 24px 22px 20px;
   display: flex; flex-direction: column;
   transition: transform .22s cubic-bezier(.2,.7,.3,1), box-shadow .22s, border-color .22s;
 }
 .svc-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: var(--line-2); }
 .svc-card.featured { background: var(--ink); border-color: var(--ink); color: #fff; }
 .svc-icon {
-  width: 52px; height: 52px; border-radius: 13px; display: grid; place-items: center;
-  background: var(--accent-soft); color: var(--accent-deep); margin-bottom: 20px;
+  width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center;
+  background: var(--accent-soft); color: var(--accent-deep); margin-bottom: 16px;
   overflow: hidden; flex: none;
 }
 .svc-icon svg { display: block; }
 .featured .svc-icon { background: color-mix(in oklab, var(--accent) 26%, transparent); color: #fff; }
-.svc-tag { font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-deep); }
+.svc-tag { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-deep); }
 .featured .svc-tag { color: var(--gold); }
-.svc-title { font-size: 23px; margin-top: 9px; font-variation-settings: "wght" 760, "wdth" 106; letter-spacing: -.01em; }
-.svc-desc { margin-top: 12px; font-size: 14.5px; color: var(--ink-2); line-height: 1.55; }
+.svc-head-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-top: 8px; }
+.svc-title { font-size: 19px; font-variation-settings: "wght" 760, "wdth" 106; letter-spacing: -.01em; }
+.svc-price { flex: none; font-size: 14px; font-weight: 700; color: var(--accent-deep); }
+.featured .svc-price { color: var(--gold); }
+.svc-desc { margin-top: 10px; font-size: 13.5px; color: var(--ink-2); line-height: 1.5; }
 .featured .svc-desc { color: rgba(255,255,255,.75); }
-.svc-points { list-style: none; margin: 18px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
-.svc-points li { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--ink-2); }
+.svc-details { margin-top: 14px; }
+.svc-summary {
+  list-style: none; cursor: pointer; display: flex; align-items: center; justify-content: space-between;
+  font-size: 12.5px; font-weight: 700; color: var(--ink); padding: 4px 0;
+}
+.svc-summary::-webkit-details-marker { display: none; }
+.featured .svc-summary { color: #fff; }
+.svc-chev { display: inline-flex; transition: transform .2s; color: var(--accent); }
+.featured .svc-chev { color: var(--gold); }
+.svc-details[open] .svc-chev { transform: rotate(90deg); }
+.svc-points { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.svc-points li { display: flex; gap: 9px; align-items: flex-start; font-size: 12.5px; color: var(--ink-2); }
 .svc-points li svg { color: var(--accent); flex: none; margin-top: 1px; }
 .featured .svc-points li { color: rgba(255,255,255,.85); }
 .featured .svc-points li svg { color: var(--gold); }
 .svc-link {
-  margin-top: auto; padding-top: 22px; display: inline-flex; align-items: center; gap: 8px;
-  font-size: 14px; font-weight: 700; color: var(--ink);
+  margin-top: auto; padding-top: 18px; display: inline-flex; align-items: center; gap: 8px;
+  font-size: 13.5px; font-weight: 700; color: var(--ink);
 }
 .svc-link span { color: var(--accent-deep); }
 .svc-link svg { transition: transform .2s; }
@@ -450,6 +463,9 @@
 /* ============================================================
    RESPONSIVE
    ============================================================ */
+@media (max-width: 1180px) {
+  .svc-grid { grid-template-columns: repeat(3, 1fr); }
+}
 @media (max-width: 1000px) {
   .hero-split-grid { grid-template-columns: 1fr; }
   .hero-visual { max-width: 520px; }

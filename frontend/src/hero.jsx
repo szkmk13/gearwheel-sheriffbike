@@ -131,7 +131,7 @@ function HeroSplit({ c }) {
 }
 
 function HeroCentered({ c }) {
-  const bikeOpts = c.services.items.map((i) => i.title);
+  const bikeOpts = c.services.bookingOptions || c.services.items.map((i) => i.title);
   const [equip, setEquip] = React.useState("rower");
   const [service, setService] = React.useState("");
   const opts = equip === "rower" ? bikeOpts : c.winter.items.map((i) => i.title);
