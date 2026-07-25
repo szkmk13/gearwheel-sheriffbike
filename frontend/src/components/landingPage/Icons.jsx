@@ -17,13 +17,13 @@ function SheriffStar({ size = 24, className = "", style = {} }) {
     <svg viewBox="0 0 100 100" width={size} height={size} className={className}
          style={style} fill="currentColor" aria-hidden="true">
       <path d="M50,6 L58.2,32.9 L84.4,22.6 L68.5,45.8 L92.9,59.8 L64.9,61.8 L69.1,89.6 L50,69 L30.9,89.6 L35.1,61.8 L7.1,59.8 L31.5,45.8 L15.6,22.6 L41.8,32.9 Z"/>
-      <circle cx="50"   cy="6"    r="3.6" fill="var(--paper, #f6f2eb)"/>
-      <circle cx="84.4" cy="22.6" r="3.6" fill="var(--paper, #f6f2eb)"/>
-      <circle cx="92.9" cy="59.8" r="3.6" fill="var(--paper, #f6f2eb)"/>
-      <circle cx="69.1" cy="89.6" r="3.6" fill="var(--paper, #f6f2eb)"/>
-      <circle cx="30.9" cy="89.6" r="3.6" fill="var(--paper, #f6f2eb)"/>
-      <circle cx="7.1"  cy="59.8" r="3.6" fill="var(--paper, #f6f2eb)"/>
-      <circle cx="15.6" cy="22.6" r="3.6" fill="var(--paper, #f6f2eb)"/>
+      <circle cx="50"   cy="6"    r="3.6" fill="#F6F2EB"/>
+      <circle cx="84.4" cy="22.6" r="3.6" fill="#F6F2EB"/>
+      <circle cx="92.9" cy="59.8" r="3.6" fill="#F6F2EB"/>
+      <circle cx="69.1" cy="89.6" r="3.6" fill="#F6F2EB"/>
+      <circle cx="30.9" cy="89.6" r="3.6" fill="#F6F2EB"/>
+      <circle cx="7.1"  cy="59.8" r="3.6" fill="#F6F2EB"/>
+      <circle cx="15.6" cy="22.6" r="3.6" fill="#F6F2EB"/>
       <circle cx="50"   cy="50"   r="13.5" fill="none" stroke="var(--paper, #f6f2eb)" strokeWidth="3"/>
     </svg>
   );

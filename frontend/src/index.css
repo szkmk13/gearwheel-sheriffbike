@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+/* Sheriff Bike brand tokens - scoped by name, safe alongside Tailwind's
+   defaults (no overlap with default palette/font names) so they don't
+   leak into the dashboard's plain-Tailwind styling. */
+@theme {
+  --color-paper: #F6F2EB;
+  --color-paper-2: #FFFFFF;
+  --color-paper-3: #EFE9DF;
+  --color-ink: #1A1613;
+  --color-ink-2: #4B433B;
+  --color-ink-3: #8C8378;
+  --color-line: #E3DBCE;
+  --color-line-2: #D5CABA;
+
+  --color-accent: #D9601C;
+  --color-accent-deep: color-mix(in oklab, var(--color-accent) 82%, #000);
+  --color-accent-soft: color-mix(in oklab, var(--color-accent) 13%, #fff);
+  --color-gold: #E0A03C;
+
+  --color-winter-bg: #1C2530;
+  --color-winter-2: #28333F;
+  --color-winter-ice: #9CC3D6;
+  --color-winter-ink: #EAF1F5;
+  --color-winter-mut: #9AAAB8;
+
+  --font-brand: "Archivo", system-ui, sans-serif;
+
+  --animate-pop: pop .4s cubic-bezier(.2,1.3,.4,1) both;
+}
+
+@keyframes pop {
+  from { transform: scale(.5) rotate(-12deg); opacity: 0; }
+  to { transform: scale(1) rotate(0); opacity: 1; }
+}
