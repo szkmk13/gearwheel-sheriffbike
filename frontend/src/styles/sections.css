@@ -88,6 +88,8 @@
   text-align: left;
 }
 .hbb-field { flex: 1; min-width: 0; }
+.hbb-field-equip { flex: 0.7; }
+.hbb-field-service { flex: 1.5; }
 .hbb-field label {
   display: block; font-size: 12px; font-weight: 700; letter-spacing: .07em;
   text-transform: uppercase; color: rgba(255,255,255,.65); margin-bottom: 7px;
@@ -102,6 +104,9 @@
   background: var(--paper-2); border: 1.5px solid var(--line); border-radius: 12px;
   padding: 13px 14px 13px 16px; cursor: pointer; text-align: left;
   transition: border-color .15s, box-shadow .15s;
+}
+.csel-trigger span:first-child {
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .csel-trigger:hover { border-color: var(--line-2); }
 .csel-trigger.open,
@@ -121,6 +126,7 @@
   font-size: 14.5px; font-weight: 500; color: var(--ink);
   background: transparent; border: 0; border-radius: 8px;
   padding: 10px 13px; cursor: pointer; transition: background .12s, color .12s;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .csel-opt:hover { background: var(--accent-soft); color: var(--accent-deep); }
 .csel-opt.on { background: var(--accent-soft); color: var(--accent-deep); font-weight: 700; }
@@ -308,7 +314,7 @@
   border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft);
 }
 
-.bf-seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bf-seg { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
 .bf-seg-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   height: 48px; border-radius: 11px; cursor: pointer; font: inherit; font-weight: 600; font-size: 14.5px;

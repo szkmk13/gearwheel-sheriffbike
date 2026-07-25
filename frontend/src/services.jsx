@@ -2,7 +2,19 @@ import React from 'react';
 import { SheriffStar, Icon } from './icons.jsx';
 import { AccentTitle } from './hero.jsx';
 
+function prefillBooking(equip, service) {
+  try {
+    sessionStorage.setItem("sheriff:prefill", JSON.stringify({ equip, service }));
+    window.dispatchEvent(new CustomEvent("sheriff:prefill", { detail: { equip, service } }));
+  } catch (e) {}
+}
+
 function ServiceCard({ s }) {
+  const onBook = (e) => {
+    e.preventDefault();
+    prefillBooking("rower", s.title);
+    document.getElementById("rezerwacja").scrollIntoView({ behavior: "smooth" });
+  };
   return (
     <article className={"svc-card" + (s.featured ? " featured" : "")}>
       {s.featured && <div className="svc-ribbon"><SheriffStar size={12} /> Polecany</div>}
@@ -26,7 +38,7 @@ function ServiceCard({ s }) {
           </ul>
         </details>
       )}
-      <a className="svc-link" href="#rezerwacja">Umów <span>{s.title.toLowerCase()}</span> {Icon.arrow({ width: 16, height: 16 })}</a>
+      <a className="svc-link" href="#rezerwacja" onClick={onBook}>Umów {Icon.arrow({ width: 16, height: 16 })}</a>
     </article>
   );
 }
@@ -39,7 +51,9 @@ function Services({ c }) {
         <div className="section-head">
           <div className="eyebrow"><SheriffStar size={14} /> {s.eyebrow}</div>
           <h2><AccentTitle text={s.title} /></h2>
-          <p className="lead">{s.lead}</p>
+          {(Array.isArray(s.lead) ? s.lead : [s.lead]).map((p, i) => (
+            <p className="lead" key={i}>{p}</p>
+          ))}
         </div>
 
         <div className="svc-grid">

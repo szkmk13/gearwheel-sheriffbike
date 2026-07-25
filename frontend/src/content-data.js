@@ -25,7 +25,10 @@ export const DEFAULT_CONTENT = {
   services: {
     eyebrow: "Co robimy",
     title: "Serwis rowerowy\nod A do Z",
-    lead: "Od szybkiej wymiany dętki po kompleksowy serwis Twojego roweru - dobierzemy zakres prac do Twoich potrzeb i budżetu.\nKażdy rower opuszcza nasz warsztat dopiero po pozytywnie zakończonej jeździe próbnej i dokładnej kontroli jakości.",
+    lead: [
+      "Od szybkiej wymiany dętki po kompleksowy serwis Twojego roweru - dobierzemy zakres prac do Twoich potrzeb i budżetu.",
+      "Każdy rower opuszcza nasz warsztat dopiero po pozytywnie zakończonej jeździe próbnej i dokładnej kontroli jakości.",
+    ],
     items: [
       { icon: "wrench", tag: "Przed sezonem", title: "Przegląd podstawowy", price: "250 zł",
         desc: "Dokładny przegląd najważniejszych podzespołów z regulacją i smarowaniem. Idealny przed sezonem.",
@@ -33,12 +36,12 @@ export const DEFAULT_CONTENT = {
       { icon: "spray", tag: "Czyszczenie napędu", title: "Przegląd podstawowy Plus", price: "350 zł",
         desc: "Rozszerzona wersja przeglądu podstawowego z dokładnym czyszczeniem napędu dla lepszej pracy i dłuższej żywotności podzespołów.",
         points: ["Wszystkie czynności z przeglądu podstawowego", "Dokładne mycie i odtłuszczenie wszystkich elementów napędu", "Ponowne smarowanie i precyzyjna regulacja przerzutek"], featured: false },
-      { icon: "cog", tag: "Raz na 2 lata", title: "Przegląd kompleksowy", price: "700 zł",
-        desc: "Pełen serwis roweru. Dokładne czyszczenie i smarowanie każdego łożyska. Dla wymagających. Zalecany raz na 2 lata.",
-        points: ["Kompletny demontaż, czyszczenie i regulacja kluczowych podzespołów", "Serwis piast, sterów i suportu", "Centrowanie kół z użyciem tensometru"], featured: true },
       { icon: "bike", tag: "Montaż", title: "Składanie roweru", price: "od 200 zł",
         desc: "Profesjonalny montaż roweru z kartonu lub po transporcie, z pełnym ustawieniem i jazdą próbną.",
         points: ["Montaż z kartonu", "Ustawienie pozycji", "Jazda próbna i korekty"], featured: false },
+      { icon: "cog", tag: "Raz na 2 lata", title: "Przegląd kompleksowy", price: "700 zł",
+        desc: "Pełen serwis roweru. Dokładne czyszczenie i smarowanie każdego łożyska. Dla wymagających. Zalecany raz na 2 lata.",
+        points: ["Kompletny demontaż, czyszczenie i regulacja kluczowych podzespołów", "Serwis piast, sterów i suportu", "Centrowanie kół z użyciem tensometru"], featured: true },
       { icon: "gauge", tag: "Szybko", title: "Regulacje przerzutek i hamulców", price: "od 40 zł",
         desc: "Precyzyjna regulacja układu napędowego i hamulcowego, zapewniająca płynną zmianę biegów oraz skuteczne i bezpieczne hamowanie.",
         points: ["Regulacja przedniej i tylnej przerzutki", "Regulacja hamulców mechanicznych lub hydraulicznych", "Kontrola linek, pancerzy oraz zużycia elementów"], featured: false },

@@ -154,7 +154,7 @@ function HeroCentered({ c }) {
         <p className="hero-cb-sub">{c.hero.sub}</p>
 
         <div className="hero-bookbar" role="group" aria-label="Szybka rezerwacja">
-          <div className="hbb-field">
+          <div className="hbb-field hbb-field-equip">
             <label>Sprzęt</label>
             <CustomSelect
               value={equip}
@@ -166,7 +166,7 @@ function HeroCentered({ c }) {
               ]}
             />
           </div>
-          <div className="hbb-field">
+          <div className="hbb-field hbb-field-service">
             <label>Usługa</label>
             <CustomSelect
               value={service}

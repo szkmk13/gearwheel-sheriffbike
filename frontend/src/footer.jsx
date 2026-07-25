@@ -33,8 +33,7 @@ function Gallery({ c }) {
 
 const EQUIP = [
   { id: "rower", label: "Rower", icon: "bike" },
-  { id: "narty", label: "Narty", icon: "ski" },
-  { id: "snowboard", label: "Snowboard", icon: "snow" },
+  { id: "zima", label: "Narty / Snowboard", icon: "ski" },
 ];
 
 function BookingForm({ c }) {
@@ -50,7 +49,7 @@ function BookingForm({ c }) {
   React.useEffect(() => {
     const apply = (d) => {
       if (!d) return;
-      if (d.equip) setEquip(d.equip);
+      if (d.equip) setEquip(d.equip === "rower" ? "rower" : "zima");
       if (d.service) setForm((f) => ({ ...f, service: d.service }));
     };
     try { apply(JSON.parse(sessionStorage.getItem("sheriff:prefill"))); } catch (e) {}
