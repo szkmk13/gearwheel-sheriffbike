@@ -1,5 +1,6 @@
 from django.conf import settings
-from rest_framework import status
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,20 +10,20 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from apps.customers.auth import (
     REFRESH_TOKEN_COOKIE,
+    AuthenticatedUserSerializer,
     delete_jwt_cookies,
     set_jwt_cookies,
 )
 
 
-def _user_payload(user):
-    return {
-        'id': user.id,
-        'username': user.username,
-        'is_staff': user.is_staff,
-    }
+class EmptyResponseSerializer(serializers.Serializer):
+    """Documents endpoints that return no body (tokens/state travel via cookies)."""
 
 
-class CookieTokenObtainPairView(TokenObtainPairView):
+class LoginView(TokenObtainPairView):
+    """Authenticates the user and sets JWT access/refresh cookies."""
+
+    @extend_schema(responses=AuthenticatedUserSerializer)
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -30,12 +31,21 @@ class CookieTokenObtainPairView(TokenObtainPairView):
         access = serializer.validated_data['access']
         refresh = serializer.validated_data['refresh']
 
-        response = Response(_user_payload(serializer.user), status=status.HTTP_200_OK)
+        response = Response(AuthenticatedUserSerializer(serializer.user).data, status=status.HTTP_200_OK)
         set_jwt_cookies(response, access, refresh)
         return response
 
 
 class CookieTokenRefreshView(TokenRefreshView):
+    """Reads the refresh token from its httpOnly cookie and issues a new access cookie."""
+
+    @extend_schema(
+        request=None,
+        responses={
+            200: EmptyResponseSerializer,
+            401: OpenApiResponse(description='Refresh token cookie missing or invalid.'),
+        },
+    )
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get(REFRESH_TOKEN_COOKIE)
         if not refresh_token:
@@ -61,6 +71,7 @@ class CookieTokenRefreshView(TokenRefreshView):
 class LogoutView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(request=None, responses={204: None})
     def post(self, request, *args, **kwargs):
         response = Response(status=status.HTTP_204_NO_CONTENT)
         delete_jwt_cookies(response)
@@ -68,5 +79,6 @@ class LogoutView(APIView):
 
 
 class MeView(APIView):
+    @extend_schema(responses=AuthenticatedUserSerializer)
     def get(self, request, *args, **kwargs):
-        return Response(_user_payload(request.user))
+        return Response(AuthenticatedUserSerializer(request.user).data)

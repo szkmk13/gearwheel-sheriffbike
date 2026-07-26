@@ -1,9 +1,16 @@
 from django.conf import settings
+from rest_framework import serializers
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 
 ACCESS_TOKEN_COOKIE = 'access_token'
 REFRESH_TOKEN_COOKIE = 'refresh_token'
+
+
+class AuthenticatedUserSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
+    username = serializers.CharField()
+    is_staff = serializers.BooleanField()
 
 
 class CookieJWTAuthentication(JWTAuthentication):

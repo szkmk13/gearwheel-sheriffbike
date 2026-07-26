@@ -8,8 +8,8 @@ from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, Sp
 from rest_framework.permissions import AllowAny
 
 from config.auth_views import (
-    CookieTokenObtainPairView,
     CookieTokenRefreshView,
+    LoginView,
     LogoutView,
     MeView,
 )
@@ -25,9 +25,9 @@ urlpatterns = [
     path('admin/', admin.site.urls),
 
     # Auth
-    path('api/auth/token/', CookieTokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/login/', LoginView.as_view(), name='login'),
     path('api/auth/token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),
-    path('api/auth/token/logout/', LogoutView.as_view(), name='token_logout'),
+    path('api/auth/logout/', LogoutView.as_view(), name='logout'),
     path('api/auth/me/', MeView.as_view(), name='me'),
 
     # Docs - public in DEBUG for local convenience, otherwise fall back to the
