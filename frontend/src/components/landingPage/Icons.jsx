@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  Phone, ArrowRight, Check, MapPin, Clock, Wrench, SprayCan,
+  Phone, ArrowRight, ChevronDown, Check, MapPin, Clock, Wrench, SprayCan,
   Gauge, Settings2, Bike, Snowflake, Mountain, Scissors,
   Globe, Send, FileText, MoreHorizontal,
 } from 'lucide-react';
@@ -67,6 +67,7 @@ const mk = (C, sw = 2) => ({ width, height, size, className, style, ...rest } = 
 const Icon = {
   phone:  mk(Phone),
   arrow:  mk(ArrowRight, 2.2),
+  chevron: mk(ChevronDown, 2.2),
   check:  mk(Check, 2.6),
   pin:    mk(MapPin),
   clock:  mk(Clock),

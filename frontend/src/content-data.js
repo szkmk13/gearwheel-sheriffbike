@@ -33,7 +33,7 @@ export const DEFAULT_CONTENT = {
       { icon: "wrench", tag: "Przed sezonem", title: "Przegląd podstawowy", price: "250 zł",
         desc: "Dokładny przegląd najważniejszych podzespołów z regulacją i smarowaniem. Idealny przed sezonem.",
         points: ["Regulacja przerzutek i hamulców", "Kontrola luzów i połączeń", "Smarowanie łańcucha", "Pompowanie kół i kontrola ogumienia", "Sprawdzenie naciągu szprych", "Sprawdzenie centryczności kół", "Kontrola linek i pancerzy"], featured: false },
-      { icon: "spray", tag: "Czyszczenie napędu", title: "Przegląd podstawowy Plus", price: "350 zł",
+      { icon: "spray", tag: "Czyszczenie", title: "Przegląd podstawowy Plus", price: "350 zł",
         desc: "Rozszerzona wersja przeglądu podstawowego z dokładnym czyszczeniem napędu dla lepszej pracy i dłuższej żywotności podzespołów.",
         points: ["Wszystkie czynności z przeglądu podstawowego", "Dokładne mycie i odtłuszczenie wszystkich elementów napędu", "Ponowne smarowanie i precyzyjna regulacja przerzutek"], featured: false },
       { icon: "bike", tag: "Montaż", title: "Składanie roweru", price: "od 200 zł",

@@ -11,46 +11,67 @@ function prefillBooking(equip, service) {
 }
 
 function ServiceCard({ s }) {
+  const [open, setOpen] = React.useState(false);
   const onBook = (e) => {
     e.preventDefault();
     prefillBooking("rower", s.title);
     document.getElementById("rezerwacja").scrollIntoView({ behavior: "smooth" });
   };
   const ServiceIcon = Icon[s.icon] || Icon.wrench;
+  const hasPoints = !!(s.points && s.points.length);
   return (
     <article
       className={
-        "group/card relative flex flex-col rounded-[22px] border p-[24px_22px_20px] transition duration-[220ms] hover:-translate-y-1 hover:shadow-lg " +
+        "group/card flex flex-col rounded-[22px] border p-[22px] transition duration-[220ms] hover:-translate-y-1 hover:shadow-lg " +
         (s.featured ? "border-ink bg-ink text-white" : "border-line bg-paper-2 hover:border-line-2")
       }
     >
-      {s.featured && (
-        <div className="absolute right-[18px] top-[18px] inline-flex items-center gap-[5px] rounded-full bg-accent py-[5px] pl-[9px] pr-[11px] text-[11px] font-bold uppercase tracking-[.06em] text-white">
-          <SheriffStar size={12} /> Polecany
+      <div className="flex flex-wrap items-center gap-2">
+        {s.featured && (
+          <span className="inline-flex flex-none items-center gap-1 whitespace-nowrap rounded-full bg-accent px-2.5 py-1 text-[10.5px] font-bold uppercase tracking-[.06em] text-white">
+            <SheriffStar size={11} /> Polecany
+          </span>
+        )}
+        {s.tag && (
+          <span className={"inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-[.06em] " + (s.featured ? "bg-white/10 text-white/80" : "bg-accent-soft text-accent-deep")}>
+            <ServiceIcon width={12} height={12} /> {s.tag}
+          </span>
+        )}
+        {s.price && <span className={"ml-auto flex-none text-sm font-bold " + (s.featured ? "text-gold" : "text-accent-deep")}>{s.price}</span>}
+      </div>
+      <h3 className="mt-3 text-[19px] font-bold leading-snug tracking-[-.01em]">{s.title}</h3>
+      <p className={"mt-2 text-[13.5px] leading-[1.5] " + (s.featured ? "text-white/75" : "text-ink-2")}>{s.desc}</p>
+      <div className="mt-auto">
+        <div className="flex items-center justify-between gap-2 pt-[18px]">
+          {hasPoints ? (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              aria-expanded={open}
+              className={
+                "-ml-1 flex cursor-pointer items-center gap-1.5 rounded-lg px-1 py-1 text-[12.5px] font-bold transition-colors " +
+                (s.featured ? "hover:bg-white/10" : "hover:bg-accent-soft/60")
+              }
+            >
+              <span>Zakres usługi</span>
+              <span className={"inline-flex transition-transform duration-200 " + (open ? "rotate-180" : "") + " " + (s.featured ? "text-gold" : "text-accent")}>
+                <Icon.chevron width={14} height={14} />
+              </span>
+            </button>
+          ) : <span />}
+          <a
+            href="#rezerwacja"
+            onClick={onBook}
+            className={"inline-flex items-center gap-2 text-[13.5px] font-bold " + (s.featured ? "text-white" : "text-ink")}
+          >
+            Umów <Icon.arrow width={16} height={16} className="transition-transform duration-200 group-hover/card:translate-x-1" />
+          </a>
         </div>
-      )}
-      <div className={"mb-4 flex h-11 w-11 flex-none items-center justify-center overflow-hidden rounded-xl " + (s.featured ? "bg-[color-mix(in_oklab,var(--color-accent)_26%,transparent)] text-white" : "bg-accent-soft text-accent-deep")}>
-        <ServiceIcon width={24} height={24} />
-      </div>
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-[19px] font-bold tracking-[-.01em]">{s.title}</h3>
-        {s.price && <span className={"flex-none text-sm font-bold " + (s.featured ? "text-gold" : "text-accent-deep")}>{s.price}</span>}
-      </div>
-      <p className={"mt-2.5 text-[13.5px] leading-[1.5] " + (s.featured ? "text-white/75" : "text-ink-2")}>{s.desc}</p>
-      {!!(s.points && s.points.length) && (
-        <div className="group/scope mt-3.5 outline-none" tabIndex={0}>
-          <div className="flex items-center justify-between py-1 text-[12.5px] font-bold">
-            <span>Zakres usługi</span>
-            <span className={"inline-flex transition-transform duration-200 group-hover/card:rotate-90 group-focus/scope:rotate-90 group-focus-within/scope:rotate-90 " + (s.featured ? "text-gold" : "text-accent")}>
-              <Icon.arrow width={14} height={14} />
-            </span>
-          </div>
+        {hasPoints && (
           <ul
             className={
-              "m-0 flex list-none flex-col gap-2 overflow-hidden p-0 opacity-0 max-h-0 transition-all duration-300 " +
-              "group-hover/card:mt-2 group-hover/card:max-h-[400px] group-hover/card:opacity-100 " +
-              "group-focus/scope:mt-2 group-focus/scope:max-h-[400px] group-focus/scope:opacity-100 " +
-              "group-focus-within/scope:mt-2 group-focus-within/scope:max-h-[400px] group-focus-within/scope:opacity-100"
+              "m-0 flex list-none flex-col gap-2 overflow-hidden p-0 transition-all duration-300 " +
+              (open ? "mt-2 max-h-[400px] opacity-100" : "max-h-0 opacity-0")
             }
           >
             {s.points.map((p, i) => (
@@ -60,15 +81,8 @@ function ServiceCard({ s }) {
               </li>
             ))}
           </ul>
-        </div>
-      )}
-      <a
-        href="#rezerwacja"
-        onClick={onBook}
-        className={"mt-auto inline-flex items-center gap-2 pt-[18px] text-[13.5px] font-bold " + (s.featured ? "text-white" : "text-ink")}
-      >
-        Umów <Icon.arrow width={16} height={16} className="transition-transform duration-200 group-hover/card:translate-x-1" />
-      </a>
+        )}
+      </div>
     </article>
   );
 }
@@ -86,9 +100,9 @@ function Services({ c }) {
           ))}
         </div>
 
-        <div className="mt-[clamp(40px,5vw,64px)] grid grid-cols-4 gap-4 max-[1180px]:grid-cols-3 max-[1000px]:grid-cols-2 max-[720px]:grid-cols-1">
+        <div className="mt-[clamp(40px,5vw,64px)] grid grid-cols-4 gap-4 max-[1180px]:grid-cols-3 max-[1000px]:grid-cols-2 max-[640px]:grid-cols-1">
           {s.items.map((it, i) => <ServiceCard key={i} s={it} />)}
-          <article className="flex flex-col items-start gap-1 rounded-[22px] border p-[24px_22px_20px] border-[color-mix(in_oklab,var(--color-accent)_22%,var(--color-line))] bg-accent-soft">
+          <article className="flex flex-col items-start gap-1 rounded-[22px] border p-[22px] border-[color-mix(in_oklab,var(--color-accent)_22%,var(--color-line))] bg-accent-soft">
             <SheriffStar size={40} className="mb-4 text-accent" />
             <h3 className="text-[19px] font-bold tracking-[-.01em]">{s.ctaTitle}</h3>
             <p className="mt-2.5 text-[13.5px] leading-[1.5] text-ink-2">{s.ctaDesc}</p>
