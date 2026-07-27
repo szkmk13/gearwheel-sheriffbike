@@ -1,3 +1,5 @@
+import { API_BASE } from './api-base.js';
+
 export const DEFAULT_CONTENT = {
   brand: {
     name: "Sheriff Bike",
@@ -121,7 +123,6 @@ export const DEFAULT_CONTENT = {
 };
 
 const STORE_KEY = "sheriff:content:v1";
-const API_BASE = "/api";
 
 function deepMerge(base, over) {
   if (Array.isArray(over)) return over.slice();

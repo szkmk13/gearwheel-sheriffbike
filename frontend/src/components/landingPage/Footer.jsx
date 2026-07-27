@@ -3,7 +3,11 @@ import { SheriffStar, Icon } from './Icons.jsx';
 import { AccentTitle } from './Hero.jsx';
 import { CustomSelect } from './CustomSelect.jsx';
 import { CustomDatePicker } from './CustomDatePicker.jsx';
+import { useTurnstile } from './useTurnstile.js';
 import { BTN_PRIMARY, BTN_GHOST, BTN_LG } from './buttonStyles.js';
+import { API_BASE } from '../../api-base.js';
+
+const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
 const ASSET_BASE = import.meta.env.BASE_URL;
 
@@ -56,6 +60,9 @@ function BookingForm({ c }) {
   const [form, setForm] = React.useState({ name: "", phone: "", service: "", date: "", msg: "" });
   const [sent, setSent] = React.useState(false);
   const [touched, setTouched] = React.useState(false);
+  const [sending, setSending] = React.useState(false);
+  const [submitError, setSubmitError] = React.useState("");
+  const { containerRef: turnstileRef, token: turnstileToken, reset: resetTurnstile } = useTurnstile(TURNSTILE_SITE_KEY);
 
   React.useEffect(() => {
     const apply = (d) => {
@@ -71,9 +78,39 @@ function BookingForm({ c }) {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const phoneOk = form.phone.replace(/\D/g, "").length >= 9;
-  const valid = form.name.trim().length > 1 && phoneOk;
+  const captchaOk = !TURNSTILE_SITE_KEY || !!turnstileToken;
+  const valid = form.name.trim().length > 1 && phoneOk && captchaOk;
 
-  const submit = (e) => { e.preventDefault(); setTouched(true); if (valid) setSent(true); };
+  const submit = async (e) => {
+    e.preventDefault();
+    setTouched(true);
+    setSubmitError("");
+    if (!valid || sending) return;
+
+    setSending(true);
+    try {
+      const res = await fetch(`${API_BASE}/contact_form/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: form.name,
+          phone: form.phone,
+          equip,
+          service: form.service,
+          date: form.date,
+          msg: form.msg,
+          turnstile_token: turnstileToken,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setSent(true);
+    } catch (err) {
+      setSubmitError("Nie udało się wysłać zgłoszenia. Spróbuj ponownie lub zadzwoń do nas.");
+      resetTurnstile();
+    } finally {
+      setSending(false);
+    }
+  };
 
   if (sent) {
     return (
@@ -94,7 +131,7 @@ function BookingForm({ c }) {
             <strong className="text-[15px]">{form.service || "do ustalenia"}</strong>
           </div>
         </div>
-        <button className={BTN_GHOST} onClick={() => { setSent(false); setForm({ name: "", phone: "", service: "", date: "", msg: "" }); setTouched(false); }}>
+        <button className={BTN_GHOST} onClick={() => { setSent(false); setForm({ name: "", phone: "", service: "", date: "", msg: "" }); setTouched(false); resetTurnstile(); }}>
           Wyślij kolejne zgłoszenie
         </button>
       </div>
@@ -170,14 +207,23 @@ function BookingForm({ c }) {
         />
       </div>
 
+      {TURNSTILE_SITE_KEY && <div ref={turnstileRef} />}
+
       {touched && !valid && (
         <div className="rounded-[10px] border border-[rgba(192,57,43,.25)] bg-[rgba(192,57,43,.08)] px-[14px] py-[11px] text-[13.5px] font-semibold text-[#A0301F]">
-          Uzupełnij imię i poprawny numer telefonu, żeby wysłać zgłoszenie.
+          {!captchaOk
+            ? "Potwierdź, że nie jesteś robotem, żeby wysłać zgłoszenie."
+            : "Uzupełnij imię i poprawny numer telefonu, żeby wysłać zgłoszenie."}
+        </div>
+      )}
+      {submitError && (
+        <div className="rounded-[10px] border border-[rgba(192,57,43,.25)] bg-[rgba(192,57,43,.08)] px-[14px] py-[11px] text-[13.5px] font-semibold text-[#A0301F]">
+          {submitError}
         </div>
       )}
 
-      <button type="submit" className={BTN_PRIMARY + " " + BTN_LG + " mt-1 w-full"}>
-        Wyślij zgłoszenie <Icon.send width={18} height={18} />
+      <button type="submit" disabled={sending} className={BTN_PRIMARY + " " + BTN_LG + " mt-1 w-full disabled:cursor-not-allowed disabled:opacity-60"}>
+        {sending ? "Wysyłanie…" : <>Wyślij zgłoszenie <Icon.send width={18} height={18} /></>}
       </button>
       <p className="text-center text-[12.5px] leading-[1.4] text-ink-3">Zadzwonimy, aby potwierdzić termin. Bez zobowiązań - wycena na miejscu jest bezpłatna.</p>
     </form>

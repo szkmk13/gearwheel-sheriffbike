@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'apps.appointments',
     'apps.inventory',
     'apps.storage',
+    'apps.contact',
 ]
 
 MIDDLEWARE = [
@@ -83,6 +84,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -124,6 +126,20 @@ REST_FRAMEWORK = {
 
 GROQ_API_KEY = env('GROQ_API_KEY', default='')
 OCR_BACKEND = env('OCR_BACKEND', default='groq')
+
+# Contact/booking form (frontend BookingForm -> POST /api/contact_form/)
+# The Turnstile *site* key is public and lives in frontend/.env as
+# VITE_TURNSTILE_SITE_KEY, not here - only the secret key is sensitive.
+TURNSTILE_SECRET_KEY = env('TURNSTILE_SECRET_KEY', default='')
+
+# Google Sheets destination for leads, via a service account that's been
+# shared (Editor) on the target spreadsheet. GOOGLE_SERVICE_ACCOUNT_FILE
+# (path to the downloaded key JSON) takes precedence over
+# GOOGLE_SERVICE_ACCOUNT_JSON (the same credentials inlined as one line).
+GOOGLE_SHEETS_SPREADSHEET_ID = env('GOOGLE_SHEETS_SPREADSHEET_ID', default='')
+GOOGLE_SHEETS_WORKSHEET_NAME = env('GOOGLE_SHEETS_WORKSHEET_NAME', default='Zgłoszenia')
+GOOGLE_SERVICE_ACCOUNT_FILE = env('GOOGLE_SERVICE_ACCOUNT_FILE', default='')
+GOOGLE_SERVICE_ACCOUNT_JSON = env('GOOGLE_SERVICE_ACCOUNT_JSON', default='')
 
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 
