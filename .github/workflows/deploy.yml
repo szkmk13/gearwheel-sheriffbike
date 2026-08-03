@@ -38,10 +38,12 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+      - name: Archive built frontend (tar preserves dotfiles like .vite/manifest.json)
+        run: tar -czf frontend-static.tar.gz -C static frontend
       - uses: actions/upload-artifact@v4
         with:
           name: frontend-static
-          path: static/frontend
+          path: frontend-static.tar.gz
           retention-days: 1
 
   deploy:
@@ -53,7 +55,13 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: frontend-static
-          path: static/frontend
+          path: .
+
+      - name: Extract built frontend
+        run: |
+          mkdir -p static
+          tar -xzf frontend-static.tar.gz -C static
+          rm frontend-static.tar.gz
 
       - name: Load SSH key
         uses: webfactory/ssh-agent@v0.9.0
@@ -75,6 +83,7 @@ jobs:
             --exclude='db.sqlite3' \
             --exclude='media/' \
             --exclude='staticfiles/' \
+            --exclude='run/' \
             --exclude='frontend/node_modules/' \
             --exclude='__pycache__/' \
             --exclude='*.pyc' \
