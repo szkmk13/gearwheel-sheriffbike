@@ -148,3 +148,29 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': False,
 }
+
+# Unhandled view exceptions (500s) get logged with a traceback to stderr,
+# which systemd captures into `journalctl --user -u gearwheel.service` -
+# without this, DEBUG=False leaves them only going to django's default
+# mail_admins handler (no ADMINS configured here, so effectively nowhere).
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['console'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}
