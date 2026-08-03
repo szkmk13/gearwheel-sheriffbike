@@ -6,22 +6,21 @@ import SlidePanel from "../components/SlidePanel";
 import StickyHeader from "../components/StickyHeader";
 
 const mockOrders = [
-  { id: "#2024-001", client: "Anna Nowak", bike: "Giant TCR Advanced", status: "W trakcie", date: "2024-05-08", price: "250 zł" },
-  { id: "#2024-002", client: "Piotr Wiśniewski", bike: "Trek Domane SL5", status: "Gotowe", date: "2024-05-08", price: "180 zł" },
-  { id: "#2024-003", client: "Katarzyna Lewandowska", bike: "Specialized Rockhopper", status: "W trakcie", date: "2024-05-07", price: "320 zł" },
-  { id: "#2024-004", client: "Tomasz Kowalczyk", bike: "Canyon Endurace CF", status: "Gotowe", date: "2024-05-07", price: "150 zł" },
-  { id: "#2024-005", client: "Magdalena Zielińska", bike: "Scott Spark 900", status: "W trakcie", date: "2024-05-06", price: "420 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "Krzysztof Dąbrowski", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-001", client: "****", bike: "Giant TCR Advanced", status: "W trakcie", date: "2024-05-08", price: "250 zł" },
+  { id: "#2024-002", client: "****", bike: "Trek Domane SL5", status: "Gotowe", date: "2024-05-08", price: "180 zł" },
+  { id: "#2024-003", client: "****", bike: "Specialized Rockhopper", status: "W trakcie", date: "2024-05-07", price: "320 zł" },
+  { id: "#2024-004", client: "****", bike: "Canyon Endurace CF", status: "Gotowe", date: "2024-05-07", price: "150 zł" },
+  { id: "#2024-005", client: "****", bike: "Scott Spark 900", status: "W trakcie", date: "2024-05-06", price: "420 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
+  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
 ];
 
 

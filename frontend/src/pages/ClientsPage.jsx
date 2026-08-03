@@ -7,66 +7,9 @@ import SlidePanel from "../components/SlidePanel";
 import Input from "../components/Input";
 import StickyHeader from "../components/StickyHeader";
 
-export const mockClients = [
-  {
-    id: 1,
-    name: "Anna Nowak",
-    orderCount: 8,
-    email: "anna.nowak@email.com",
-    phone: "723 723 823",
-    bikesCount: 2
-  },
-  {
-    id: 2,
-    name: "Piotr Wiśniewski",
-    ordersCount: 5,
-    email: "p.wisniewski@gmail.com",
-    phone: "+48 601 234 567",
-    bikesCount: 1,
-    notes: "spoko morda"
-  },
-  {
-    id: 3,
-    name: "Katarzyna Lewandowska",
-    ordersCount: 12,
-    email: "k.lewandowska@email.pl",
-    phone: "+48 602 345 678",
-    bikesCount: 3
-  },
-  {
-    id: 4,
-    name: "Tomasz Kowalczyk",
-    ordersCount: 3,
-    email: "tomasz.k@email.pl",
-    phone: "+48 603 456 789",
-    bikesCount: 1
-  },
-  {
-    id: 5,
-    name: "Magdalena Zielińska",
-    ordersCount: 7,
-    email: "m.zielinska@gmail.com",
-    phone: "+48 604 567 890",
-    bikesCount: 2
-  },
-  {
-    id: 6,
-    name: "Krzysztof Dąbrowski",
-    ordersCount: 15,
-    email: "k.dabrowski@email.pl",
-    phone: "+48 605 678 901",
-    bikesCount: 4
-  }
-];
+export const mockClients = [];
 
-export const mockBikes = [
-  { id: 1, clientId: 1, manufacturer: "Giant", model: "TCR Advanced", type: "Szosowy" },
-  { id: 2, clientId: 1, manufacturer: "Kross", model: "Level 6.0", type: "MTB" },
-  { id: 3, clientId: 2, manufacturer: "Trek", model: "Domane SL5", type: "Szosowy" },
-  { id: 4, clientId: 3, manufacturer: "Specialized", model: "Rockhopper", type: "MTB" },
-  { id: 5, clientId: 3, manufacturer: "Canyon", model: "Grizl", type: "Gravel" },
-  { id: 6, clientId: 3, manufacturer: "Rondo", model: "Ruut", type: "Gravel" }
-];
+export const mockBikes = [];
 
 export default function ClientsPage() {
   const navigate = useNavigate();

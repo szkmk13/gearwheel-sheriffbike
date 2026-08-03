@@ -167,7 +167,17 @@ function HeroSplit({ c }) {
         </div>
         <div className="relative max-[1000px]:max-w-[520px]">
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-[-1] -translate-x-[46%] -translate-y-[52%] text-[color-mix(in_oklab,var(--color-accent)_16%,transparent)]"><SheriffStar size={420} /></div>
-          <img className="aspect-[4/5] w-full rounded-[20px] bg-paper-3 object-cover shadow-lg max-[1000px]:aspect-[16/11]" src={ASSET_BASE + "assets/trek.jpg"} alt="Rower szosowy" />
+          <picture>
+            <source srcSet={ASSET_BASE + "assets/trek.webp"} type="image/webp" />
+            <img
+              className="aspect-[4/5] w-full rounded-[20px] bg-paper-3 object-cover shadow-lg max-[1000px]:aspect-[16/11]"
+              src={ASSET_BASE + "assets/trek.jpg"}
+              alt="Rower szosowy"
+              width="1200"
+              height="800"
+              fetchPriority="high"
+            />
+          </picture>
           <div className="absolute -left-[26px] bottom-[34px] flex flex-col leading-none rounded-2xl bg-ink px-[22px] py-4 text-white shadow-lg max-[720px]:left-auto max-[720px]:right-3 max-[720px]:bottom-3 max-[720px]:px-[18px] max-[720px]:py-[13px]">
             <span className="font-brand text-[34px] font-black max-[720px]:text-[27px]">12+</span>
             <span className="mt-[7px] text-xs font-semibold text-[#C9BFB1]">lat na warsztacie</span>
@@ -194,7 +204,17 @@ function HeroCentered({ c }) {
 
   return (
     <header className="relative z-[1] flex min-h-[clamp(580px,88vh,840px)] items-center bg-ink" id="top">
-      <img className="absolute inset-0 h-full w-full bg-paper-3 object-cover" src={ASSET_BASE + "assets/trek.jpg"} alt="Warsztat rowerowy" />
+      <picture>
+        <source srcSet={ASSET_BASE + "assets/trek.webp"} type="image/webp" />
+        <img
+          className="absolute inset-0 h-full w-full bg-paper-3 object-cover"
+          src={ASSET_BASE + "assets/trek.jpg"}
+          alt="Warsztat rowerowy"
+          width="1200"
+          height="800"
+          fetchPriority="high"
+        />
+      </picture>
       <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_50%,rgba(12,9,7,.35)_0%,rgba(12,9,7,.62)_70%,rgba(12,9,7,.8)_100%),linear-gradient(to_top,rgba(12,9,7,.55),rgba(12,9,7,.2))]" />
       <div className="relative z-[2] mx-auto w-full max-w-[900px] px-[clamp(20px,5vw,64px)] py-[clamp(56px,8vw,96px)] text-center">
         <div className="inline-flex items-center justify-center gap-[9px] text-[12.5px] font-bold uppercase tracking-[0.18em] text-white"><SheriffStar size={15} /> {c.hero.eyebrow}</div>
@@ -236,7 +256,17 @@ function HeroCentered({ c }) {
 function HeroOverlay({ c }) {
   return (
     <header className="relative z-[1] flex min-h-[clamp(560px,86vh,820px)] items-end bg-ink max-[720px]:min-h-[540px]" id="top">
-      <img className="absolute inset-0 h-full w-full bg-paper-3 object-cover" src={ASSET_BASE + "assets/trek.jpg"} alt="Rower w warsztacie" />
+      <picture>
+        <source srcSet={ASSET_BASE + "assets/trek.webp"} type="image/webp" />
+        <img
+          className="absolute inset-0 h-full w-full bg-paper-3 object-cover"
+          src={ASSET_BASE + "assets/trek.jpg"}
+          alt="Rower w warsztacie"
+          width="1200"
+          height="800"
+          fetchPriority="high"
+        />
+      </picture>
       <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(12,9,7,.78)_0%,rgba(12,9,7,.34)_42%,rgba(12,9,7,.10)_72%,rgba(12,9,7,.22)_100%),linear-gradient(to_right,rgba(12,9,7,.42)_0%,rgba(12,9,7,0)_58%)]" />
       <div className="relative w-full px-[clamp(20px,5vw,64px)] py-[clamp(48px,7vw,88px)] text-white">
         <div className="inline-flex items-center gap-[9px] text-[12.5px] font-bold uppercase tracking-[0.18em] text-white"><SheriffStar size={15} /> {c.hero.eyebrow}</div>

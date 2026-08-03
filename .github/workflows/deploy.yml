@@ -80,6 +80,7 @@ jobs:
             --exclude='.git/' \
             --exclude='.venv/' \
             --exclude='.env' \
+            --exclude='sheriff-bike-*.json' \
             --exclude='db.sqlite3' \
             --exclude='media/' \
             --exclude='staticfiles/' \

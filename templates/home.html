@@ -7,11 +7,55 @@
   <title>Sheriff Bike - Serwis rowerowy Gdańsk</title>
   <link rel="icon" type="image/png" href="{% static 'frontend/assets/favicon.png' %}" />
   <link rel="apple-touch-icon" href="{% static 'frontend/assets/favicon.png' %}" />
-  <meta name="description" content="Sheriff Bike - nowoczesny serwis rowerowy w Gdańsku. Czyszczenie, serwis podstawowy i rozszerzony, składanie rowerów oraz serwis nart i snowboardu. Umów wizytę online." />
+  <meta name="description" content="Sheriff Bike - serwis rowerowy w Gdańsku. Przeglądy, naprawy, składanie rowerów oraz serwis nart i snowboardu zimą. Umów wizytę online." />
+  {% if noindex %}<meta name="robots" content="noindex, nofollow" />{% endif %}
+  <link rel="canonical" href="{{ request.scheme }}://{{ request.get_host }}{% url 'home' %}" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:locale" content="pl_PL" />
+  <meta property="og:site_name" content="Sheriff Bike" />
+  <meta property="og:title" content="Sheriff Bike - Serwis rowerowy Gdańsk" />
+  <meta property="og:description" content="Serwis rowerowy w Gdańsku. Przeglądy, naprawy, składanie rowerów oraz serwis nart i snowboardu zimą. Umów wizytę online." />
+  <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{% url 'home' %}" />
+  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'frontend/assets/trek.jpg' %}" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Sheriff Bike - Serwis rowerowy Gdańsk" />
+  <meta name="twitter:description" content="Serwis rowerowy w Gdańsku. Przeglądy, naprawy, składanie rowerów oraz serwis nart i snowboardu zimą. Umów wizytę online." />
+  <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'frontend/assets/trek.jpg' %}" />
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet" />
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  {% if not noindex %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BicycleStore",
+    "name": "Sheriff Bike",
+    "image": "{{ request.scheme }}://{{ request.get_host }}{% static 'frontend/assets/trek.jpg' %}",
+    "url": "{{ request.scheme }}://{{ request.get_host }}{% url 'home' %}",
+    "telephone": "+48729787883",
+    "priceRange": "$$",
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "kmdr. T. Bramińskiego 11",
+      "addressLocality": "Gdańsk",
+      "postalCode": "80-180",
+      "addressCountry": "PL"
+    },
+    "openingHoursSpecification": [
+      { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"], "opens": "10:00", "closes": "18:00" },
+      { "@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "10:00", "closes": "14:00" }
+    ],
+    "aggregateRating": {
+      "@type": "AggregateRating",
+      "ratingValue": "5.0",
+      "reviewCount": "81"
+    }
+  }
+  </script>
+  {% endif %}
   {% vite_hmr_client %}
   {% vite_react_refresh %}
   {% vite_asset 'src/main.jsx' %}

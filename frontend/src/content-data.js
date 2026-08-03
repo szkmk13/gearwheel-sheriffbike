@@ -1,5 +1,3 @@
-import { API_BASE } from './api-base.js';
-
 export const DEFAULT_CONTENT = {
   brand: {
     name: "Sheriff Bike",
@@ -106,49 +104,4 @@ export const DEFAULT_CONTENT = {
   },
 
   theme: { accent: "#D9601C" },
-};
-
-const STORE_KEY = "sheriff:content:v1";
-
-function deepMerge(base, over) {
-  if (Array.isArray(over)) return over.slice();
-  if (over && typeof over === "object") {
-    const out = Array.isArray(base) ? [] : { ...(base || {}) };
-    for (const k of Object.keys({ ...(base || {}), ...over })) {
-      out[k] = (k in over) ? deepMerge(base ? base[k] : undefined, over[k]) : base[k];
-    }
-    return out;
-  }
-  return over === undefined ? base : over;
-}
-
-export const ContentStore = {
-  async load() {
-    try {
-      const r = await fetch(`${API_BASE}/content`);
-      if (r.ok) {
-        const data = await r.json();
-        return deepMerge(DEFAULT_CONTENT, data || {});
-      }
-    } catch (e) {
-      console.warn("API load failed, using defaults", e);
-    }
-    return structuredClone(DEFAULT_CONTENT);
-  },
-
-  async save(content, token) {
-    const r = await fetch(`${API_BASE}/content`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Authorization: "Bearer " + (token || "") },
-      body: JSON.stringify(content),
-    });
-    if (!r.ok) throw new Error("Zapis nie powiódł się (" + r.status + ")");
-    return r.json();
-  },
-
-  async reset(token) {
-    return this.save(structuredClone(DEFAULT_CONTENT), token);
-  },
-
-  key: STORE_KEY,
 };
