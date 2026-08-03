@@ -2,8 +2,8 @@
 # Not applied automatically by CI - copy/adapt into the server's nginx config once.
 
 server {
-    listen 80;
-    server_name your-domain.pl;
+    listen 20122;
+    server_name srv63.mikr.us;
 
     location /static/ {
         alias /home/sheriff_bike/staticfiles/;
