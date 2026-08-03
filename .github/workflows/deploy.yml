@@ -1,0 +1,86 @@
+name: Deploy to mikrus
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-mikrus
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+      SECRET_KEY: ci-test-secret-key
+      DEBUG: "True"
+      ALLOWED_HOSTS: "*"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install -r requirements.txt
+      - run: python manage.py test
+
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-static
+          path: static/frontend
+          retention-days: 1
+
+  deploy:
+    needs: [test, build-frontend]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: frontend-static
+          path: static/frontend
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.MIKRUS_SSH_KEY }}
+
+      - name: Trust mikrus host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -p "${{ secrets.MIKRUS_PORT }}" "${{ secrets.MIKRUS_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Sync code + built frontend to mikrus
+        run: |
+          rsync -az --delete \
+            -e "ssh -p ${{ secrets.MIKRUS_PORT }}" \
+            --exclude='.git/' \
+            --exclude='.venv/' \
+            --exclude='.env' \
+            --exclude='db.sqlite3' \
+            --exclude='media/' \
+            --exclude='staticfiles/' \
+            --exclude='frontend/node_modules/' \
+            --exclude='__pycache__/' \
+            --exclude='*.pyc' \
+            ./ "${{ secrets.MIKRUS_USER }}@${{ secrets.MIKRUS_HOST }}:${{ secrets.MIKRUS_DEPLOY_PATH }}/"
+
+      - name: Install deps, migrate, restart service
+        run: |
+          ssh -p "${{ secrets.MIKRUS_PORT }}" "${{ secrets.MIKRUS_USER }}@${{ secrets.MIKRUS_HOST }}" \
+            "bash ${{ secrets.MIKRUS_DEPLOY_PATH }}/deploy/deploy_remote.sh"

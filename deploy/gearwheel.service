@@ -1,0 +1,27 @@
+# One-time server setup (not touched by CI):
+#   mkdir -p ~/.config/systemd/user /home/sheriff_bike/run
+#   cp deploy/gearwheel.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now gearwheel.service
+#   loginctl enable-linger <mikrus-user>   # so the service survives SSH logout
+#
+# Adjust /home/sheriff_bike below if the app lives elsewhere on the server.
+
+[Unit]
+Description=gearwheel-sherifbike (gunicorn)
+After=network.target
+
+[Service]
+WorkingDirectory=/home/sheriff_bike
+Environment=DJANGO_SETTINGS_MODULE=config.settings.dev
+EnvironmentFile=/home/sheriff_bike/.env
+ExecStart=/home/sheriff_bike/.venv/bin/gunicorn config.wsgi:application \
+    --bind unix:/home/sheriff_bike/run/gunicorn.sock \
+    --workers 2 \
+    --access-logfile - \
+    --error-logfile -
+Restart=on-failure
+RestartSec=3
+
+[Install]
+WantedBy=default.target

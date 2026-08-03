@@ -11,38 +11,6 @@ const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
 const ASSET_BASE = import.meta.env.BASE_URL;
 
-function Gallery({ c }) {
-  const g = c.gallery;
-  const tiles = (g.tiles || []).filter((t) => t.url);
-  if (tiles.length === 0) return null;
-  return (
-    <section className="py-[clamp(64px,9vw,132px)]" id="galeria">
-      <div className="mx-auto max-w-[1240px] px-[clamp(20px,5vw,64px)]">
-        <div className="flex flex-wrap items-end justify-between gap-6">
-          <div className="max-w-[720px]">
-            <div className="inline-flex items-center gap-[9px] text-[12.5px] font-bold uppercase tracking-[0.18em] text-accent-deep"><SheriffStar size={14} /> {g.eyebrow}</div>
-            <h2 className="mt-[18px] text-[clamp(34px,5.2vw,60px)] font-black uppercase leading-[0.92] tracking-[-0.015em]">{g.title}</h2>
-          </div>
-        </div>
-        <div className="mt-[clamp(34px,4vw,52px)] grid grid-cols-4 auto-rows-[200px] gap-[14px] max-[720px]:grid-cols-2 max-[720px]:auto-rows-[160px]">
-          {tiles.map((t) => (
-            <div
-              key={t.id}
-              className={
-                "h-full w-full overflow-hidden rounded-2xl shadow-sm " +
-                (t.span === "tall" ? "row-span-2" : "") +
-                (t.span === "wide" ? " col-span-2" : "")
-              }
-            >
-              <img className="block h-full w-full object-cover" src={t.url} alt="" loading="lazy" />
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
 const EQUIP = [
   { id: "rower", label: "Rower", icon: "bike" },
   { id: "zima", label: "Narty / Snowboard", icon: "ski" },
@@ -303,7 +271,6 @@ function Footer({ c }) {
             <h5 className="mb-[18px] text-xs font-bold uppercase tracking-[.14em] text-[#8C8377]">Usługi</h5>
             <a href="#uslugi" className="mb-3 block text-[14.5px] text-[#C9BFB1] transition-colors hover:text-white">Serwis rowerowy</a>
             <a href="#zima" className="mb-3 block text-[14.5px] text-[#C9BFB1] transition-colors hover:text-white">Serwis nart i snowboardu</a>
-            <a href="#galeria" className="mb-3 block text-[14.5px] text-[#C9BFB1] transition-colors hover:text-white">Galeria</a>
             <a href="#rezerwacja" className="mb-3 block text-[14.5px] text-[#C9BFB1] transition-colors hover:text-white">Umów wizytę</a>
           </div>
         </div>
@@ -328,4 +295,4 @@ function Footer({ c }) {
   );
 }
 
-export { Gallery, Booking, Footer };
+export { Booking, Footer };

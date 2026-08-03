@@ -1,0 +1,23 @@
+# Reference reverse-proxy config for the mikrus nginx in front of gunicorn.
+# Not applied automatically by CI - copy/adapt into the server's nginx config once.
+
+server {
+    listen 80;
+    server_name your-domain.pl;
+
+    location /static/ {
+        alias /home/sheriff_bike/staticfiles/;
+    }
+
+    location /media/ {
+        alias /home/sheriff_bike/media/;
+    }
+
+    location / {
+        proxy_pass http://unix:/home/sheriff_bike/run/gunicorn.sock;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}

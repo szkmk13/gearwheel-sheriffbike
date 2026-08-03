@@ -78,20 +78,6 @@ export const DEFAULT_CONTENT = {
     ],
   },
 
-  gallery: {
-    eyebrow: "Z warsztatu",
-    title: "Zajrzyj do nas",
-    note: "Wgraj własne zdjęcia - przeciągnij je na kafelki poniżej.",
-    tiles: [
-      { id: "g1", ph: "Warsztat", span: "tall" },
-      { id: "g2", ph: "Rower po serwisie", span: "" },
-      { id: "g3", ph: "Napęd / detal", span: "" },
-      { id: "g4", ph: "Koła i opony", span: "" },
-      { id: "g5", ph: "Serwis nart", span: "wide" },
-      { id: "g6", ph: "Zespół Sheriff Bike", span: "" },
-    ],
-  },
-
   booking: {
     eyebrow: "Rezerwacja",
     title: "Umów wizytę\nw 30 sekund",

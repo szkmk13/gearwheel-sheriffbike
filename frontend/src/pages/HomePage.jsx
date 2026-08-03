@@ -2,7 +2,7 @@ import React from 'react';
 import { DEFAULT_CONTENT, ContentStore } from '../content-data.js';
 import { Nav, Hero, TrustStrip } from '../components/landingPage/Hero.jsx';
 import { Services, Winter } from '../components/landingPage/Services.jsx';
-import { Gallery, Booking, Footer } from '../components/landingPage/Footer.jsx';
+import { Booking, Footer } from '../components/landingPage/Footer.jsx';
 
 function HomePage() {
   const [c, setC] = React.useState(null);
@@ -25,7 +25,6 @@ function HomePage() {
       <TrustStrip c={c} />
       <Services c={c} />
       <Winter c={c} />
-      <Gallery c={c} />
       <Booking c={c} />
       <Footer c={c} />
     </div>

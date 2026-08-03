@@ -8,7 +8,6 @@ const ASSET_BASE = import.meta.env.BASE_URL;
 const NAV_ITEMS = [
   { href: "#uslugi", label: "Usługi" },
   { href: "#zima", label: "Serwis zimowy" },
-  { href: "#galeria", label: "Galeria" },
   { href: "#rezerwacja", label: "Rezerwacja" },
   { href: "#kontakt", label: "Kontakt" },
 ];
