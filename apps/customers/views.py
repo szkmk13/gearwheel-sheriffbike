@@ -1,7 +1,9 @@
 import uuid
 
-from rest_framework.decorators import action
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from .models import Customer, Bike
 from .serializers import CustomerListSerializer, CustomerDetailSerializer, BikeSerializer
@@ -19,14 +21,25 @@ class CustomerViewSet(ModelViewSet):
         return CustomerDetailSerializer
 
 
-class BikeViewSet(ModelViewSet):
-    queryset = Bike.objects.select_related('customer').all()
-    serializer_class = BikeSerializer
-    filterset_fields = ['customer', 'bike_type']
-    search_fields = ['brand', 'model', 'serial_no']
-
-    @action(detail=False, methods=['get'], url_path='lookup')
-    def lookup(self, request):
+class BikeLookupView(APIView):
+    @extend_schema(
+        summary=_('Look up a bike by QR code'),
+        description=_(
+            'Looks up a bike by its `sheriff_code` (format `sheriff-<id>-<uuid>`), as scanned from '
+            'the QR code attached to the bike.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                'code', str, OpenApiParameter.QUERY, required=True,
+                description=_('The bike\'s `sheriff_code`, e.g. `sheriff-5-9c1e2f2a-1234-4a5b-8b1c-abcdef123456`.'),
+            ),
+        ],
+        responses={
+            200: BikeSerializer,
+            404: OpenApiResponse(description=_('No bike found for the given code.')),
+        },
+    )
+    def get(self, request):
         code = request.query_params.get('code', '').strip()
 
         prefix = 'sheriff-'
@@ -45,5 +58,5 @@ class BikeViewSet(ModelViewSet):
         if not bike:
             return Response({'detail': 'Nie znaleziono roweru dla podanego kodu.'}, status=404)
 
-        serializer = self.get_serializer(bike)
+        serializer = BikeSerializer(bike)
         return Response(serializer.data)

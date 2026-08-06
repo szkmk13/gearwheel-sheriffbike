@@ -3,7 +3,7 @@ from rest_framework.routers import DefaultRouter
 from .views import RepairOrderViewSet, DashboardView
 
 router = DefaultRouter()
-router.register('orders', RepairOrderViewSet, basename='order')
+router.register('', RepairOrderViewSet, basename='order')
 
 urlpatterns = [
     path('dashboard/', DashboardView.as_view(), name='dashboard'),

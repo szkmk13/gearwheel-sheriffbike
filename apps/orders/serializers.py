@@ -45,3 +45,22 @@ class RepairOrderWriteSerializer(serializers.ModelSerializer):
         model = RepairOrder
         fields = '__all__'
         read_only_fields = ('created_at', 'updated_at')
+
+
+class ChangeOrderStatusSerializer(serializers.Serializer):
+    status = serializers.ChoiceField(choices=RepairOrder.STATUS_CHOICES)
+    note = serializers.CharField(required=False, allow_blank=True)
+
+
+class WeeklyTrendPointSerializer(serializers.Serializer):
+    week_start = serializers.DateField()
+    orders_completed = serializers.IntegerField()
+    profit = serializers.DecimalField(max_digits=10, decimal_places=2)
+
+
+class DashboardSerializer(serializers.Serializer):
+    bikes_count = serializers.IntegerField()
+    customers_count = serializers.IntegerField()
+    orders_completed_this_week = serializers.IntegerField()
+    profit_this_week = serializers.DecimalField(max_digits=10, decimal_places=2)
+    weekly_trend = WeeklyTrendPointSerializer(many=True)

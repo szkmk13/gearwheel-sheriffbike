@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
@@ -24,18 +25,18 @@ class LoginView(TokenObtainPairView):
     """Authenticates the user and sets JWT access/refresh cookies."""
 
     @extend_schema(
-        summary='Zaloguj użytkownika',
-        description=(
-            'Weryfikuje `username`/`password` i, jeśli poprawne, uwierzytelnia użytkownika. '
-            'Wygenerowane tokeny JWT (`access` i `refresh`) nie są zwracane w body odpowiedzi - '
-            'trafiają wyłącznie jako httpOnly cookies (`access_token`, `refresh_token`, '
-            '`SameSite=Lax`, `Secure` poza trybem DEBUG). Kolejne żądania do API są autoryzowane '
-            'automatycznie przez przeglądarkę na podstawie tych ciasteczek, bez potrzeby wysyłania '
-            'nagłówka `Authorization`. Endpoint jest publiczny (nie wymaga wcześniejszej autoryzacji).'
+        summary=_('Log in a user'),
+        description=_(
+            'Verifies `username`/`password` and, if valid, authenticates the user. '
+            'The generated JWT tokens (`access` and `refresh`) are not returned in the response '
+            'body - they are set only as httpOnly cookies (`access_token`, `refresh_token`, '
+            '`SameSite=Lax`, `Secure` outside DEBUG mode). Subsequent API requests are authorized '
+            'automatically by the browser based on these cookies, with no need to send an '
+            '`Authorization` header. This endpoint is public (no prior authentication required).'
         ),
         responses={
             200: AuthenticatedUserSerializer,
-            401: OpenApiResponse(description='Nieprawidłowa nazwa użytkownika lub hasło.'),
+            401: OpenApiResponse(description=_('Invalid username or password.')),
         },
     )
     def post(self, request, *args, **kwargs):
@@ -54,17 +55,17 @@ class CookieTokenRefreshView(TokenRefreshView):
     """Reads the refresh token from its httpOnly cookie and issues a new access cookie."""
 
     @extend_schema(
-        summary='Odśwież token dostępu',
-        description=(
-            'Odczytuje `refresh_token` z httpOnly cookie (nie trzeba nic przesyłać w body) i, jeśli '
-            'jest ważny, wydaje nowy `access_token`. Jeśli w `SIMPLE_JWT.ROTATE_REFRESH_TOKENS` włączona '
-            'jest rotacja, ustawiany jest też nowy `refresh_token`. Oba tokeny trafiają wyłącznie do '
-            'httpOnly cookies - odpowiedź nie zawiera żadnych danych w body.'
+        summary=_('Refresh the access token'),
+        description=_(
+            'Reads the `refresh_token` from its httpOnly cookie (nothing needs to be sent in the '
+            'body) and, if it is valid, issues a new `access_token`. If `SIMPLE_JWT.ROTATE_REFRESH_TOKENS` '
+            'is enabled, a new `refresh_token` is also set. Both tokens are set only as httpOnly '
+            'cookies - the response body contains no data.'
         ),
         request=None,
         responses={
             200: EmptyResponseSerializer,
-            401: OpenApiResponse(description='Refresh token cookie missing or invalid.'),
+            401: OpenApiResponse(description=_('Refresh token cookie missing or invalid.')),
         },
     )
     def post(self, request, *args, **kwargs):
@@ -93,11 +94,11 @@ class LogoutView(APIView):
     permission_classes = [AllowAny]
 
     @extend_schema(
-        summary='Wyloguj użytkownika',
-        description=(
-            'Czyści ciasteczka `access_token` i `refresh_token`, kończąc sesję po stronie klienta. '
-            'Endpoint jest publiczny i bezstanowy (nie waliduje wcześniejszego uwierzytelnienia) - '
-            'wywołanie go bez aktywnej sesji również zwraca `204`.'
+        summary=_('Log out a user'),
+        description=_(
+            'Clears the `access_token` and `refresh_token` cookies, ending the session on the '
+            'client side. This endpoint is public and stateless (it does not validate any prior '
+            'authentication) - calling it without an active session also returns `204`.'
         ),
         request=None,
         responses={204: None},
@@ -110,14 +111,14 @@ class LogoutView(APIView):
 
 class MeView(APIView):
     @extend_schema(
-        summary='Dane zalogowanego użytkownika',
-        description=(
-            'Zwraca podstawowe dane użytkownika aktualnie uwierzytelnionego na podstawie ciasteczka '
-            '`access_token` (lub nagłówka `Authorization`, jeśli obecny). Wymaga ważnego uwierzytelnienia.'
+        summary=_('Current authenticated user'),
+        description=_(
+            'Returns basic data for the user currently authenticated via the `access_token` cookie '
+            '(or the `Authorization` header, if present). Requires valid authentication.'
         ),
         responses={
             200: AuthenticatedUserSerializer,
-            401: OpenApiResponse(description='Brak lub nieprawidłowe uwierzytelnienie.'),
+            401: OpenApiResponse(description=_('Missing or invalid authentication.')),
         },
     )
     def get(self, request, *args, **kwargs):

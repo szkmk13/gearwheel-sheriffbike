@@ -4,6 +4,8 @@ from decimal import Decimal
 from django.db.models import Case, Count, IntegerField, Sum, When
 from django.db.models.functions import Coalesce, TruncWeek
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -14,6 +16,8 @@ from apps.customers.models import Bike, Customer
 
 from .models import RepairOrder, RepairOrderItem, StatusHistory
 from .serializers import (
+    ChangeOrderStatusSerializer,
+    DashboardSerializer,
     RepairOrderListSerializer,
     RepairOrderDetailSerializer,
     RepairOrderWriteSerializer,
@@ -25,6 +29,70 @@ from .serializers import (
 STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted', 'delivered', 'cancelled']
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary=_('List repair orders'),
+        description=_(
+            'Returns repair orders sorted by status (order: done, in_progress, diagnosing, '
+            'waiting_parts, accepted, delivered, cancelled), and within each status - newest first. '
+            'Supports filtering (`status`, `priority`, `customer`, `bike`), searching '
+            '(`search` over the description, mechanic notes, and customer data), and ordering (`ordering`).'
+        ),
+        parameters=[
+            OpenApiParameter(
+                'status', str, OpenApiParameter.QUERY, enum=[c[0] for c in RepairOrder.STATUS_CHOICES],
+                description=_('Filter by exact order status.'),
+            ),
+            OpenApiParameter(
+                'priority', str, OpenApiParameter.QUERY, enum=[c[0] for c in RepairOrder.PRIORITY_CHOICES],
+                description=_('Filter by exact order priority.'),
+            ),
+            OpenApiParameter(
+                'customer', int, OpenApiParameter.QUERY,
+                description=_('Filter by customer ID.'),
+            ),
+            OpenApiParameter(
+                'bike', int, OpenApiParameter.QUERY,
+                description=_('Filter by bike ID.'),
+            ),
+            OpenApiParameter(
+                'search', str, OpenApiParameter.QUERY,
+                description=_(
+                    'Free-text search over `description`, `mechanic_notes`, and the customer\'s '
+                    'first/last name.'
+                ),
+            ),
+            OpenApiParameter(
+                'ordering', str, OpenApiParameter.QUERY,
+                enum=['created_at', '-created_at', 'updated_at', '-updated_at', 'priority', '-priority'],
+                description=_(
+                    'Order results by the given field; prefix with `-` for descending order. '
+                    'Overrides the default status-based ordering.'
+                ),
+            ),
+        ],
+    ),
+    create=extend_schema(
+        summary=_('Create a repair order'),
+        description=_('Opens a new repair order for the given customer and bike.'),
+    ),
+    retrieve=extend_schema(
+        summary=_('Retrieve a repair order'),
+        description=_('Returns the full order data, including items (`items`) and status history (`status_history`).'),
+    ),
+    update=extend_schema(
+        summary=_('Update a repair order'),
+        description=_('Overwrites all editable fields of the order.'),
+    ),
+    partial_update=extend_schema(
+        summary=_('Partially update a repair order'),
+        description=_('Updates selected fields of the order without submitting the whole object.'),
+    ),
+    destroy=extend_schema(
+        summary=_('Delete a repair order'),
+        description=_('Permanently deletes the order.'),
+    ),
+)
 class RepairOrderViewSet(ModelViewSet):
     queryset = RepairOrder.objects.select_related('customer', 'bike').annotate(
         status_order=Case(
@@ -43,6 +111,20 @@ class RepairOrderViewSet(ModelViewSet):
             return RepairOrderWriteSerializer
         return RepairOrderDetailSerializer
 
+    @extend_schema(
+        summary=_('Change a repair order status'),
+        description=_(
+            'Changes the order status and appends an entry to its status history (`old_status`, '
+            '`new_status`, `changed_by`, optional `note`). Transitioning to `accepted` sets '
+            '`accepted_at`, and to `delivered` sets `delivered_at` (unless already set). '
+            'The request is rejected if the given status is invalid or identical to the current one.'
+        ),
+        request=ChangeOrderStatusSerializer,
+        responses={
+            200: RepairOrderDetailSerializer,
+            400: OpenApiResponse(description=_('Invalid status, or the order already has the given status.')),
+        },
+    )
     @action(detail=True, methods=['post'], url_path='status')
     def change_status(self, request, pk=None):
         order = self.get_object()
@@ -71,12 +153,29 @@ class RepairOrderViewSet(ModelViewSet):
         order.save()
         return Response(RepairOrderDetailSerializer(order).data)
 
+    @extend_schema(
+        summary=_('Repair order status history'),
+        description=_('Returns the chronological (newest first) list of status changes for the given order.'),
+        responses=StatusHistorySerializer(many=True),
+    )
     @action(detail=True, methods=['get'], url_path='history')
     def history(self, request, pk=None):
         order = self.get_object()
         qs = order.status_history.all()
         return Response(StatusHistorySerializer(qs, many=True).data)
 
+    @extend_schema(
+        summary=_('Repair order items (parts/labor)'),
+        description=_(
+            'GET - returns the list of items (parts and labor) attached to the order. '
+            'POST - adds a new item; `repair_order` is set automatically from the order in the URL.'
+        ),
+        request=RepairOrderItemSerializer,
+        responses={
+            200: RepairOrderItemSerializer(many=True),
+            201: RepairOrderItemSerializer,
+        },
+    )
     @action(detail=True, methods=['get', 'post'], url_path='items')
     def items(self, request, pk=None):
         order = self.get_object()
@@ -91,6 +190,16 @@ class RepairOrderViewSet(ModelViewSet):
 class DashboardView(APIView):
     WEEKS_OF_TREND = 8
 
+    @extend_schema(
+        summary=_('Dashboard statistics'),
+        description=_(
+            'Returns aggregate dashboard statistics: total bikes and customers in the system, the '
+            'number of orders completed (`done`/`delivered`) this week, the sum of `final_cost` for '
+            'those orders, and a weekly trend (orders completed and profit) for the last %(weeks)d '
+            'weeks, starting from Monday.'
+        ) % {'weeks': WEEKS_OF_TREND},
+        responses=DashboardSerializer,
+    )
     def get(self, request):
         today = timezone.localdate()
         week_start = today - timedelta(days=today.weekday())

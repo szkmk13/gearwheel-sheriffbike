@@ -1,5 +1,6 @@
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
 from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import serializers, status
@@ -23,18 +24,27 @@ class ContactFormView(APIView):
     authentication_classes = []
 
     @extend_schema(
+        summary=_('Submit the contact form'),
+        description=_(
+            'Public, unauthenticated endpoint for the contact/booking form on the marketing '
+            'frontend. Appends the submission as a new row to the configured Google Sheet (via a '
+            'Google service account, `GOOGLE_SHEETS_SPREADSHEET_ID` / '
+            '`GOOGLE_SERVICE_ACCOUNT_FILE`/`GOOGLE_SERVICE_ACCOUNT_JSON`). If Google Sheets is not '
+            'configured, the append is skipped (with a warning logged), but the endpoint still '
+            'returns `201`. Cloudflare Turnstile verification is present in the code but currently disabled.'
+        ),
         request=ContactFormSerializer,
         responses={201: ContactFormResponseSerializer},
         examples=[
             OpenApiExample(
-                'Zgłoszenie z formularza',
+                'Sample submission',
                 value={
                     'name': 'Jan Kowalski',
                     'phone': '+48123456789',
-                    'equip': 'Rower szosowy',
-                    'service': 'Przegląd okresowy',
+                    'equip': 'Road bike',
+                    'service': 'Periodic checkup',
                     'date': '2026-08-10',
-                    'msg': 'Proszę o kontakt po 16:00',
+                    'msg': 'Please contact after 4 PM',
                 },
                 request_only=True,
             ),
