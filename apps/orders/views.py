@@ -19,6 +19,7 @@ from .serializers import (
     ChangeOrderStatusSerializer,
     DashboardSerializer,
     RepairOrderListSerializer,
+    RepairOrderCreateSerializer,
     RepairOrderDetailSerializer,
     RepairOrderWriteSerializer,
     RepairOrderItemSerializer,
@@ -36,7 +37,7 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
             'Returns repair orders sorted by status (order: done, in_progress, diagnosing, '
             'waiting_parts, accepted, delivered, cancelled), and within each status - newest first. '
             'Supports filtering (`status`, `priority`, `customer`, `bike`), searching '
-            '(`search` over the description, mechanic notes, and customer data), and ordering (`ordering`).'
+            '(`search` over the description and customer data), and ordering (`ordering`).'
         ),
         parameters=[
             OpenApiParameter(
@@ -58,8 +59,7 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
             OpenApiParameter(
                 'search', str, OpenApiParameter.QUERY,
                 description=_(
-                    'Free-text search over `description`, `mechanic_notes`, and the customer\'s '
-                    'first/last name.'
+                    'Free-text search over `description` and the customer\'s first/last name.'
                 ),
             ),
             OpenApiParameter(
@@ -74,7 +74,13 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
     ),
     create=extend_schema(
         summary=_('Create a repair order'),
-        description=_('Opens a new repair order for the given customer and bike.'),
+        description=_(
+            'Opens a new repair order for the given customer and bike. Only `customer`, `bike`, '
+            '`description`, and `estimated_cost` are accepted. `status` and `priority` are not '
+            'inputs here - new orders always start as `accepted` / `normal` priority (change them '
+            'afterwards via the status endpoint or a regular update). `accepted_at`, `delivered_at`, '
+            'and `final_cost` do not apply to creation and are also not accepted.'
+        ),
     ),
     retrieve=extend_schema(
         summary=_('Retrieve a repair order'),
@@ -101,13 +107,15 @@ class RepairOrderViewSet(ModelViewSet):
         )
     ).order_by('status_order', '-created_at')
     filterset_fields = ['status', 'priority', 'customer', 'bike']
-    search_fields = ['description', 'mechanic_notes', 'customer__first_name', 'customer__last_name']
+    search_fields = ['description', 'customer__first_name', 'customer__last_name']
     ordering_fields = ['created_at', 'updated_at', 'priority']
 
     def get_serializer_class(self):
         if self.action == 'list':
             return RepairOrderListSerializer
-        if self.action in ('create', 'update', 'partial_update'):
+        if self.action == 'create':
+            return RepairOrderCreateSerializer
+        if self.action in ('update', 'partial_update'):
             return RepairOrderWriteSerializer
         return RepairOrderDetailSerializer
 

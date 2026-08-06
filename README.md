@@ -32,8 +32,7 @@ cp .env_example .env
 # 5. Wykonaj migracje (domyślnie SQLite, bez potrzeby dodatkowej konfiguracji)
 python manage.py migrate
 
-# 6. Utwórz konto administratora (potrzebne do /admin/ oraz do endpointów API,
-#    które domyślnie wymagają uprawnień staff, w tym /api/docs/)
+# 6. Utwórz konto 
 python manage.py createsuperuser
 ```
 
@@ -51,7 +50,7 @@ npm install
 
 ```bash
 # Terminal 1 - backend (z katalogu głównego repo, z aktywnym .venv)
-python manage.py runserver
+python manage.py startserver   
 
 # Terminal 2 - frontend
 cd frontend
@@ -59,9 +58,10 @@ npm run dev
 ```
 
 Aplikacja dostępna pod: http://127.0.0.1:8000
+
 Panel admina: http://127.0.0.1:8000/admin/
-Dokumentacja API (Swagger): http://127.0.0.1:8000/api/docs/ - wymaga zalogowania jako
-superuser (np. przez `/admin/` w tej samej przeglądarce, żeby uzyskać sesję/ciasteczko).
+
+Dokumentacja API (Swagger): http://127.0.0.1:8000/api/docs/
 
 ## Budowanie frontendu na produkcję
 

@@ -25,7 +25,6 @@ class RepairOrder(models.Model):
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='accepted', db_index=True)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal')
     description = models.TextField()
-    mechanic_notes = models.TextField(blank=True)
     estimated_cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     final_cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     accepted_at = models.DateTimeField(null=True, blank=True)

@@ -40,6 +40,12 @@ class RepairOrderDetailSerializer(serializers.ModelSerializer):
         read_only_fields = ('created_at', 'updated_at')
 
 
+class RepairOrderCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RepairOrder
+        fields = ('customer', 'bike', 'description', 'estimated_cost')
+
+
 class RepairOrderWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = RepairOrder
