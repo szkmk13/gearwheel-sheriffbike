@@ -38,9 +38,8 @@ def robots_txt(request):
 _docs_view_kwargs = {'permission_classes': [AllowAny]} if settings.DEBUG else {}
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
     path('robots.txt', robots_txt, name='robots-txt'),
-
+    path('admin/', admin.site.urls),
     # Auth
     path('api/auth/login/', LoginView.as_view(), name='login'),
     path('api/auth/token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),

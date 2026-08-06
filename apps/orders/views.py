@@ -79,8 +79,11 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
             '`description`, and `estimated_cost` are accepted. `status` and `priority` are not '
             'inputs here - new orders always start as `accepted` / `normal` priority (change them '
             'afterwards via the status endpoint or a regular update). `accepted_at`, `delivered_at`, '
-            'and `final_cost` do not apply to creation and are also not accepted.'
+            'and `final_cost` do not apply to creation and are also not accepted. The response returns '
+            'the full order object (same shape as retrieve), including the auto-assigned defaults.'
         ),
+        request=RepairOrderCreateSerializer,
+        responses={201: RepairOrderDetailSerializer},
     ),
     retrieve=extend_schema(
         summary=_('Retrieve a repair order'),
@@ -118,6 +121,14 @@ class RepairOrderViewSet(ModelViewSet):
         if self.action in ('update', 'partial_update'):
             return RepairOrderWriteSerializer
         return RepairOrderDetailSerializer
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        detail = RepairOrderDetailSerializer(serializer.instance)
+        return Response(detail.data, status=status.HTTP_201_CREATED, headers=headers)
 
     @extend_schema(
         summary=_('Change a repair order status'),

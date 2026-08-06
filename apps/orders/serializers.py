@@ -1,4 +1,7 @@
 from rest_framework import serializers
+
+from apps.customers.serializers import BikeSerializer, CustomerListSerializer
+
 from .models import RepairOrder, RepairOrderItem, StatusHistory
 
 
@@ -31,6 +34,8 @@ class RepairOrderListSerializer(serializers.ModelSerializer):
 
 
 class RepairOrderDetailSerializer(serializers.ModelSerializer):
+    customer = CustomerListSerializer(read_only=True)
+    bike = BikeSerializer(read_only=True)
     items = RepairOrderItemSerializer(many=True, read_only=True)
     status_history = StatusHistorySerializer(many=True, read_only=True)
 
