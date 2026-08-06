@@ -24,7 +24,10 @@ class RepairOrderListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RepairOrder
-        fields = ('id', 'customer', 'customer_name', 'bike', 'bike_label', 'status', 'priority', 'created_at')
+        fields = (
+            'id', 'customer', 'customer_name', 'bike', 'bike_label', 'bike_tag_number',
+            'status', 'priority', 'created_at',
+        )
 
     def get_customer_name(self, obj):
         return str(obj.customer)
@@ -48,7 +51,7 @@ class RepairOrderDetailSerializer(serializers.ModelSerializer):
 class RepairOrderCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = RepairOrder
-        fields = ('customer', 'bike', 'description', 'estimated_cost')
+        fields = ('customer', 'bike', 'bike_tag_number', 'description', 'estimated_cost')
 
 
 class RepairOrderWriteSerializer(serializers.ModelSerializer):

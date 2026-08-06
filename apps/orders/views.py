@@ -76,11 +76,15 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
         summary=_('Create a repair order'),
         description=_(
             'Opens a new repair order for the given customer and bike. Only `customer`, `bike`, '
-            '`description`, and `estimated_cost` are accepted. `status` and `priority` are not '
-            'inputs here - new orders always start as `accepted` / `normal` priority (change them '
-            'afterwards via the status endpoint or a regular update). `accepted_at`, `delivered_at`, '
-            'and `final_cost` do not apply to creation and are also not accepted. The response returns '
-            'the full order object (same shape as retrieve), including the auto-assigned defaults.'
+            '`bike_tag_number`, `description`, and `estimated_cost` are accepted. `bike_tag_number` '
+            'is the physical claim-tag number (a plain integer) attached to the bike while it is in '
+            'the shop - it is not a unique identifier and may repeat across different orders/bikes. '
+            '`status` and '
+            '`priority` are not inputs here - new orders always start as `accepted` / `normal` '
+            'priority (change them afterwards via the status endpoint or a regular update). '
+            '`accepted_at`, `delivered_at`, and `final_cost` do not apply to creation and are also '
+            'not accepted. The response returns the full order object (same shape as retrieve), '
+            'including the auto-assigned defaults.'
         ),
         request=RepairOrderCreateSerializer,
         responses={201: RepairOrderDetailSerializer},
