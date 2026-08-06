@@ -4,6 +4,10 @@ import SearchInput from "../components/SearchInput";
 import StatusBadge from "../components/StatusBadge";
 import SlidePanel from "../components/SlidePanel";
 import StickyHeader from "../components/StickyHeader";
+import Modal from "../components/Modal";
+import Input from "../components/Input";
+import Select from "../components/Select";
+import { mockClients, mockBikes } from "./ClientsPage";
 
 const mockOrders = [
   { id: "#2024-001", client: "Anna Nowak", bike: "Giant TCR Advanced", status: "W trakcie", date: "2024-05-08", price: "250 zł" },
@@ -29,6 +33,27 @@ const mockOrders = [
 export default function OrdersPage() {
 
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isAddOrderFormOpen, setIsAddOrderFormOpen] = useState(false);
+  const [isNewClient, setIsNewClient] = useState(false);
+  const [isNewBike, setIsNewBike] = useState(false);
+
+  const todayDate = new Date().toISOString().split('T')[0];
+  const clientOptions = mockClients.map(client => ({
+    value: client.id,
+    label: client.name
+  }));
+  const bikeOptions = mockBikes.map(bike => ({
+    value: bike.id,
+    label: `${bike.manufacturer} ${bike.model}`
+  }));
+
+  const handleAddOrder = (e) => {
+    e.preventDefault();
+    console.log("Zapisywanie zlecenia...");
+    setIsAddOrderFormOpen(false);
+    setIsNewClient(false);
+    setIsNewBike(false);
+  };
 
   return (
     <div className="px-8 pb-8 relative">
@@ -36,7 +61,7 @@ export default function OrdersPage() {
       <StickyHeader>
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Zlecenia serwisowe</h1>
-          <Button>+ Przymij rower</Button>
+          <Button onClick={() => setIsAddOrderFormOpen(true)}>+ Przymij rower</Button>
         </div>
 
         <div className="flex gap-4">
@@ -84,6 +109,7 @@ export default function OrdersPage() {
         </table>
       </div>
 
+      {/*Podgląd zlecenia*/}
       <SlidePanel
         isOpen={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
@@ -136,6 +162,138 @@ export default function OrdersPage() {
 
       </SlidePanel>
 
+      {/*Formularz dodania zlecenia*/}
+      <Modal 
+        isOpen={isAddOrderFormOpen} 
+        onClose={() => setIsAddOrderFormOpen(false)}
+        title="Nowe zlecenie serwisowe"
+      >
+        <form onSubmit={handleAddOrder} className="flex flex-col gap-6 mt-2">
+          
+          <div className="flex flex-col gap-6 pb-6 border-b border-gray-100">
+            
+            <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition-all">
+              
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-sm font-semibold text-gray-800">
+                  {isNewClient ? "Dane nowego klienta" : "Wybór klienta"}
+                </h4>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="newClientCheckbox"
+                    checked={isNewClient}
+                    onChange={(e) => {
+                      setIsNewClient(e.target.checked);
+                      if (e.target.checked) setIsNewBike(false); 
+                    }}
+                    className="w-4 h-4 text-[#009ceb] bg-white border-gray-300 rounded focus:ring-[#009ceb] cursor-pointer"
+                  />
+                  <label htmlFor="newClientCheckbox" className="text-sm font-medium text-gray-700 cursor-pointer">
+                    Nowy klient
+                  </label>
+                </div>
+              </div>
+
+              {!isNewClient ? (
+                <Select
+                  label="Klient"
+                  options={clientOptions}
+                  placeholder="Wybierz klienta z bazy..."
+                  required={!isNewClient} 
+                />
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <Input label="Imię i nazwisko" placeholder="np. Jan Kowalski" required={true} />
+                  <Input label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} />
+                  <div className="lg:col-span-2">
+                    <Input label="Adres e-mail" type="email" placeholder="np. jan.kowalski@email.com" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition-all">
+              
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="text-sm font-semibold text-gray-800">
+                  {(isNewClient || isNewBike) ? "Rejestracja nowego roweru" : "Wybór przypisanego roweru"}
+                </h4>
+                
+                {!isNewClient && (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="newBikeCheckbox"
+                      checked={isNewBike}
+                      onChange={(e) => setIsNewBike(e.target.checked)}
+                      className="w-4 h-4 text-[#009ceb] bg-white border-gray-300 rounded focus:ring-[#009ceb] cursor-pointer"
+                    />
+                    <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-gray-700 cursor-pointer">
+                      Nowy rower
+                    </label>
+                  </div>
+                )}
+              </div>
+
+              {(!isNewClient && !isNewBike) ? (
+                <Select
+                  label="Rower"
+                  options={bikeOptions}
+                  placeholder="Wybierz przypisany rower..."
+                  required={(!isNewClient && !isNewBike)}
+                />
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <Input label="Producent" placeholder="np. Trek, Giant" required={true} />
+                  <Input label="Model" placeholder="np. Domane SL5" required={true} />
+                  <Input label="Typ" placeholder="np. Szosowy, MTB" required={true} />
+                </div>
+              )}
+            </div>
+
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-gray-100 pt-4">
+            <Input
+              label="Data przyjęcia"
+              type="date"
+              defaultValue={todayDate}
+              required={true}
+            />
+            
+            <Input
+              label="Szacowana wartość (zł)"
+              type="number"
+              placeholder="np. 150"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-sm font-medium text-gray-700 mb-1">
+              Opis usterki / zakres prac <span className="text-red-500">*</span>
+            </label>
+            <textarea
+              className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
+              placeholder="Dokładny opis tego, co należy wykonać..."
+              required={true}
+            ></textarea>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+            <button
+              type="button"
+              onClick={() => setIsAddOrderFormOpen(false)}
+              className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
+            >
+              Anuluj
+            </button>
+            <Button type="submit">Utwórz zlecenie</Button>
+          </div>
+
+        </form>
+      </Modal>
+    
     </div>
   );
 }
