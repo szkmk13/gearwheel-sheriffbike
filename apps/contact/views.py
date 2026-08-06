@@ -1,13 +1,18 @@
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework import status
+from drf_spectacular.utils import OpenApiExample, extend_schema
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import ContactFormSerializer
 from .services import append_lead_to_sheet, verify_turnstile
+
+
+class ContactFormResponseSerializer(serializers.Serializer):
+    ok = serializers.BooleanField()
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -17,6 +22,24 @@ class ContactFormView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    @extend_schema(
+        request=ContactFormSerializer,
+        responses={201: ContactFormResponseSerializer},
+        examples=[
+            OpenApiExample(
+                'Zgłoszenie z formularza',
+                value={
+                    'name': 'Jan Kowalski',
+                    'phone': '+48123456789',
+                    'equip': 'Rower szosowy',
+                    'service': 'Przegląd okresowy',
+                    'date': '2026-08-10',
+                    'msg': 'Proszę o kontakt po 16:00',
+                },
+                request_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         serializer = ContactFormSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

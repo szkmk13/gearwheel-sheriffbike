@@ -56,9 +56,9 @@ urlpatterns = [
     # Apps
     path('api/customers/', include('apps.customers.urls')),
     path('api/orders/', include('apps.orders.urls')),
-    path('api/appointments/', include('apps.appointments.urls')),
-    path('api/inventory/', include('apps.inventory.urls')),
-    path('api/storage/', include('apps.storage.urls')),
+    # path('api/appointments/', include('apps.appointments.urls')),
+    # path('api/inventory/', include('apps.inventory.urls')),
+    # path('api/storage/', include('apps.storage.urls')),
     path('api/', include('apps.contact.urls')),
 ]
 
