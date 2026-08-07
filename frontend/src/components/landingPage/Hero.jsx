@@ -168,10 +168,10 @@ function HeroSplit({ c }) {
         <div className="relative max-[1000px]:max-w-[520px]">
           <div className="pointer-events-none absolute left-1/2 top-1/2 z-[-1] -translate-x-[46%] -translate-y-[52%] text-[color-mix(in_oklab,var(--color-accent)_16%,transparent)]"><SheriffStar size={420} /></div>
           <picture>
-            <source srcSet={ASSET_BASE + "assets/trek.webp"} type="image/webp" />
+            <source srcSet={ASSET_BASE + "assets/warsztat-narzedzia.webp"} type="image/webp" />
             <img
               className="aspect-[4/5] w-full rounded-[20px] bg-paper-3 object-cover shadow-lg max-[1000px]:aspect-[16/11]"
-              src={ASSET_BASE + "assets/trek.jpg"}
+              src={ASSET_BASE + "assets/warsztat-narzedzia.jpg"}
               alt="Rower szosowy"
               width="1200"
               height="800"
@@ -205,10 +205,10 @@ function HeroCentered({ c }) {
   return (
     <header className="relative z-[1] flex min-h-[clamp(580px,88vh,840px)] items-center bg-ink" id="top">
       <picture>
-        <source srcSet={ASSET_BASE + "assets/trek.webp"} type="image/webp" />
+        <source srcSet={ASSET_BASE + "assets/warsztat-narzedzia.webp"} type="image/webp" />
         <img
           className="absolute inset-0 h-full w-full bg-paper-3 object-cover"
-          src={ASSET_BASE + "assets/trek.jpg"}
+          src={ASSET_BASE + "assets/warsztat-narzedzia.jpg"}
           alt="Warsztat rowerowy"
           width="1200"
           height="800"
@@ -257,10 +257,10 @@ function HeroOverlay({ c }) {
   return (
     <header className="relative z-[1] flex min-h-[clamp(560px,86vh,820px)] items-end bg-ink max-[720px]:min-h-[540px]" id="top">
       <picture>
-        <source srcSet={ASSET_BASE + "assets/trek.webp"} type="image/webp" />
+        <source srcSet={ASSET_BASE + "assets/warsztat-narzedzia.webp"} type="image/webp" />
         <img
           className="absolute inset-0 h-full w-full bg-paper-3 object-cover"
-          src={ASSET_BASE + "assets/trek.jpg"}
+          src={ASSET_BASE + "assets/warsztat-narzedzia.jpg"}
           alt="Rower w warsztacie"
           width="1200"
           height="800"
