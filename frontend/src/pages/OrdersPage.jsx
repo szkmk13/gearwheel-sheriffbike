@@ -1,4 +1,9 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchOrders, createOrder } from "../api/orders";
+import { fetchClients, fetchClientDetails, createClient, createBike } from "../api/clients";
+
 import Button from "../components/Button";
 import SearchInput from "../components/SearchInput";
 import StatusBadge from "../components/StatusBadge";
@@ -7,70 +12,127 @@ import StickyHeader from "../components/StickyHeader";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
 import Select from "../components/Select";
-import { mockClients, mockBikes } from "./ClientsPage";
-
-const mockOrders = [
-  { id: "#2024-001", client: "****", bike: "Giant TCR Advanced", status: "W trakcie", date: "2024-05-08", price: "250 zł" },
-  { id: "#2024-002", client: "****", bike: "Trek Domane SL5", status: "Gotowe", date: "2024-05-08", price: "180 zł" },
-  { id: "#2024-003", client: "****", bike: "Specialized Rockhopper", status: "W trakcie", date: "2024-05-07", price: "320 zł" },
-  { id: "#2024-004", client: "****", bike: "Canyon Endurace CF", status: "Gotowe", date: "2024-05-07", price: "150 zł" },
-  { id: "#2024-005", client: "****", bike: "Scott Spark 900", status: "W trakcie", date: "2024-05-06", price: "420 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-];
-
-
 
 export default function OrdersPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const formRef = useRef(null);
 
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isAddOrderFormOpen, setIsAddOrderFormOpen] = useState(false);
+  
+
   const [isNewClient, setIsNewClient] = useState(false);
   const [isNewBike, setIsNewBike] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
 
   const todayDate = new Date().toISOString().split('T')[0];
-  const clientOptions = mockClients.map(client => ({
+
+  const { data: ordersData, isLoading: isOrdersLoading } = useQuery({
+    queryKey: ['orders'],
+    queryFn: () => fetchOrders(),
+  });
+  const ordersList = ordersData?.results || [];
+
+  const { data: clientsData } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => fetchClients(),
+  });
+  const clientOptions = (clientsData?.results || []).map(client => ({
     value: client.id,
-    label: client.name
+    label: `${client.first_name} ${client.last_name}`
   }));
-  const bikeOptions = mockBikes.map(bike => ({
+
+  const { data: selectedClientDetails } = useQuery({
+    queryKey: ['client', selectedClientId],
+    queryFn: () => fetchClientDetails(selectedClientId),
+    enabled: !!selectedClientId && !isNewClient, // Pobieraj tylko jeśli klient już istnieje
+  });
+  const bikeOptions = (selectedClientDetails?.bikes || []).map(bike => ({
     value: bike.id,
-    label: `${bike.manufacturer} ${bike.model}`
+    label: `${bike.brand} ${bike.model} (${bike.bike_type})`
   }));
+
+  const mutation = useMutation({
+    mutationFn: async (formData) => {
+      let finalCustomerId = formData.get('customer');
+      let finalBikeId = formData.get('bike');
+
+      // 1. Jeśli to nowy klient, najpierw utwórz go w bazie
+      if (isNewClient) {
+        const fullName = formData.get('fullName').trim();
+        const nameParts = fullName.split(' ');
+        
+        const newClientData = {
+          first_name: nameParts[0],
+          last_name: nameParts.slice(1).join(' ') || '-',
+          phone: formData.get('phone'),
+          email: formData.get('email') || '',
+          notes: ''
+        };
+        const createdClient = await createClient(newClientData);
+        finalCustomerId = createdClient.id; // Przechwytujemy nowe ID z bazy!
+      }
+
+      // 2. Jeśli to nowy klient LUB nowy rower, utwórz rower (przypisując do finalCustomerId)
+      if (isNewClient || isNewBike) {
+        const newBikeData = {
+          customer: parseInt(finalCustomerId),
+          brand: formData.get('brand'),
+          model: formData.get('model'),
+          bike_type: formData.get('bike_type')
+        };
+        const createdBike = await createBike(newBikeData);
+        finalBikeId = createdBike.id; // Przechwytujemy nowe ID roweru!
+      }
+
+      // 3. Na samym końcu utwórz docelowe zlecenie serwisowe[cite: 1]
+      const newOrder = {
+        customer: parseInt(finalCustomerId),
+        bike: parseInt(finalBikeId),
+        bike_tag_number: parseInt(formData.get('bike_tag_number') || 0),
+        description: formData.get('description'),
+        estimated_cost: formData.get('estimated_cost') || null,
+      };
+
+      return await createOrder(newOrder);
+    },
+    onSuccess: () => {
+      // Odświeżamy zlecenia i klientów po udanej akcji
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      formRef.current?.reset();
+      setIsAddOrderFormOpen(false);
+      setIsNewClient(false);
+      setIsNewBike(false);
+    },
+    onError: (error) => {
+      alert(`Wystąpił błąd podczas przetwarzania: ${error.message}`);
+    }
+  });
 
   const handleAddOrder = (e) => {
     e.preventDefault();
-    console.log("Zapisywanie zlecenia...");
-    setIsAddOrderFormOpen(false);
-    setIsNewClient(false);
-    setIsNewBike(false);
+    const formData = new FormData(e.target);
+    mutation.mutate(formData); // Przekazujemy cały formData do naszej zaawansowanej mutacji
   };
 
   return (
     <div className="px-8 pb-8 relative">
-
       <StickyHeader>
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Zlecenia serwisowe</h1>
-          <Button onClick={() => setIsAddOrderFormOpen(true)}>+ Przymij rower</Button>
+          <Button onClick={() => setIsAddOrderFormOpen(true)}>+ Przyjmij rower</Button>
         </div>
 
         <div className="flex gap-4">
           <div className="flex-1"> <SearchInput placeholder="Szukaj po kliencie, numerze zlecenia..."/> </div>
           <div>
             <select className="h-[46px] border border-gray-200 rounded-lg px-4 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#009ceb] shadow-sm">
-              <option>Wszystkie</option>
-              <option>W trakcie</option>
-              <option>Gotowe</option>
-              <option>Odebrane</option>
+              <option value="">Wszystkie</option>
+              <option value="in_progress">W trakcie</option>
+              <option value="done">Gotowe</option>
+              <option value="delivered">Odebrane</option>
             </select>
           </div>
         </div>
@@ -90,18 +152,20 @@ export default function OrdersPage() {
           </thead>
 
           <tbody className="text-sm text-gray-800">
-            {mockOrders.map((order, index) => (
+            {isOrdersLoading ? (
+              <tr><td colSpan="6" className="py-4 px-6 text-center text-gray-500">Ładowanie...</td></tr>
+            ) : ordersList.map((order, index) => (
               <tr 
                 key={order.id} 
                 onClick={() => setSelectedOrder(order)} 
-                className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index === mockOrders.length - 1 ? 'border-b-0' : '' }`}
+                className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index === ordersList.length - 1 ? 'border-b-0' : '' }`}
               >
-                <td className="py-4 px-6 font-medium text-gray-600">{order.id}</td>
-                <td className="py-4 px-6">{order.client}</td>
-                <td className="py-4 px-6 text-gray-600">{order.bike}</td>
+                <td className="py-4 px-6 font-medium text-gray-600">#{order.id}</td>
+                <td className="py-4 px-6">{order.customer_name}</td>
+                <td className="py-4 px-6 text-gray-600">{order.bike_label}</td>
                 <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
-                <td className="py-4 px-6 text-gray-500">{order.date}</td>
-                <td className="py-4 px-6 font-medium">{order.price}</td>
+                <td className="py-4 px-6 text-gray-500">{new Date(order.created_at).toLocaleDateString()}</td>
+                <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `~${order.estimated_cost} zł` : '-')}</td>
               </tr>
             ))}
           </tbody>
@@ -115,13 +179,12 @@ export default function OrdersPage() {
       >
         {selectedOrder && (
           <div className="space-y-6">
-
             <div className="bg-white border border-gray-200 rounded-lg p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-gray-800"> {selectedOrder.id} </h2>
+                  <h2 className="text-xl font-bold text-gray-800"> #{selectedOrder.id} </h2>
                   <p className="text-sm text-gray-500 mt-1">
-                    Klient: <span className="font-medium text-gray-700"> {selectedOrder.client} </span>
+                    Klient: <span className="font-medium text-gray-700"> {selectedOrder.customer_name} </span>
                   </p>
                 </div>
                 <StatusBadge status={selectedOrder.status} />
@@ -131,34 +194,37 @@ export default function OrdersPage() {
             <div className="flex justify-between py-6 gap-4 mt-6 pt-6 border-t border-gray-100">
               <div>
                 <p className="text-xs text-gray-500 mb-1">Rower</p>
-                <p className="font-medium text-gray-800"> {selectedOrder.bike} </p>
+                <p className="font-medium text-gray-800"> {selectedOrder.bike_label} </p>
               </div>
-
               <div>
                 <p className="text-xs text-gray-500 mb-1">Data przyjęcia</p>
-                <p className="font-medium text-gray-800"> {selectedOrder.date} </p>
+                <p className="font-medium text-gray-800"> {new Date(selectedOrder.created_at).toLocaleDateString()} </p>
               </div>
-
               <div>
                 <p className="text-xs text-gray-500 mb-1">Wartość</p>
-                <p className="font-medium text-gray-800"> {selectedOrder.price} </p>
+                <p className="font-medium text-gray-800"> {selectedOrder.final_cost ? `${selectedOrder.final_cost} zł` : '-'} </p>
               </div>
             </div>
 
             <div className="bg-white border border-gray-800 rounded-lg p-6">
               <div className="flex justify-between items-center mb-3 pb-2 border-b-4 border-black">
-                <h3 className="text-lg font-semibold text-gray-800">Zakres prac</h3>
+                <h3 className="text-lg font-semibold text-gray-800">Zawieszka serwisowa</h3>
               </div>
-              <p className="text-sm text-gray-600 min-h-[60px]">
-                W trakcie budowy...
+              <p className="text-sm text-gray-600 font-medium">
+                Numer: {selectedOrder.bike_tag_number || '-'}
               </p>
             </div>
-
+            
             <div className="bg-gray-300 rounded text-gray-600 font-medium p-3 text-sm">Lista użytych części (w budowie)</div>
-
+            
+            <Button 
+              className="w-full justify-center py-3 text-base" 
+              onClick={() => navigate(`/panel/orders/${selectedOrder.id}`)}
+            >
+              Otwórz pełne szczegóły zlecenia
+            </Button>
           </div>
         )}
-
       </SlidePanel>
 
       {/*Formularz dodania zlecenia*/}
@@ -167,12 +233,10 @@ export default function OrdersPage() {
         onClose={() => setIsAddOrderFormOpen(false)}
         title="Nowe zlecenie serwisowe"
       >
-        <form onSubmit={handleAddOrder} className="flex flex-col gap-6 mt-2">
-          
+        <form ref={formRef} onSubmit={handleAddOrder} className="flex flex-col gap-6 mt-2">
           <div className="flex flex-col gap-6 pb-6 border-b border-gray-100">
             
             <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition-all">
-              
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-sm font-semibold text-gray-800">
                   {isNewClient ? "Dane nowego klienta" : "Wybór klienta"}
@@ -184,7 +248,7 @@ export default function OrdersPage() {
                     checked={isNewClient}
                     onChange={(e) => {
                       setIsNewClient(e.target.checked);
-                      if (e.target.checked) setIsNewBike(false); 
+                      if (e.target.checked) setIsNewBike(true); // Nowy klient MUSI mieć nowy rower
                     }}
                     className="w-4 h-4 text-[#009ceb] bg-white border-gray-300 rounded focus:ring-[#009ceb] cursor-pointer"
                   />
@@ -196,24 +260,25 @@ export default function OrdersPage() {
 
               {!isNewClient ? (
                 <Select
-                  label="Klient"
+                  name="customer"
+                  label="Klient z bazy"
                   options={clientOptions}
-                  placeholder="Wybierz klienta z bazy..."
+                  placeholder="Wybierz klienta..."
                   required={!isNewClient} 
+                  onChange={(e) => setSelectedClientId(e.target.value)}
                 />
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Input label="Imię i nazwisko" placeholder="np. Jan Kowalski" required={true} />
-                  <Input label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} />
+                  <Input name="fullName" label="Imię i nazwisko" placeholder="np. Jan Kowalski" required={true} />
+                  <Input name="phone" label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} />
                   <div className="lg:col-span-2">
-                    <Input label="Adres e-mail" type="email" placeholder="np. jan.kowalski@email.com" />
+                    <Input name="email" label="Adres e-mail" type="email" placeholder="np. jan.kowalski@email.com" />
                   </div>
                 </div>
               )}
             </div>
 
             <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition-all">
-              
               <div className="flex justify-between items-center mb-4">
                 <h4 className="text-sm font-semibold text-gray-800">
                   {(isNewClient || isNewBike) ? "Rejestracja nowego roweru" : "Wybór przypisanego roweru"}
@@ -237,31 +302,46 @@ export default function OrdersPage() {
 
               {(!isNewClient && !isNewBike) ? (
                 <Select
-                  label="Rower"
+                  name="bike"
+                  label="Rower przypisany do klienta"
                   options={bikeOptions}
-                  placeholder="Wybierz przypisany rower..."
+                  placeholder="Wybierz rower..."
                   required={(!isNewClient && !isNewBike)}
+                  disabled={!selectedClientId || bikeOptions.length === 0}
                 />
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <Input label="Producent" placeholder="np. Trek, Giant" required={true} />
-                  <Input label="Model" placeholder="np. Domane SL5" required={true} />
-                  <Input label="Typ" placeholder="np. Szosowy, MTB" required={true} />
+                  <Input name="brand" label="Producent" placeholder="np. Trek" required={true} />
+                  <Input name="model" label="Model" placeholder="np. Domane SL5" required={true} />
+                  <Input name="bike_type" label="Typ (np. mtb, road)" placeholder="np. mtb" required={true} />
                 </div>
               )}
+            </div>
+            
+            <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition-all">
+              <h4 className="text-sm font-semibold text-gray-800 mb-4">Fizyczny numer zawieszki</h4>
+              <Input
+                name="bike_tag_number"
+                label="Numer zawieszki z serwisu"
+                type="number"
+                placeholder="np. 45"
+                required={true}
+              />
             </div>
 
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-gray-100 pt-4">
             <Input
+              name="accepted_at"
               label="Data przyjęcia"
               type="date"
               defaultValue={todayDate}
-              required={true}
+              disabled={true} 
             />
             
             <Input
+              name="estimated_cost"
               label="Szacowana wartość (zł)"
               type="number"
               placeholder="np. 150"
@@ -273,6 +353,7 @@ export default function OrdersPage() {
               Opis usterki / zakres prac <span className="text-red-500">*</span>
             </label>
             <textarea
+              name="description"
               className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
               placeholder="Dokładny opis tego, co należy wykonać..."
               required={true}
@@ -282,17 +363,22 @@ export default function OrdersPage() {
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
             <button
               type="button"
-              onClick={() => setIsAddOrderFormOpen(false)}
+              onClick={() => {
+                formRef.current?.reset();
+                setIsAddOrderFormOpen(false);
+                setIsNewClient(false);
+                setIsNewBike(false);
+              }}
               className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
             >
               Anuluj
             </button>
-            <Button type="submit">Utwórz zlecenie</Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? "Zapisywanie..." : "Utwórz zlecenie"}
+            </Button>
           </div>
-
         </form>
       </Modal>
-    
     </div>
   );
 }

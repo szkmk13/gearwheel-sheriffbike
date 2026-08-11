@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { fetchClientDetails, updateClient, createBike } from "../api/clients";
+
 import Button from "../components/Button";
 import SlidePanel from "../components/SlidePanel";
 import Input from "../components/Input";
 import { getInitials } from "../components/ClientCard";
-import { mockClients } from "./ClientsPage";
-import { mockBikes } from "./ClientsPage";
 
 const EditIcon = () => (
   <button className="text-gray-400 hover:text-gray-700 transition-colors">
@@ -16,27 +17,78 @@ const EditIcon = () => (
 export default function ClientDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     const [isEditFormOpen, setIsEditFormOpen] = useState(false);
     const [isAddBikeFormOpen, setIsAddBikeFormOpen] = useState(false);
 
+    const editFormRef = useRef(null);
+    const bikeFormRef = useRef(null);
+
+    const { data: client, isLoading, isError, error } = useQuery({
+        queryKey: ['client', id],
+        queryFn: () => fetchClientDetails(id),
+    });
+
+    const editMutation = useMutation({
+        mutationFn: updateClient,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['client', id] });
+            queryClient.invalidateQueries({ queryKey: ['clients'] }); // Odśwież główną listę
+            editFormRef.current?.reset();
+            setIsEditFormOpen(false);
+        },
+        onError: (error) => alert(`Wystąpił błąd edycji: ${error.message}`)
+    });
+
+    const bikeMutation = useMutation({
+        mutationFn: createBike,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['client', id] }); // Odśwież detale, żeby pokazał się rower
+            bikeFormRef.current?.reset();
+            setIsAddBikeFormOpen(false);
+        },
+        onError: (error) => alert(`Wystąpił błąd zapisu roweru: ${error.message}`)
+    });
+
     const handleEditClient = (e) => {
         e.preventDefault();
-        console.log("Miejsce na przesłanie klienta do bazy");
-        setIsEditFormOpen(false); 
+        const formData = new FormData(e.target);
+        
+        const fullName = formData.get('fullName').trim();
+        const nameParts = fullName.split(' ');
+
+        const updatedData = {
+            first_name: nameParts[0],
+            last_name: nameParts.slice(1).join(' ') || '-',
+            email: formData.get('email') || "",
+            phone: formData.get('phone'),
+            notes: formData.get('notes') || ""
+        };
+
+        editMutation.mutate({ id, clientData: updatedData });
     };
+
     const handleAddBike = (e) => {
         e.preventDefault();
-        console.log("Rower przypisany do klienta ID:", client.id);
-        setIsAddBikeFormOpen(false);
+        const formData = new FormData(e.target);
+        
+        const newBikeData = {
+            customer: parseInt(id),
+            brand: formData.get('brand'),
+            model: formData.get('model'),
+            bike_type: formData.get('bike_type')
+        };
+
+        bikeMutation.mutate(newBikeData);
     };
 
-    const client = mockClients.find(c => c.id === parseInt(id));
-    const clientBikes = mockBikes.filter(bike => bike.clientId === client.id);
+    if (isLoading) return <div className="p-8 text-gray-500 font-medium">Ładowanie szczegółów klienta...</div>;
+    if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
+    if (!client) return <div className="p-8 text-red-500 font-medium">Nie znaleziono klienta.</div>;
 
-    if (!client) {
-        return <div className="p-8 text-red-500">Nie znaleziono klienta.</div>;
-    }
+    const fullName = `${client.first_name} ${client.last_name}`.trim();
+    const clientBikes = client.bikes || [];
 
     return(
         <div className="p-8">
@@ -48,10 +100,7 @@ export default function ClientDetailsPage() {
                     <svg className="w-6 h-6 text-gray-800 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    <span 
-                        onClick={() => navigate('/panel/clients')} 
-                        className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors"
-                    >
+                    <span className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors">
                         Wróć do klientów
                     </span>
                 </button>
@@ -61,11 +110,11 @@ export default function ClientDetailsPage() {
                 
                 <div className="flex items-center gap-6">
                     <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center font-bold text-2xl shrink-0">
-                        {getInitials(client.name)}
+                        {getInitials(fullName)}
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{client.name}</h1>
-                        <p className="text-gray-500 mt-1">{client.email} • {client.phone}</p>
+                        <h1 className="text-3xl font-bold text-gray-900">{fullName}</h1>
+                        <p className="text-gray-500 mt-1">{client.email || 'Brak e-maila'} • {client.phone}</p>
                     </div>
                 </div>
 
@@ -88,7 +137,7 @@ export default function ClientDetailsPage() {
                     {client.notes && (
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
                             <h3 className="text-lg font-semibold text-gray-800 mb-3">Notatki</h3>
-                            <p className="text-sm text-gray-600">{client.notes}</p>
+                            <p className="text-sm text-gray-600 whitespace-pre-wrap">{client.notes}</p>
                         </div>
                     )}
 
@@ -97,10 +146,12 @@ export default function ClientDetailsPage() {
                         {clientBikes.length > 0 ? (
                         <div className="space-y-3">
                             {clientBikes.map(bike => (
-                            <div key={bike.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center">
+                            <div key={bike.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors cursor-pointer">
                                 <div>
-                                <p className="font-semibold text-gray-800">{bike.manufacturer} <span className="font-normal text-gray-600">{bike.model}</span></p>
-                                <p className="text-xs text-gray-500 mt-1">{bike.type}</p>
+                                    <p className="font-semibold text-gray-800">
+                                        {bike.brand} <span className="font-normal text-gray-600">{bike.model}</span>
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1 capitalize">{bike.bike_type}</p>
                                 </div>
                             </div>
                             ))}
@@ -132,64 +183,70 @@ export default function ClientDetailsPage() {
                     </h2>
                     
                     <form 
+                        ref={editFormRef}
                         onSubmit={handleEditClient} 
                         className="flex flex-col gap-6"
                     >
-                        <div className="bg-white border border-gray-200 rounded-lg 
-                                        p-6 flex flex-col gap-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                            Dane kontaktowe
-                        </h3>
+                        <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-4">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                Dane kontaktowe
+                            </h3>
 
-                        <Input
-                            label="Imię i nazwisko"
-                            defaultValue={client.name}
-                            required={true}
-                        />
+                            <Input
+                                name="fullName"
+                                label="Imię i nazwisko"
+                                defaultValue={fullName}
+                                required={true}
+                            />
 
-                        <Input
-                            label="Adres e-mail"
-                            type="email"
-                            defaultValue={client.email}
-                        />
+                            <Input
+                                name="email"
+                                label="Adres e-mail"
+                                type="email"
+                                defaultValue={client.email}
+                            />
 
-                        <Input
-                            label="Numer telefonu"
-                            type="tel"
-                            defaultValue={client.phone}
-                            required={true}
-                        />
+                            <Input
+                                name="phone"
+                                label="Numer telefonu"
+                                type="tel"
+                                defaultValue={client.phone}
+                                required={true}
+                            />
                         </div>
 
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <div className="flex justify-between items-center mb-3 pb-2">
-                            <h3 className="text-lg font-semibold text-gray-800">
-                            Notatki
-                            </h3>
-                        </div>
-                        
-                        <textarea 
-                            defaultValue={client.notes}
-                            className="w-full mt-2 p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 
-                                    focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
-                            placeholder="Dodatkowe informacje o kliencie..."
-                        ></textarea>
+                            <div className="flex justify-between items-center mb-3 pb-2">
+                                <h3 className="text-lg font-semibold text-gray-800">Notatki</h3>
+                            </div>
+                            
+                            <textarea 
+                                name="notes"
+                                defaultValue={client.notes}
+                                className="w-full mt-2 p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 
+                                        focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
+                                placeholder="Dodatkowe informacje o kliencie..."
+                            ></textarea>
                         </div>
 
                         <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                        <button
-                            type="button"
-                            onClick={() => setIsEditFormOpen(false)}
-                            className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-                        >Anuluj</button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    editFormRef.current?.reset();
+                                    setIsEditFormOpen(false);
+                                }}
+                                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                            >Anuluj</button>
 
-                        <Button type="submit">Zapisz zmiany</Button>
+                            <Button type="submit" disabled={editMutation.isPending}>
+                                {editMutation.isPending ? "Zapisywanie..." : "Zapisz zmiany"}
+                            </Button>
                         </div>
                     </form>
                 </div>
             </SlidePanel>
             
-
             {/* Formularz dodania roweru */}
             <SlidePanel 
                 isOpen={isAddBikeFormOpen}
@@ -198,45 +255,52 @@ export default function ClientDetailsPage() {
                 <div className="space-y-6">
                     <h2 className="text-2xl font-bold text-gray-900 px-1">Nowy rower</h2>
 
-                    <form onSubmit={handleAddBike} className="flex flex-col gap-6">
-                    <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Dane roweru</h3>
+                    <form ref={bikeFormRef} onSubmit={handleAddBike} className="flex flex-col gap-6">
+                        <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-4">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Dane roweru</h3>
 
-                        <div className="mb-2">
-                            <p className="text-sm font-medium text-gray-700">Właściciel</p>
-                            <p className="text-sm text-gray-900 mt-1 font-semibold">{client.name}</p>
+                            <div className="mb-2">
+                                <p className="text-sm font-medium text-gray-700">Właściciel</p>
+                                <p className="text-sm text-gray-900 mt-1 font-semibold">{fullName}</p>
+                            </div>
+
+                            <Input
+                                name="brand"
+                                label="Producent"
+                                placeholder="np. Trek, Giant, Kross"
+                                required={true}
+                            />
+                            <Input
+                                name="model"
+                                label="Model"
+                                placeholder="np. Domane SL5"
+                                required={true}
+                            />
+                            <Input
+                                name="bike_type"
+                                label="Typ (np. road, mtb, city, gravel, electric, other)"
+                                placeholder="np. mtb"
+                                required={true}
+                            />
                         </div>
+                        
+                        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    bikeFormRef.current?.reset();
+                                    setIsAddBikeFormOpen(false);
+                                }}
+                                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                            >Anuluj</button>
 
-                        <Input
-                        label="Producent"
-                        placeholder="np. Trek, Giant, Kross"
-                        required={true}
-                        />
-                        <Input
-                        label="Model"
-                        placeholder="np. Domane SL5"
-                        required={true}
-                        />
-                        <Input
-                        label="Typ"
-                        placeholder="np. Szosowy, MTB, Gravel"
-                        required={true}
-                        />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                        <button
-                        type="button"
-                        onClick={() => setIsAddBikeFormOpen(false)}
-                        className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transiton-colors"
-                        >Anuluj</button>
-
-                        <Button type="submit">Zapisz rower</Button>
-
-                    </div>
+                            <Button type="submit" disabled={bikeMutation.isPending}>
+                                {bikeMutation.isPending ? "Zapisywanie..." : "Zapisz rower"}
+                            </Button>
+                        </div>
                     </form>
                 </div>
             </SlidePanel>
         </div>
-
     )
 }
