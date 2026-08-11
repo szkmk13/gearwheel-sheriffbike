@@ -25,22 +25,6 @@ export const createOrder = async (newOrderData) => {
   return response.json();
 };
 
-export const createBike = async (bikeData) => {
-  // to nie istnieje
-  const response = await fetch(`${API_BASE_URL}/api/bikes/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(bikeData),
-  });
-
-  if (!response.ok) {
-    throw new Error('Nie udało się zapisać roweru w bazie.');
-  }
-
-  return response.json();
-};
 
 // Pobiera szczegóły pojedynczego zlecenia
 export const fetchOrderDetails = async (id) => {
