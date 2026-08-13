@@ -2,15 +2,16 @@ import uuid
 
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 from .models import Customer, Bike
-from .serializers import CustomerListSerializer, CustomerDetailSerializer, BikeSerializer
+from .serializers import CustomerListSerializer, CustomerDetailSerializer, BikeSerializer, BikeReadSerializer
 
 
 class CustomerViewSet(ModelViewSet):
-    queryset = Customer.objects.all()
+    queryset = Customer.objects.prefetch_related('bikes')
     filterset_fields = ['email']
     search_fields = ['first_name', 'last_name', 'phone', 'email']
     ordering_fields = ['last_name', 'created_at']
@@ -19,6 +20,12 @@ class CustomerViewSet(ModelViewSet):
         if self.action == 'list':
             return CustomerListSerializer
         return CustomerDetailSerializer
+
+
+@extend_schema(responses=BikeReadSerializer)
+class BikeCreateView(CreateAPIView):
+    queryset = Bike.objects.select_related('customer')
+    serializer_class = BikeSerializer
 
 
 class BikeLookupView(APIView):
@@ -35,7 +42,7 @@ class BikeLookupView(APIView):
             ),
         ],
         responses={
-            200: BikeSerializer,
+            200: BikeReadSerializer,
             404: OpenApiResponse(description=_('No bike found for the given code.')),
         },
     )
