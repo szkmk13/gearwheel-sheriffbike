@@ -2,6 +2,7 @@ import uuid
 
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
@@ -19,6 +20,11 @@ class CustomerViewSet(ModelViewSet):
         if self.action == 'list':
             return CustomerListSerializer
         return CustomerDetailSerializer
+
+
+class BikeCreateView(CreateAPIView):
+    queryset = Bike.objects.all()
+    serializer_class = BikeSerializer
 
 
 class BikeLookupView(APIView):
