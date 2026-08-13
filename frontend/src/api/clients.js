@@ -28,9 +28,9 @@ export const createClient = async (newClientData) => {
   return response.json();
 };
 
-// Tymczasowy endpoint do tworzenia roweru 
+// POST /api/customers/bikes/ endpoint do tworzenia roweru 
 export const createBike = async (bikeData) => {
-  const response = await fetch(`${API_BASE_URL}/api/bikes/`, {
+  const response = await fetch(`${API_BASE_URL}/api/customers/bikes/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

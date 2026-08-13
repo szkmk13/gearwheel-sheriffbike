@@ -21,7 +21,6 @@ export default function OrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [isAddOrderFormOpen, setIsAddOrderFormOpen] = useState(false);
   
-
   const [isNewClient, setIsNewClient] = useState(false);
   const [isNewBike, setIsNewBike] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
@@ -46,7 +45,7 @@ export default function OrdersPage() {
   const { data: selectedClientDetails } = useQuery({
     queryKey: ['client', selectedClientId],
     queryFn: () => fetchClientDetails(selectedClientId),
-    enabled: !!selectedClientId && !isNewClient, // Pobieraj tylko jeśli klient już istnieje
+    enabled: !!selectedClientId && !isNewClient,
   });
   const bikeOptions = (selectedClientDetails?.bikes || []).map(bike => ({
     value: bike.id,
@@ -58,7 +57,6 @@ export default function OrdersPage() {
       let finalCustomerId = formData.get('customer');
       let finalBikeId = formData.get('bike');
 
-      // 1. Jeśli to nowy klient, najpierw utwórz go w bazie
       if (isNewClient) {
         const fullName = formData.get('fullName').trim();
         const nameParts = fullName.split(' ');
@@ -71,10 +69,9 @@ export default function OrdersPage() {
           notes: ''
         };
         const createdClient = await createClient(newClientData);
-        finalCustomerId = createdClient.id; // Przechwytujemy nowe ID z bazy!
+        finalCustomerId = createdClient.id; 
       }
 
-      // 2. Jeśli to nowy klient LUB nowy rower, utwórz rower (przypisując do finalCustomerId)
       if (isNewClient || isNewBike) {
         const newBikeData = {
           customer: parseInt(finalCustomerId),
@@ -83,14 +80,13 @@ export default function OrdersPage() {
           bike_type: formData.get('bike_type')
         };
         const createdBike = await createBike(newBikeData);
-        finalBikeId = createdBike.id; // Przechwytujemy nowe ID roweru!
+        finalBikeId = createdBike.id; 
       }
 
-      // 3. Na samym końcu utwórz docelowe zlecenie serwisowe[cite: 1]
       const newOrder = {
         customer: parseInt(finalCustomerId),
         bike: parseInt(finalBikeId),
-        bike_tag_number: parseInt(formData.get('bike_tag_number') || 0),
+        bike_tag_number: parseInt(finalBikeId),
         description: formData.get('description'),
         estimated_cost: formData.get('estimated_cost') || null,
       };
@@ -98,7 +94,6 @@ export default function OrdersPage() {
       return await createOrder(newOrder);
     },
     onSuccess: () => {
-      // Odświeżamy zlecenia i klientów po udanej akcji
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       formRef.current?.reset();
@@ -114,7 +109,7 @@ export default function OrdersPage() {
   const handleAddOrder = (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    mutation.mutate(formData); // Przekazujemy cały formData do naszej zaawansowanej mutacji
+    mutation.mutate(formData);
   };
 
   return (
@@ -172,7 +167,6 @@ export default function OrdersPage() {
         </table>
       </div>
 
-      {/*Podgląd zlecenia*/}
       <SlidePanel
         isOpen={!!selectedOrder}
         onClose={() => setSelectedOrder(null)}
@@ -227,7 +221,6 @@ export default function OrdersPage() {
         )}
       </SlidePanel>
 
-      {/*Formularz dodania zlecenia*/}
       <Modal 
         isOpen={isAddOrderFormOpen} 
         onClose={() => setIsAddOrderFormOpen(false)}
@@ -248,7 +241,7 @@ export default function OrdersPage() {
                     checked={isNewClient}
                     onChange={(e) => {
                       setIsNewClient(e.target.checked);
-                      if (e.target.checked) setIsNewBike(true); // Nowy klient MUSI mieć nowy rower
+                      if (e.target.checked) setIsNewBike(true); 
                     }}
                     className="w-4 h-4 text-[#009ceb] bg-white border-gray-300 rounded focus:ring-[#009ceb] cursor-pointer"
                   />
@@ -313,22 +306,23 @@ export default function OrdersPage() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                   <Input name="brand" label="Producent" placeholder="np. Trek" required={true} />
                   <Input name="model" label="Model" placeholder="np. Domane SL5" required={true} />
-                  <Input name="bike_type" label="Typ (np. mtb, road)" placeholder="np. mtb" required={true} />
+                  <Select
+                    name="bike_type"
+                    label="Typ roweru"
+                    required={true}
+                    options={[
+                        { value: 'road', label: 'Szosowy (road)' },
+                        { value: 'mtb', label: 'Górski (mtb)' },
+                        { value: 'city', label: 'Miejski (city)' },
+                        { value: 'gravel', label: 'Gravel (gravel)' },
+                        { value: 'electric', label: 'Elektryczny (electric)' },
+                        { value: 'other', label: 'Inny (other)' }
+                    ]}
+                  />
                 </div>
               )}
             </div>
             
-            <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition-all">
-              <h4 className="text-sm font-semibold text-gray-800 mb-4">Fizyczny numer zawieszki</h4>
-              <Input
-                name="bike_tag_number"
-                label="Numer zawieszki z serwisu"
-                type="number"
-                placeholder="np. 45"
-                required={true}
-              />
-            </div>
-
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-gray-100 pt-4">

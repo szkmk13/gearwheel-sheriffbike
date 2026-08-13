@@ -6,12 +6,13 @@ import { fetchClientDetails, updateClient, createBike } from "../api/clients";
 import Button from "../components/Button";
 import SlidePanel from "../components/SlidePanel";
 import Input from "../components/Input";
+import Select from "../components/Select";
 import { getInitials } from "../components/ClientCard";
 
 const EditIcon = () => (
-  <button className="text-gray-400 hover:text-gray-700 transition-colors">
+  <div className="text-gray-400 transition-colors">
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-  </button>
+  </div>
 );
 
 export default function ClientDetailsPage() {
@@ -276,11 +277,18 @@ export default function ClientDetailsPage() {
                                 placeholder="np. Domane SL5"
                                 required={true}
                             />
-                            <Input
+                            <Select
                                 name="bike_type"
-                                label="Typ (np. road, mtb, city, gravel, electric, other)"
-                                placeholder="np. mtb"
+                                label="Typ roweru"
                                 required={true}
+                                options={[
+                                    { value: 'road', label: 'Szosowy (road)' },
+                                    { value: 'mtb', label: 'Górski (mtb)' },
+                                    { value: 'city', label: 'Miejski (city)' },
+                                    { value: 'gravel', label: 'Gravel (gravel)' },
+                                    { value: 'electric', label: 'Elektryczny (electric)' },
+                                    { value: 'other', label: 'Inny (other)' }
+                                ]}
                             />
                         </div>
                         

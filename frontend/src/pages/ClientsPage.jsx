@@ -10,8 +10,6 @@ import Input from "../components/Input";
 import StickyHeader from "../components/StickyHeader";
 
 
-  export const mockClients = [];
-  export const mockBikes = [];
 
 
 export default function ClientsPage() {
