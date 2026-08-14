@@ -1,17 +1,24 @@
 import uuid
 
+from django.db.models import Prefetch
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.generics import CreateAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
+
+from apps.orders.models import RepairOrder
+
 from .models import Customer, Bike
 from .serializers import CustomerListSerializer, CustomerDetailSerializer, BikeSerializer, BikeReadSerializer
 
 
 class CustomerViewSet(ModelViewSet):
-    queryset = Customer.objects.prefetch_related('bikes')
+    queryset = Customer.objects.prefetch_related(
+        'bikes',
+        Prefetch('repair_orders', queryset=RepairOrder.objects.select_related('bike').order_by('-created_at')),
+    )
     filterset_fields = ['email']
     search_fields = ['first_name', 'last_name', 'phone', 'email']
     ordering_fields = ['last_name', 'created_at']

@@ -19,7 +19,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CORS_ALLOW_CREDENTIALS = True
-DEBUG=True
+DEBUG = True
 
 # Temporary: allow unauthenticated access to the API in local dev.
 REST_FRAMEWORK = {
