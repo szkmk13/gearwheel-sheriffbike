@@ -96,9 +96,9 @@ export const DEFAULT_CONTENT = {
       { d: "Niedziela", h: "Zamknięte",    closed: true },
     ],
     social: {
-      facebook: "https://facebook.com",
-      instagram: "https://instagram.com",
-      google: "https://www.google.com/maps",
+      facebook: "https://www.facebook.com/profile.php?id=61574532525611",
+      instagram: "https://www.instagram.com/sheriffbikeserwis/",
+      google: "https://maps.app.goo.gl/yGUZeYdLnXSvCuRs5",
     },
     blurb: "Nowoczesny serwis rowerowy z sercem do detalu. Latem rowery, zimą narty i snowboard.",
   },
