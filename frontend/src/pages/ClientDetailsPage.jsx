@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { fetchClientDetails, updateClient, createBike } from "../api/clients";
 
 import Button from "../components/Button";
@@ -38,6 +39,7 @@ export default function ClientDetailsPage() {
             queryClient.invalidateQueries({ queryKey: ['clients'] }); // Odśwież główną listę
             editFormRef.current?.reset();
             setIsEditFormOpen(false);
+            toast.success("Dane klienta zostały zaktualizowane!");
         },
         onError: (error) => alert(`Wystąpił błąd edycji: ${error.message}`)
     });
@@ -48,6 +50,7 @@ export default function ClientDetailsPage() {
             queryClient.invalidateQueries({ queryKey: ['client', id] }); // Odśwież detale, żeby pokazał się rower
             bikeFormRef.current?.reset();
             setIsAddBikeFormOpen(false);
+            toast.success("Rower został pomyślnie dodany!");
         },
         onError: (error) => alert(`Wystąpił błąd zapisu roweru: ${error.message}`)
     });
@@ -147,7 +150,7 @@ export default function ClientDetailsPage() {
                         {clientBikes.length > 0 ? (
                         <div className="space-y-3">
                             {clientBikes.map(bike => (
-                            <div key={bike.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors cursor-pointer">
+                            <div key={bike.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center">
                                 <div>
                                     <p className="font-semibold text-gray-800">
                                         {bike.brand} <span className="font-normal text-gray-600">{bike.model}</span>

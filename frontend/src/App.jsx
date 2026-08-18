@@ -7,6 +7,7 @@ import InventoryPage from "./pages/InventoryPage";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailsPage from "./pages/ClientDetailsPage"
 import OrderDetailsPage from './pages/OrderDetailsPage';
+import { Toaster } from 'react-hot-toast';
 
 // Vite's `base` (/static/frontend/) is only a real URL prefix when this
 // bundle is previewed directly off the Vite dev server; when django-vite
@@ -20,6 +21,18 @@ const basename = viteBase && window.location.pathname.startsWith(viteBase + '/')
 function App() {
   return (
     <BrowserRouter basename={basename}>
+
+      <Toaster 
+          position="top-right" 
+          toastOptions={{
+            duration: 4000, // Znika po 4 sekundach
+            style: {
+              background: '#333',
+              color: '#fff',
+            },
+          }} 
+        />
+        
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/panel" element={<MainLayout />}>
