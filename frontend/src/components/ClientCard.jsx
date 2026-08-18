@@ -24,7 +24,7 @@ export default function ClientCard({ client, onClick }) {
                 </div>
                 <div>
                     <h3 className="text-[15px] font-semibold text-gray-800">{fullName}</h3>
-                    <p className="text-xs text-gray-500">{client.repair_orders || 0} zleceń</p>
+                    <p className="text-xs text-gray-500">{client.repair_orders_count || 0} zleceń</p>
                 </div>
             </div>
 

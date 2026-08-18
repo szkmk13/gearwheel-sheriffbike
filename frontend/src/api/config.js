@@ -1,10 +1,10 @@
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000';
 
 export const fetcher = async (endpoint) => {
   console.log(`[API GET] Fetching: ${endpoint}`);
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    credentials: 'omit',
+    credentials: 'include',
     headers: {
       'Content-Type': 'application/json',
     }

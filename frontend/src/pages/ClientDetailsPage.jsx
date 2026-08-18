@@ -9,6 +9,7 @@ import SlidePanel from "../components/SlidePanel";
 import Input from "../components/Input";
 import Select from "../components/Select";
 import { getInitials } from "../components/ClientCard";
+import StatusBadge from "../components/StatusBadge"; 
 
 const EditIcon = () => (
   <div className="text-gray-400 transition-colors">
@@ -36,23 +37,23 @@ export default function ClientDetailsPage() {
         mutationFn: updateClient,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['client', id] });
-            queryClient.invalidateQueries({ queryKey: ['clients'] }); // Odśwież główną listę
+            queryClient.invalidateQueries({ queryKey: ['clients'] }); 
             editFormRef.current?.reset();
             setIsEditFormOpen(false);
             toast.success("Dane klienta zostały zaktualizowane!");
         },
-        onError: (error) => alert(`Wystąpił błąd edycji: ${error.message}`)
+        onError: (error) => toast.error(`Wystąpił błąd edycji: ${error.message}`)
     });
 
     const bikeMutation = useMutation({
         mutationFn: createBike,
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['client', id] }); // Odśwież detale, żeby pokazał się rower
+            queryClient.invalidateQueries({ queryKey: ['client', id] }); 
             bikeFormRef.current?.reset();
             setIsAddBikeFormOpen(false);
             toast.success("Rower został pomyślnie dodany!");
         },
-        onError: (error) => alert(`Wystąpił błąd zapisu roweru: ${error.message}`)
+        onError: (error) => toast.error(`Wystąpił błąd zapisu roweru: ${error.message}`)
     });
 
     const handleEditClient = (e) => {
@@ -93,6 +94,7 @@ export default function ClientDetailsPage() {
 
     const fullName = `${client.first_name} ${client.last_name}`.trim();
     const clientBikes = client.bikes || [];
+    const clientOrders = client.repair_orders || [];
 
     return(
         <div className="p-8">
@@ -169,9 +171,33 @@ export default function ClientDetailsPage() {
                 <div className="space-y-6">
                     <div className="bg-white border border-gray-200 rounded-lg p-6">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Historia zleceń</h3>
-                        <div className="bg-gray-100 rounded text-gray-500 text-sm p-4 text-center">
-                            Tu wstawimy historię zamówień klienta
-                        </div>
+                        {clientOrders.length > 0 ? (
+                            <div className="space-y-3">
+                                {clientOrders.map(order => (
+                                    <div 
+                                        key={order.id} 
+                                        onClick={() => navigate(`/panel/orders/${order.id}`)}
+                                        className="p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors cursor-pointer"
+                                    >
+                                        <div>
+                                            <p className="font-semibold text-gray-800">
+                                                #{order.id} <span className="font-normal text-gray-600 ml-1">{order.bike_label}</span>
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                {new Date(order.created_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <StatusBadge status={order.status} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-gray-100 rounded text-gray-500 text-sm p-4 text-center">
+                                Brak zleceń serwisowych dla tego klienta.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
