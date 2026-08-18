@@ -6,6 +6,7 @@ import OrdersPage from "./pages/OrdersPage";
 import InventoryPage from "./pages/InventoryPage";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailsPage from "./pages/ClientDetailsPage"
+import OrderDetailsPage from './pages/OrderDetailsPage';
 
 // Vite's `base` (/static/frontend/) is only a real URL prefix when this
 // bundle is previewed directly off the Vite dev server; when django-vite
@@ -27,6 +28,7 @@ function App() {
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="clients" element={<ClientsPage />} />
           <Route path="clients/:id" element={<ClientDetailsPage />} />
+          <Route path="orders/:id" element={<OrderDetailsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
