@@ -10,8 +10,6 @@ import Input from "../components/Input";
 import StickyHeader from "../components/StickyHeader";
 
 
-
-
 export default function ClientsPage() {
   const navigate = useNavigate();
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
