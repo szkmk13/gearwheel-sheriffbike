@@ -59,8 +59,7 @@ urlpatterns = [
     path('api/appointments/', include('apps.appointments.urls')),
     path('api/inventory/', include('apps.inventory.urls')),
     path('api/storage/', include('apps.storage.urls')),
-    path('api/', include('apps.contact.urls')),
-    path('api/', include('apps.reviews.urls')),
+    path('api/', include('apps.landing.urls')),
 ]
 
 if settings.DEBUG:

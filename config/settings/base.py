@@ -33,8 +33,7 @@ INSTALLED_APPS = [
     'apps.appointments',
     'apps.inventory',
     'apps.storage',
-    'apps.contact',
-    'apps.reviews',
+    'apps.landing',
 ]
 
 MIDDLEWARE = [
