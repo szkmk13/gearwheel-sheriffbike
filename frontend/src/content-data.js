@@ -72,7 +72,7 @@ export const DEFAULT_CONTENT = {
     eyebrow: "Sezon zimowy",
     title: "Przechowaj rower\nu nas przez zimę",
     lead: "Nie masz gdzie trzymać roweru zimą? Zostaw go u nas. Odbierzesz na wiosnę - po przeglądzie, wyczyszczony i gotowy do jazdy.",
-    price: "350 zł",
+    price: "550 zł",
     priceNote: "za cały sezon, z przeglądem i czyszczeniem",
     service: "Przechowanie zimowe",
     cta: "Zarezerwuj miejsce",
