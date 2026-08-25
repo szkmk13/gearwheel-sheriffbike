@@ -38,6 +38,35 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
+        env:
+          # Vite inlines VITE_* into the bundle at BUILD time, and the build
+          # happens here - not on mikrus. A frontend/.env on the server is
+          # never read, because deploy_remote.sh only runs collectstatic.
+          # Vite picks VITE_-prefixed vars straight out of process.env, so
+          # there is no file to write.
+          VITE_TURNSTILE_SITE_KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+          # VITE_API_URL is deliberately NOT set: api-base.js falls back to a
+          # same-origin "/api", which is what production needs. Setting it to
+          # a dev value would bake that URL into every visitor's browser.
+
+      - name: Verify the bundle is deployable
+        env:
+          KEY: ${{ secrets.VITE_TURNSTILE_SITE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::VITE_TURNSTILE_SITE_KEY is not set in repository secrets - the booking form's captcha would never render."
+            exit 1
+          fi
+          if ! grep -rqF "$KEY" static/frontend/assets/; then
+            echo "::error::Turnstile site key did not make it into the built bundle."
+            exit 1
+          fi
+          if grep -rqF 'localhost:8000' static/frontend/assets/; then
+            echo "::error::A localhost API URL was baked into the bundle - visitors' browsers would call their own machine."
+            exit 1
+          fi
+          echo "Bundle OK: site key inlined, no localhost URL."
+
       - name: Archive built frontend (tar preserves dotfiles like .vite/manifest.json)
         run: tar -czf frontend-static.tar.gz -C static frontend
       - uses: actions/upload-artifact@v4
