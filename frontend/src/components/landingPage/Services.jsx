@@ -2,20 +2,13 @@ import React from 'react';
 import { SheriffStar, Icon } from './Icons.jsx';
 import { AccentTitle } from './Hero.jsx';
 import { BTN_DARK, BTN_PRIMARY, BTN_LG } from './buttonStyles.js';
-
-function prefillBooking(equip, service) {
-  try {
-    sessionStorage.setItem("sheriff:prefill", JSON.stringify({ equip, service }));
-    window.dispatchEvent(new CustomEvent("sheriff:prefill", { detail: { equip, service } }));
-  } catch (e) {}
-}
+import { prefillBooking } from './bookingPrefill.js';
 
 function ServiceCard({ s }) {
   const [open, setOpen] = React.useState(false);
   const onBook = (e) => {
     e.preventDefault();
-    prefillBooking("rower", s.title);
-    document.getElementById("rezerwacja").scrollIntoView({ behavior: "smooth" });
+    prefillBooking({ equip: "rower", service: s.title });
   };
   const ServiceIcon = Icon[s.icon] || Icon.wrench;
   const hasPoints = !!(s.points && s.points.length);
@@ -94,7 +87,7 @@ function Services({ c }) {
       <div className="mx-auto max-w-[1240px] px-[clamp(20px,5vw,64px)]">
         <div className="max-w-[720px]">
           <div className="inline-flex items-center gap-[9px] text-[12.5px] font-bold uppercase tracking-[0.18em] text-accent-deep"><SheriffStar size={14} /> {s.eyebrow}</div>
-          <h2 className="mt-[18px] text-[clamp(34px,5.2vw,60px)] font-black uppercase leading-[0.92] tracking-[-0.015em]"><AccentTitle text={s.title} /></h2>
+          <h2 className="mt-[18px] text-[clamp(34px,5.2vw,60px)] font-brand font-black uppercase leading-[0.9] tracking-[0.01em]"><AccentTitle text={s.title} /></h2>
           {(Array.isArray(s.lead) ? s.lead : [s.lead]).map((p, i) => (
             <p className="mt-5 max-w-[580px] text-[clamp(17px,1.5vw,19px)] text-ink-2" key={i}>{p}</p>
           ))}
@@ -103,7 +96,6 @@ function Services({ c }) {
         <div className="mt-[clamp(40px,5vw,64px)] grid grid-cols-4 gap-4 max-[1180px]:grid-cols-3 max-[1000px]:grid-cols-2 max-[640px]:grid-cols-1">
           {s.items.map((it, i) => <ServiceCard key={i} s={it} />)}
           <article className="flex flex-col items-start gap-1 rounded-[22px] border p-[22px] border-[color-mix(in_oklab,var(--color-accent)_22%,var(--color-line))] bg-accent-soft">
-            <SheriffStar size={40} className="mb-4 text-accent" />
             <h3 className="text-[19px] font-bold tracking-[-.01em]">{s.ctaTitle}</h3>
             <p className="mt-2.5 text-[13.5px] leading-[1.5] text-ink-2">{s.ctaDesc}</p>
             <a className={BTN_DARK + " mt-auto"} href="#rezerwacja">Zapytaj o wycenę <Icon.arrow /></a>
@@ -122,10 +114,20 @@ function Winter({ c }) {
       <div className="relative mx-auto grid max-w-[1240px] grid-cols-2 items-center gap-[clamp(36px,5vw,72px)] px-[clamp(20px,5vw,64px)] max-[1000px]:grid-cols-1">
         <div>
           <div className="inline-flex items-center gap-[9px] text-[12.5px] font-bold uppercase tracking-[0.18em] text-winter-ice"><SheriffStar size={14} /> {w.eyebrow}</div>
-          <h2 className="mt-[18px] text-[clamp(36px,4.6vw,62px)] font-black uppercase leading-[0.92] tracking-[-0.015em] text-white"><AccentTitle text={w.title} /></h2>
+          <h2 className="mt-[18px] text-[clamp(36px,4.6vw,62px)] font-brand font-black uppercase leading-[0.9] tracking-[0.01em] text-white"><AccentTitle text={w.title} /></h2>
           <p className="mt-[22px] max-w-[32em] text-[clamp(16px,1.5vw,18.5px)] leading-[1.6] text-winter-mut">{w.lead}</p>
           <div className="mt-8">
-            <a className={BTN_PRIMARY + " " + BTN_LG} href="#rezerwacja">{w.cta} <Icon.arrow /></a>
+            {/* Switches the form to ski/snowboard and preselects the service.
+                Taken from w.items[0] rather than hardcoded, so it stays valid
+                if the winter list is reordered or retitled - BookingForm
+                builds its winter options from these same titles. */}
+            <button
+              type="button"
+              className={BTN_PRIMARY + " " + BTN_LG}
+              onClick={() => prefillBooking({ equip: "zima", service: w.items[0].title })}
+            >
+              {w.cta} <Icon.arrow />
+            </button>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-[14px] max-[720px]:grid-cols-1">

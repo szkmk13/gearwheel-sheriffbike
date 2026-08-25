@@ -1,3 +1,9 @@
+"""Public, unauthenticated endpoints backing the React landing page.
+
+Everything here is reachable by anonymous visitors - the rest of the API
+defaults to IsAdminUser, so each view opts out explicitly.
+"""
+
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
@@ -9,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .serializers import ContactFormSerializer
-from .services import append_lead_to_sheet, verify_turnstile
+from .services import append_lead_to_sheet, fetch_google_reviews, verify_turnstile
 
 
 class ContactFormResponseSerializer(serializers.Serializer):
@@ -59,11 +65,11 @@ class ContactFormView(APIView):
         if remote_ip:
             remote_ip = remote_ip.split(',')[0].strip()
 
-        # if not verify_turnstile(data['turnstile_token'], remote_ip):
-        #     return Response(
-        #         {'detail': 'Weryfikacja captcha nie powiodła się. Spróbuj ponownie.'},
-        #         status=status.HTTP_400_BAD_REQUEST,
-        #     )
+        if not verify_turnstile(data['turnstile_token'], remote_ip):
+            return Response(
+                {'detail': 'Weryfikacja captcha nie powiodła się. Spróbuj ponownie.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         append_lead_to_sheet({
             'created_at': timezone.localtime().strftime('%Y-%m-%d %H:%M'),
@@ -76,3 +82,19 @@ class ContactFormView(APIView):
         })
 
         return Response({'ok': True}, status=status.HTTP_201_CREATED)
+
+
+class GoogleReviewsView(APIView):
+    """Public read-only feed of the shop's Google reviews for the landing page."""
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        data = fetch_google_reviews()
+        if data is None:
+            # Not configured, or Google is unreachable. The frontend falls back
+            # to its own hardcoded numbers, so a 200 with source="fallback"
+            # keeps that path simple - this is not an error the user caused.
+            return Response({'source': 'fallback', 'reviews': []})
+        return Response({'source': 'google', **data})
