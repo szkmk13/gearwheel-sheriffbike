@@ -17,21 +17,21 @@
   <meta property="og:title" content="Sheriff Bike - Serwis rowerowy Gdańsk" />
   <meta property="og:description" content="Serwis rowerowy w Gdańsku. Przeglądy, naprawy, składanie rowerów oraz serwis nart i snowboardu zimą. Umów wizytę online." />
   <meta property="og:url" content="{{ request.scheme }}://{{ request.get_host }}{% url 'home' %}" />
-  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'frontend/assets/trek.jpg' %}" />
+  <meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'frontend/assets/warsztat-narzedzia.jpg' %}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Sheriff Bike - Serwis rowerowy Gdańsk" />
   <meta name="twitter:description" content="Serwis rowerowy w Gdańsku. Przeglądy, naprawy, składanie rowerów oraz serwis nart i snowboardu zimą. Umów wizytę online." />
-  <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'frontend/assets/trek.jpg' %}" />
+  <meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{% static 'frontend/assets/warsztat-narzedzia.jpg' %}" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,100..900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800;900&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   {% if not noindex %}
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
-    "@type": "BicycleStore",
+    "@type": "Store",
     "name": "Sheriff Bike",
     "image": "{{ request.scheme }}://{{ request.get_host }}{% static 'frontend/assets/trek.jpg' %}",
     "url": "{{ request.scheme }}://{{ request.get_host }}{% url 'home' %}",
@@ -39,7 +39,7 @@
     "priceRange": "$$",
     "address": {
       "@type": "PostalAddress",
-      "streetAddress": "kmdr. T. Bramińskiego 11",
+      "streetAddress": "Kmdr. Tadeusza Bramińskiego 11",
       "addressLocality": "Gdańsk",
       "postalCode": "80-180",
       "addressCountry": "PL"
