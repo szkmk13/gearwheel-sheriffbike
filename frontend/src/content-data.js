@@ -59,10 +59,34 @@ export const DEFAULT_CONTENT = {
       "Przegląd podstawowy", "Przegląd podstawowy Plus", "Przegląd roweru dziecięcego",
       "Przegląd e-bike", "Przegląd kompleksowy", "Przegląd premium",
       "Złożenie roweru z kartonu", "Czyszczenie napędu", "Centrowanie kół",
-      "Odpowietrzenie hamulców", "Inne",
+      "Odpowietrzenie hamulców", "Przechowanie zimowe", "Inne",
     ],
     ctaTitle: "Nie wiesz, czego potrzebujesz?",
     ctaDesc: "Przyjedź lub napisz - ocenimy stan roweru i zaproponujemy najlepszy zakres serwisu. Wycena zawsze bezpłatna.",
+  },
+
+  // Winter bike storage - the bridge section between the bike services and the
+  // ski/snowboard ones. `service` must stay in sync with the matching entry in
+  // services.bookingOptions, or the prefilled booking select renders blank.
+  storage: {
+    eyebrow: "Sezon zimowy",
+    title: "Przechowaj rower\nu nas przez zimę",
+    lead: "Nie masz gdzie trzymać roweru zimą? Zostaw go u nas. Odbierzesz na wiosnę - po przeglądzie, wyczyszczony i gotowy do jazdy.",
+    price: "350 zł",
+    priceNote: "za cały sezon, z przeglądem i czyszczeniem",
+    service: "Przechowanie zimowe",
+    cta: "Zarezerwuj miejsce",
+    steps: [
+      { icon: "bike",   title: "Przywieź rower",         desc: "Wpadnij jesienią, zanim zrobi się zimno. Resztą zajmiemy się my." },
+      { icon: "snow",   title: "Garażujemy",             desc: "Rower stoi u nas w suchym, zamkniętym pomieszczeniu przez całą zimę." },
+      { icon: "wrench", title: "Przegląd i czyszczenie", desc: "W tym czasie robimy pełny przegląd i myjemy napęd." },
+      { icon: "check",  title: "Odbierasz gotowy",       desc: "Na wiosnę wsiadasz i jedziesz. Bez kurzu, bez skrzypienia." },
+    ],
+    perks: [
+      "Suche, zamknięte pomieszczenie",
+      "Przegląd i czyszczenie w cenie",
+      "Odbiór na wiosnę w dogodnym terminie",
+    ],
   },
 
   winter: {

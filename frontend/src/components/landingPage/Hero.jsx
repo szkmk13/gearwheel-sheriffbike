@@ -4,6 +4,7 @@ import { CustomSelect } from './CustomSelect.jsx';
 import { BTN, BTN_PRIMARY, BTN_GHOST } from './buttonStyles.js';
 import { ReviewsModal } from './ReviewsModal.jsx';
 import { useGoogleReviews } from './useGoogleReviews.js';
+import { prefillBooking } from './bookingPrefill.js';
 
 const ASSET_BASE = import.meta.env.BASE_URL;
 
@@ -238,13 +239,7 @@ function HeroCentered({ c }) {
   const [service, setService] = React.useState("");
   const opts = equip === "rower" ? bikeOpts : c.winter.items.map((i) => i.title);
 
-  const goBook = () => {
-    try {
-      sessionStorage.setItem("sheriff:prefill", JSON.stringify({ equip, service }));
-      window.dispatchEvent(new CustomEvent("sheriff:prefill", { detail: { equip, service } }));
-    } catch (e) {}
-    document.getElementById("rezerwacja").scrollIntoView({ behavior: "smooth" });
-  };
+  const goBook = () => prefillBooking({ equip, service });
 
   return (
     <header className="relative z-[1] flex min-h-[clamp(580px,88vh,840px)] items-center bg-ink" id="top">

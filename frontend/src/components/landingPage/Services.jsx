@@ -2,20 +2,13 @@ import React from 'react';
 import { SheriffStar, Icon } from './Icons.jsx';
 import { AccentTitle } from './Hero.jsx';
 import { BTN_DARK, BTN_PRIMARY, BTN_LG } from './buttonStyles.js';
-
-function prefillBooking(equip, service) {
-  try {
-    sessionStorage.setItem("sheriff:prefill", JSON.stringify({ equip, service }));
-    window.dispatchEvent(new CustomEvent("sheriff:prefill", { detail: { equip, service } }));
-  } catch (e) {}
-}
+import { prefillBooking } from './bookingPrefill.js';
 
 function ServiceCard({ s }) {
   const [open, setOpen] = React.useState(false);
   const onBook = (e) => {
     e.preventDefault();
-    prefillBooking("rower", s.title);
-    document.getElementById("rezerwacja").scrollIntoView({ behavior: "smooth" });
+    prefillBooking({ equip: "rower", service: s.title });
   };
   const ServiceIcon = Icon[s.icon] || Icon.wrench;
   const hasPoints = !!(s.points && s.points.length);
@@ -124,7 +117,17 @@ function Winter({ c }) {
           <h2 className="mt-[18px] text-[clamp(36px,4.6vw,62px)] font-brand font-black uppercase leading-[0.9] tracking-[0.01em] text-white"><AccentTitle text={w.title} /></h2>
           <p className="mt-[22px] max-w-[32em] text-[clamp(16px,1.5vw,18.5px)] leading-[1.6] text-winter-mut">{w.lead}</p>
           <div className="mt-8">
-            <a className={BTN_PRIMARY + " " + BTN_LG} href="#rezerwacja">{w.cta} <Icon.arrow /></a>
+            {/* Switches the form to ski/snowboard and preselects the service.
+                Taken from w.items[0] rather than hardcoded, so it stays valid
+                if the winter list is reordered or retitled - BookingForm
+                builds its winter options from these same titles. */}
+            <button
+              type="button"
+              className={BTN_PRIMARY + " " + BTN_LG}
+              onClick={() => prefillBooking({ equip: "zima", service: w.items[0].title })}
+            >
+              {w.cta} <Icon.arrow />
+            </button>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-[14px] max-[720px]:grid-cols-1">

@@ -20,7 +20,11 @@ const FIELD_INPUT = "w-full rounded-[11px] border-[1.5px] border-line-2 bg-paper
 const FIELD_ERR = "border-[#C0392B] shadow-[0_0_0_4px_rgba(192,57,43,.1)]";
 
 function BookingForm({ c }) {
-  const bikeOpts = c.services.items.map((i) => i.title).concat(["Inne / nie wiem"]);
+  // Same source as the hero's quick-select. These used to diverge - the hero
+  // read bookingOptions while this form derived its list from services.items -
+  // so anything offered only in bookingOptions (e.g. "Przechowanie zimowe")
+  // prefilled into a value this select had no option for, and rendered blank.
+  const bikeOpts = c.services.bookingOptions || c.services.items.map((i) => i.title).concat(["Inne / nie wiem"]);
   const winterOpts = c.winter.items.map((i) => i.title).concat(["Pełny serwis", "Inne / nie wiem"]);
   const optsFor = (e) => (e === "rower" ? bikeOpts : winterOpts);
 
@@ -30,6 +34,7 @@ function BookingForm({ c }) {
   const [touched, setTouched] = React.useState(false);
   const [sending, setSending] = React.useState(false);
   const [submitError, setSubmitError] = React.useState("");
+  const [consent, setConsent] = React.useState(false);
   const { containerRef: turnstileRef, token: turnstileToken, reset: resetTurnstile } = useTurnstile(TURNSTILE_SITE_KEY);
 
   React.useEffect(() => {
@@ -47,7 +52,7 @@ function BookingForm({ c }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const phoneOk = form.phone.replace(/\D/g, "").length >= 9;
   const captchaOk = !TURNSTILE_SITE_KEY || !!turnstileToken;
-  const valid = form.name.trim().length > 1 && phoneOk && captchaOk;
+  const valid = form.name.trim().length > 1 && phoneOk && captchaOk && consent;
 
   const submit = async (e) => {
     e.preventDefault();
@@ -100,7 +105,9 @@ function BookingForm({ c }) {
             <strong className="text-[15px]">{form.service || "do ustalenia"}</strong>
           </div>
         </div>
-        <button className={BTN_GHOST} onClick={() => { setSent(false); setForm({ name: "", phone: "", service: "", date: "", msg: "" }); setTouched(false); resetTurnstile(); }}>
+        {/* consent resets too - it has to be given again for a new submission,
+            not inherited from the previous one. */}
+        <button className={BTN_GHOST} onClick={() => { setSent(false); setForm({ name: "", phone: "", service: "", date: "", msg: "" }); setTouched(false); setConsent(false); resetTurnstile(); }}>
           Wyślij kolejne zgłoszenie
         </button>
       </div>
@@ -176,13 +183,34 @@ function BookingForm({ c }) {
         />
       </div>
 
+      <label className={
+        "flex cursor-pointer items-start gap-3 rounded-[11px] border-[1.5px] p-[13px_15px] transition-colors " +
+        (touched && !consent ? FIELD_ERR : "border-line-2 bg-paper-2 hover:border-ink-3")
+      }>
+        <input
+          type="checkbox"
+          checked={consent}
+          onChange={(e) => setConsent(e.target.checked)}
+          className="mt-[3px] h-[17px] w-[17px] flex-none cursor-pointer accent-[var(--color-accent)]"
+        />
+        <span className="text-[13.5px] leading-[1.5] text-ink-2">
+          Zgadzam się na kontakt telefoniczny w sprawie tego zgłoszenia. Mój numer
+          zostanie użyty wyłącznie w celu potwierdzenia terminu i nie będzie
+          przekazywany dalej ani wykorzystywany do marketingu.
+        </span>
+      </label>
+
       {TURNSTILE_SITE_KEY && <div ref={turnstileRef} />}
 
       {touched && !valid && (
         <div className="rounded-[10px] border border-[rgba(192,57,43,.25)] bg-[rgba(192,57,43,.08)] px-[14px] py-[11px] text-[13.5px] font-semibold text-[#A0301F]">
-          {!captchaOk
-            ? "Potwierdź, że nie jesteś robotem, żeby wysłać zgłoszenie."
-            : "Uzupełnij imię i poprawny numer telefonu, żeby wysłać zgłoszenie."}
+          {/* Fields first, then consent, then captcha - tell people about
+              what they can fix before what the page is still loading. */}
+          {form.name.trim().length < 2 || !phoneOk
+            ? "Uzupełnij imię i poprawny numer telefonu, żeby wysłać zgłoszenie."
+            : !consent
+              ? "Zaznacz zgodę na kontakt telefoniczny, żeby wysłać zgłoszenie."
+              : "Potwierdź, że nie jesteś robotem, żeby wysłać zgłoszenie."}
         </div>
       )}
       {submitError && (

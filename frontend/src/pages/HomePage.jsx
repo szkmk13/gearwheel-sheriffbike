@@ -2,6 +2,7 @@ import React from 'react';
 import { DEFAULT_CONTENT } from '../content-data.js';
 import { Nav, Hero, TrustStrip } from '../components/landingPage/Hero.jsx';
 import { Services, Winter } from '../components/landingPage/Services.jsx';
+import { WinterStorage } from '../components/landingPage/WinterStorage.jsx';
 import { Booking, Footer } from '../components/landingPage/Footer.jsx';
 
 const c = DEFAULT_CONTENT;
@@ -17,6 +18,7 @@ function HomePage() {
       <Hero c={c} />
       <TrustStrip c={c} />
       <Services c={c} />
+      <WinterStorage c={c} />
       <Winter c={c} />
       <Booking c={c} />
       <Footer c={c} />
