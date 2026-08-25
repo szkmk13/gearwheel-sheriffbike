@@ -9,15 +9,17 @@ export const DEFAULT_CONTENT = {
   hero: {
     variant: "centered",
     eyebrow: "Serwis rowerowy · Gdańsk",
-    title: "Złap formę\nResztą zajmie się\nszeryf",
+    title: "Twój rower\nw rękach szeryfa",
     sub: "Profesjonalny serwis Twojego roweru oraz nart i snowboardu zimą. Diagnoza, regulacja, naprawa. Wszystko w jednym warsztacie.",
     ctaPrimary: "Umów wizytę",
     ctaSecondary: "Zobacz usługi",
   },
 
+  // `live` marks the cells TrustStrip replaces with real Google numbers once
+  // /api/reviews/ answers - the values here are the fallback when it doesn't.
   trust: [
-    { k: "5,0 / 5", v: "ocena w Google" },
-    { k: "81+", v: "zadowolonych klientów" },
+    { k: "5,0 / 5", v: "ocena w Google", live: "rating" },
+    { k: "87+", v: "zadowolonych klientów", live: "count" },
     { k: "12 lat", v: "doświadczenia" },
     { k: "48h", v: "typowy czas realizacji" },
   ],

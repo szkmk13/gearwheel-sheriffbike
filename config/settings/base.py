@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'apps.inventory',
     'apps.storage',
     'apps.contact',
+    'apps.reviews',
 ]
 
 MIDDLEWARE = [
@@ -140,6 +141,15 @@ GOOGLE_SHEETS_SPREADSHEET_ID = env('GOOGLE_SHEETS_SPREADSHEET_ID', default='')
 GOOGLE_SHEETS_WORKSHEET_NAME = env('GOOGLE_SHEETS_WORKSHEET_NAME', default='Zgłoszenia')
 GOOGLE_SERVICE_ACCOUNT_FILE = env('GOOGLE_SERVICE_ACCOUNT_FILE', default='')
 GOOGLE_SERVICE_ACCOUNT_JSON = env('GOOGLE_SERVICE_ACCOUNT_JSON', default='')
+
+# Google reviews on the landing page (GET /api/reviews/), via the Places API
+# (New). This key is server-side only - it must not be exposed to the browser.
+# Restrict it in Google Cloud to the Places API alone. GOOGLE_PLACE_ID is the
+# shop's Place ID (looks like ChIJ...), not the CID from a Maps embed URL.
+# Leave either blank and the endpoint reports source="fallback" and the
+# frontend keeps using its own numbers.
+GOOGLE_PLACES_API_KEY = env('GOOGLE_PLACES_API_KEY', default='')
+GOOGLE_PLACE_ID = env('GOOGLE_PLACE_ID', default='')
 
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 

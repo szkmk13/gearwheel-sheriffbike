@@ -86,8 +86,9 @@ function BookingForm({ c }) {
         <div className="animate-pop text-accent"><SheriffStar size={46} /></div>
         <h3 className="text-[28px] font-extrabold">Zgłoszenie przyjęte!</h3>
         <p className="max-w-[30em] text-[15.5px] text-ink-2">
-          Dzięki, <strong>{form.name.split(" ")[0] || "rowerzysto"}</strong>. Odezwiemy się pod numerem{" "}
-          <strong>{form.phone}</strong>, aby potwierdzić termin{form.date ? <> na <strong>{form.date}</strong></> : null}.
+          Dzięki, <strong>{form.name.split(" ")[0] || "rowerzysto"}</strong>. Nie musisz nic więcej robić - to my
+          skontaktujemy się z Tobą pod numerem <strong>{form.phone}</strong>, aby potwierdzić termin
+          {form.date ? <> na <strong>{form.date}</strong></> : null}.
         </p>
         <div className="my-1.5 mb-2.5 flex w-full gap-3 max-[720px]:flex-col">
           <div className="flex flex-1 flex-col gap-[5px] rounded-xl border border-line bg-paper-2 p-3.5">
@@ -205,7 +206,7 @@ function Booking({ c }) {
       <div className="mx-auto grid max-w-[1240px] grid-cols-[0.92fr_1.08fr] items-start gap-[clamp(36px,5vw,72px)] px-[clamp(20px,5vw,64px)] max-[1000px]:grid-cols-1">
         <div>
           <div className="inline-flex items-center gap-[9px] text-[12.5px] font-bold uppercase tracking-[0.18em] text-accent-deep"><SheriffStar size={14} /> {b.eyebrow}</div>
-          <h2 className="mt-[18px] text-[clamp(34px,4.4vw,56px)] font-black uppercase leading-[0.92] tracking-[-0.015em]"><AccentTitle text={b.title} /></h2>
+          <h2 className="mt-[18px] text-[clamp(34px,4.4vw,56px)] font-brand font-black uppercase leading-[0.9] tracking-[0.01em]"><AccentTitle text={b.title} /></h2>
           <p className="mt-5 max-w-[26em] text-[17px] text-ink-2">{b.lead}</p>
           <ul className="mt-7 flex list-none flex-col gap-[13px] p-0">
             {b.perks.map((p, i) => (
@@ -289,7 +290,6 @@ function Footer({ c }) {
       </div>
       <div className="mx-auto flex flex-wrap items-center justify-between gap-4 border-t border-white/[.08] px-[clamp(20px,5vw,64px)] py-[22px] text-[13px] text-[#8C8377] max-w-[1240px]">
         <span>© {new Date().getFullYear()} {c.brand.name} · Serwis rowerowy Gdańsk</span>
-        <span className="inline-flex items-center gap-1.5">Zrobione z <Icon.wrench width={14} height={14} style={{ display: "inline", verticalAlign: "-2px" }} /> i pasją do dwóch kółek</span>
       </div>
     </footer>
   );

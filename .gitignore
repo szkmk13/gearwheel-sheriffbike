@@ -14,3 +14,4 @@ __pycache__/
 
 # Google service-account keys (e.g. sheriff-bike-*.json) - never commit these
 /*.json
+/docs/
