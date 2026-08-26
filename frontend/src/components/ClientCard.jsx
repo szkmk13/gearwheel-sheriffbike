@@ -19,7 +19,11 @@ export default function ClientCard({ client, onClick }) {
             className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col h-full cursor-pointer hover:shadow-md transition-shadow"
         >
             <div className="flex items-center gap-4 mb-5">
-                <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center font-bold text-lg shrink-0">
+                {/* Zastąpiono bg-blue-50 text-blue-500 markowym akcentem */}
+                <div 
+                    className="w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg shrink-0"
+                    style={{ backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}
+                >
                     {getInitials(fullName)}
                 </div>
                 <div>

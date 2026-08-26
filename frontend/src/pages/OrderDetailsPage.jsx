@@ -38,14 +38,14 @@ export default function OrderDetailsPage() {
         <div className="p-8">
             <div className="flex items-center mb-6">
                 <button
-                    onClick={() => navigate('/panel/orders')}
+                    onClick={() => navigate(-1)}
                     className="flex items-center p-2 border border-transparent hover:border-gray-200 hover:bg-gray-200 rounded-full transition-colors cursor-pointer mr-2"
                 >
                     <svg className="w-6 h-6 text-gray-800 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    <span className="text-gray-700 font-medium hover:text-gray-900 transition-colors">
-                        Wróć do zleceń
+                    <span className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors">
+                        Powrót
                     </span>
                 </button>
             </div>
@@ -123,7 +123,7 @@ export default function OrderDetailsPage() {
                         
                         <div className="flex justify-between items-center mt-4 pt-2 text-lg">
                             <span className="font-bold text-gray-900">Do zapłaty:</span>
-                            <span className="font-bold text-[#009ceb]">{order.final_cost ? `${order.final_cost} zł` : '0 zł'}</span>
+                            <span className="font-bold text-[var(--color-accent)]">{order.final_cost ? `${order.final_cost} zł` : '0 zł'}</span>
                         </div>
                     </div>
 

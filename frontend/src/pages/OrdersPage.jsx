@@ -100,7 +100,7 @@ export default function OrdersPage() {
       setIsNewBike(false);
       toast.success("Utworzono nowe zlecenie!");
     },
-    onError: (error) => toast.error(`Wystąpił błąd podczas przetwarzania: ${error.message}`) // ERROR TOAST
+    onError: (error) => toast.error(`Wystąpił błąd podczas przetwarzania: ${error.message}`)
   });
 
   const handleAddOrder = (e) => {
@@ -120,7 +120,7 @@ export default function OrdersPage() {
         <div className="flex gap-4">
           <div className="flex-1"> <SearchInput placeholder="Szukaj po kliencie, numerze zlecenia..."/> </div>
           <div>
-            <select className="h-[46px] border border-gray-200 rounded-lg px-4 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#009ceb] shadow-sm">
+            <select className="h-[46px] border border-gray-200 rounded-lg px-4 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] shadow-sm">
               <option value="">Wszystkie</option>
               <option value="in_progress">W trakcie</option>
               <option value="done">Gotowe</option>
@@ -135,6 +135,7 @@ export default function OrdersPage() {
           <thead>
             <tr className="bg-gray-50 border-b border-solid border-gray-200 text-sm text-gray-600">
               <th className="py-4 px-6 font-medium">Nr zlecenia</th>
+              <th className="py-4 px-6 font-medium">Zawieszka</th>
               <th className="py-4 px-6 font-medium">Klient</th>
               <th className="py-4 px-6 font-medium">Rower</th>
               <th className="py-4 px-6 font-medium">Status</th>
@@ -145,7 +146,7 @@ export default function OrdersPage() {
 
           <tbody className="text-sm text-gray-800">
             {isOrdersLoading ? (
-              <tr><td colSpan="6" className="py-4 px-6 text-center text-gray-500">Ładowanie...</td></tr>
+              <tr><td colSpan="7" className="py-4 px-6 text-center text-gray-500">Ładowanie...</td></tr>
             ) : ordersList.map((order, index) => (
               <tr 
                 key={order.id} 
@@ -153,6 +154,7 @@ export default function OrdersPage() {
                 className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index === ordersList.length - 1 ? 'border-b-0' : '' }`}
               >
                 <td className="py-4 px-6 font-medium text-gray-600">#{order.id}</td>
+                <td className="py-4 px-6 font-bold text-gray-900">#{order.bike_tag_number}</td>
                 <td className="py-4 px-6">{order.customer_name}</td>
                 <td className="py-4 px-6 text-gray-600">{order.bike_label}</td>
                 <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
@@ -183,7 +185,7 @@ export default function OrdersPage() {
                         setIsNewClient(e.target.checked);
                         if (e.target.checked) setIsNewBike(true); 
                         }}
-                        className="w-4 h-4 text-[#009ceb] bg-white border-gray-300 rounded focus:ring-[#009ceb] cursor-pointer"
+                        className="w-4 h-4 text-[var(--color-accent)] bg-white border-gray-300 rounded focus:ring-[var(--color-accent)] cursor-pointer"
                     />
                     <label htmlFor="newClientCheckbox" className="text-sm font-medium text-gray-700 cursor-pointer">
                         Nowy klient
@@ -218,7 +220,7 @@ export default function OrdersPage() {
                         <input
                         type="checkbox" id="newBikeCheckbox" checked={isNewBike}
                         onChange={(e) => setIsNewBike(e.target.checked)}
-                        className="w-4 h-4 text-[#009ceb] bg-white border-gray-300 rounded focus:ring-[#009ceb] cursor-pointer"
+                        className="w-4 h-4 text-[var(--color-accent)] bg-white border-gray-300 rounded focus:ring-[var(--color-accent)] cursor-pointer"
                         />
                         <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-gray-700 cursor-pointer">Nowy rower</label>
                     </div>
@@ -261,7 +263,7 @@ export default function OrdersPage() {
                 </label>
                 <textarea
                 name="description"
-                className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
+                className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] min-h-[120px] resize-y"
                 placeholder="Dokładny opis tego, co należy wykonać..." required={true}
                 ></textarea>
             </div>

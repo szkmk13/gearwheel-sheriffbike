@@ -115,7 +115,11 @@ export default function ClientDetailsPage() {
             <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 
                 <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center font-bold text-2xl shrink-0">
+                    {/* Zastąpiono sztywnego blue-50/500 spójnym akcentem */}
+                    <div 
+                        className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl shrink-0"
+                        style={{ backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}
+                    >
                         {getInitials(fullName)}
                     </div>
                     <div>
@@ -254,7 +258,7 @@ export default function ClientDetailsPage() {
                                 name="notes"
                                 defaultValue={client.notes}
                                 className="w-full mt-2 p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 
-                                        focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
+                                        focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] min-h-[120px] resize-y"
                                 placeholder="Dodatkowe informacje o kliencie..."
                             ></textarea>
                         </div>

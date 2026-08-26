@@ -16,7 +16,7 @@ export default function Input({
                 type={type}
                 required={required}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800
-                           focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] transition-all shadow-sm"
+                           focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] transition-all shadow-sm"
                 {...props}
             />
         </div>
