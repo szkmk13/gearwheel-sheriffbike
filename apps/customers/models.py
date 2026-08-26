@@ -43,7 +43,7 @@ class Bike(models.Model):
         ordering = ['brand', 'model']
 
     def __str__(self):
-        return f'{self.brand} {self.model} ({self.customer})'
+        return f'{self.brand} {self.model}'
 
     @property
     def sheriff_code(self):
