@@ -6,7 +6,7 @@ from .models import Customer, Bike
 class CustomerBasicSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
-        fields = ('id', 'first_name', 'last_name', 'phone', 'email', 'created_at')
+        fields = ('id', 'first_name', 'last_name', 'phone', 'email', 'rodo_accepted', 'created_at')
 
 
 class BikeNestedSerializer(serializers.ModelSerializer):
@@ -58,7 +58,10 @@ class CustomerListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Customer
-        fields = ('id', 'first_name', 'last_name', 'phone', 'email', 'created_at', 'bikes', 'repair_orders_count')
+        fields = (
+            'id', 'first_name', 'last_name', 'phone', 'email', 'rodo_accepted', 'created_at',
+            'bikes', 'repair_orders_count',
+        )
 
     @extend_schema_field(serializers.IntegerField())
     def get_repair_orders_count(self, obj):

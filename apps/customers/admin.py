@@ -12,7 +12,8 @@ class BikeInline(admin.TabularInline):
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ('last_name', 'first_name', 'phone', 'email', 'created_at')
+    list_display = ('last_name', 'first_name', 'phone', 'email', 'rodo_accepted', 'created_at')
+    list_filter = ('rodo_accepted',)
     search_fields = ('first_name', 'last_name', 'phone', 'email')
     inlines = [BikeInline]
 

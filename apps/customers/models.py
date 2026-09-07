@@ -9,6 +9,11 @@ class Customer(models.Model):
     phone = models.CharField(max_length=20)
     email = models.EmailField(blank=True)
     notes = models.TextField(blank=True)
+    rodo_accepted = models.BooleanField(
+        default=False,
+        verbose_name='RODO zaakceptowane',
+        help_text='Klient podpisal zgode RODO na przetwarzanie danych i przechowywanie ich w systemie.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
