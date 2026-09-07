@@ -1,9 +1,12 @@
-import { fetcher, API_BASE_URL } from './config';
+import { fetcher, API_BASE_URL, getCsrfToken } from './config';
 
 export const loginApi = async (credentials) => {
   const response = await fetch(`${API_BASE_URL}/api/auth/login/`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': getCsrfToken(),
+    },
     body: JSON.stringify(credentials),
     credentials: 'include',
   });
@@ -17,6 +20,7 @@ export const loginApi = async (credentials) => {
 export const logoutApi = async () => {
   const response = await fetch(`${API_BASE_URL}/api/auth/logout/`, {
     method: 'POST',
+    headers: { 'X-CSRFToken': getCsrfToken() },
     credentials: 'include',
   });
 

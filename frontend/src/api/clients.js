@@ -1,4 +1,4 @@
-import { fetcher, API_BASE_URL } from './config';
+import {fetcher, API_BASE_URL, post} from './config';
 
 // GET /api/customers/ - Pobiera listę klientów (wspiera paginację, wyszukiwanie po imieniu/nazwisku)
 export const fetchClients = async (searchQuery = '') => {
@@ -13,19 +13,20 @@ export const fetchClientDetails = async (clientId) => {
 
 // POST /api/customers/ - Dodaje nowego klienta
 export const createClient = async (newClientData) => {
-  const response = await fetch(`${API_BASE_URL}/api/customers/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(newClientData),
-  });
-
-  if (!response.ok) {
-    throw new Error('Nie udało się zapisać klienta na serwerze.');
-  }
-
-  return response.json();
+  // const response = await fetch(`${API_BASE_URL}/api/customers/`, {
+  //   method: 'POST',
+  //   headers: {
+  //     'Content-Type': 'application/json',
+  //   },
+  //   body: JSON.stringify(newClientData),
+  // });
+  //
+  // if (!response.ok) {
+  //   throw new Error('Nie udało się zapisać klienta na serwerze.');
+  // }
+  //
+  // return response.json();
+  return post(`${API_BASE_URL}/api/customers/`, newClientData)
 };
 
 // POST /api/customers/bikes/ endpoint do tworzenia roweru 
