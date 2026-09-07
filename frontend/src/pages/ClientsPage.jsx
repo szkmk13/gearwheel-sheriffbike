@@ -10,8 +10,6 @@ import Input from "../components/Input";
 import StickyHeader from "../components/StickyHeader";
 
 
-
-
 export default function ClientsPage() {
   const navigate = useNavigate();
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
@@ -131,7 +129,7 @@ export default function ClientsPage() {
               
               <textarea 
                 name="notes"
-                className="w-full mt-2 p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
+                className="w-full mt-2 p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] min-h-[120px] resize-y"
                 placeholder="Dodatkowe informacje o kliencie"
               ></textarea>
             </div>

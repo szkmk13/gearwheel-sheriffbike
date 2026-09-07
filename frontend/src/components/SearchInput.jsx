@@ -8,7 +8,7 @@ export default function SearchInput({ placeholder, value, onChange }) {
             </div>
             <input
                 type="text"
-                className="block w-full pl-11 pr-4 py-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[#009ceb] focus:border-[#009ceb] text-sm shadow-sm"
+                className="block w-full pl-11 pr-4 py-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] text-sm shadow-sm transition-all"
                 placeholder={placeholder}
                 value={value}
                 onChange={onChange}

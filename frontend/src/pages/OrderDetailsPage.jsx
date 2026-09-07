@@ -1,29 +1,28 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
 import { fetchOrderDetails, updateOrder } from "../api/orders";
 
 import StatusBadge from "../components/StatusBadge";
-import Button from "../components/Button";
 
 export default function OrderDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
     const queryClient = useQueryClient();
 
-    // Pobieranie szczegółów zlecenia z serwera
     const { data: order, isLoading, isError, error } = useQuery({
         queryKey: ['order', id],
         queryFn: () => fetchOrderDetails(id),
     });
 
-    // Mutacja do natychmiastowej aktualizacji statusu
     const statusMutation = useMutation({
         mutationFn: updateOrder,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['order', id] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
+            toast.success("Status zlecenia został zaktualizowany!"); 
         },
-        onError: (error) => alert(`Błąd aktualizacji statusu: ${error.message}`)
+        onError: (error) => toast.error(`Błąd aktualizacji statusu: ${error.message}`) 
     });
 
     const handleStatusChange = (e) => {
@@ -37,22 +36,20 @@ export default function OrderDetailsPage() {
 
     return (
         <div className="p-8">
-            {/* Nawigacja powrotna */}
             <div className="flex items-center mb-6">
                 <button
-                    onClick={() => navigate('/panel/orders')}
+                    onClick={() => navigate(-1)}
                     className="flex items-center p-2 border border-transparent hover:border-gray-200 hover:bg-gray-200 rounded-full transition-colors cursor-pointer mr-2"
                 >
                     <svg className="w-6 h-6 text-gray-800 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    <span className="text-gray-700 font-medium hover:text-gray-900 transition-colors">
-                        Wróć do zleceń
+                    <span className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors">
+                        Powrót
                     </span>
                 </button>
             </div>
 
-            {/* Główny nagłówek zlecenia */}
             <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <div className="flex items-center gap-4 mb-2">
@@ -79,18 +76,23 @@ export default function OrderDetailsPage() {
                 </div>
             </div>
 
-            {/* Główne informacje */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                
-                {/* Lewa i Środkowa kolumna (Dane) */}
                 <div className="lg:col-span-2 space-y-6">
                     <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col sm:flex-row gap-8">
                         <div className="flex-1">
                             <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Klient</h3>
-                            <p className="text-lg font-medium text-gray-900">{order.customer_name}</p>
-                            <Button className="mt-3 !px-3 !py-1.5 text-xs" onClick={() => navigate(`/panel/clients/${order.customer}`)}>
-                                Zobacz profil klienta
-                            </Button>
+                            <p className="text-lg font-medium text-gray-900">{order.customer.first_name} {order.customer.last_name}</p>
+                            
+                            <div className="mt-2 text-sm text-gray-600 space-y-1">
+                                <p className="flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                                    {order.customer.phone || 'Brak telefonu'}
+                                </p>
+                                <p className="flex items-center gap-2">
+                                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                    {order.customer.email || 'Brak e-maila'}
+                                </p>
+                            </div>
                         </div>
                         <div className="w-px bg-gray-200 hidden sm:block"></div>
                         <div className="flex-1">
@@ -110,7 +112,6 @@ export default function OrderDetailsPage() {
                     </div>
                 </div>
 
-                {/* Prawa kolumna (Moduł Kosztów i Części - W BUDOWIE) */}
                 <div className="space-y-6">
                     <div className="bg-white border border-gray-200 rounded-lg p-6">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Podsumowanie kosztów</h3>
@@ -122,7 +123,7 @@ export default function OrderDetailsPage() {
                         
                         <div className="flex justify-between items-center mt-4 pt-2 text-lg">
                             <span className="font-bold text-gray-900">Do zapłaty:</span>
-                            <span className="font-bold text-[#009ceb]">{order.final_cost ? `${order.final_cost} zł` : '0 zł'}</span>
+                            <span className="font-bold text-[var(--color-accent)]">{order.final_cost ? `${order.final_cost} zł` : '0 zł'}</span>
                         </div>
                     </div>
 
