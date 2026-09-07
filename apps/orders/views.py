@@ -1,7 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Case, Count, IntegerField, Sum, When
+from django.db.models import Case, Count, F, IntegerField, Sum, When
 from django.db.models.functions import Coalesce, TruncWeek
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -37,7 +37,9 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
             'Returns repair orders sorted by status (order: done, in_progress, diagnosing, '
             'waiting_parts, accepted, delivered, cancelled), and within each status - newest first. '
             'Supports filtering (`status`, `priority`, `customer`, `bike`), searching '
-            '(`search` over the description and customer data), and ordering (`ordering`).'
+            '(`search` over the description and customer data), and ordering (`ordering`). '
+            'Each order also exposes `cost` - its effective price, i.e. `final_cost` once it is '
+            'known, otherwise `estimated_cost`.'
         ),
         parameters=[
             OpenApiParameter(
@@ -64,10 +66,15 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
             ),
             OpenApiParameter(
                 'ordering', str, OpenApiParameter.QUERY,
-                enum=['created_at', '-created_at', 'updated_at', '-updated_at', 'priority', '-priority'],
+                enum=[
+                    'created_at', '-created_at', 'updated_at', '-updated_at', 'priority', '-priority',
+                    'estimated_cost', '-estimated_cost', 'final_cost', '-final_cost',
+                    'cost', '-cost',
+                ],
                 description=_(
                     'Order results by the given field; prefix with `-` for descending order. '
-                    'Overrides the default status-based ordering.'
+                    'Overrides the default status-based ordering. Orders with no cost set '
+                    '(`null`) are grouped together at one end of a cost-ordered list.'
                 ),
             ),
         ],
@@ -111,11 +118,14 @@ class RepairOrderViewSet(ModelViewSet):
         status_order=Case(
             *[When(status=status_value, then=position) for position, status_value in enumerate(STATUS_ORDER)],
             output_field=IntegerField(),
-        )
+        ),
+        # The effective cost, mirroring RepairOrderListSerializer.get_cost - annotated so
+        # `?ordering=cost` sorts on the same value the list response shows.
+        cost=Coalesce(F('final_cost'), F('estimated_cost')),
     ).order_by('status_order', '-created_at')
     filterset_fields = ['status', 'priority', 'customer', 'bike']
     search_fields = ['description', 'customer__first_name', 'customer__last_name']
-    ordering_fields = ['created_at', 'updated_at', 'priority']
+    ordering_fields = ['created_at', 'updated_at', 'priority', 'estimated_cost', 'final_cost', 'cost']
 
     def get_serializer_class(self):
         if self.action == 'list':

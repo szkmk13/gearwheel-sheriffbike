@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.customers.serializers import BikeSerializer, CustomerListSerializer
@@ -21,12 +22,13 @@ class StatusHistorySerializer(serializers.ModelSerializer):
 class RepairOrderListSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     bike_label = serializers.SerializerMethodField()
+    cost = serializers.SerializerMethodField()
 
     class Meta:
         model = RepairOrder
         fields = (
             'id', 'customer', 'customer_name', 'bike', 'bike_label', 'bike_tag_number',
-            'status', 'priority', 'created_at',
+            'status', 'priority', 'estimated_cost', 'final_cost', 'cost', 'created_at',
         )
 
     def get_customer_name(self, obj):
@@ -34,6 +36,11 @@ class RepairOrderListSerializer(serializers.ModelSerializer):
 
     def get_bike_label(self, obj):
         return str(obj.bike)
+
+    @extend_schema_field(serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True))
+    def get_cost(self, obj):
+        """The order's effective cost: `final_cost` once it's known, otherwise `estimated_cost`."""
+        return obj.final_cost if obj.final_cost is not None else obj.estimated_cost
 
 
 class RepairOrderDetailSerializer(serializers.ModelSerializer):

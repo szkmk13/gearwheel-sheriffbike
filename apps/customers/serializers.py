@@ -49,6 +49,9 @@ class RepairOrderHistorySerializer(serializers.Serializer):
     bike_tag_number = serializers.IntegerField()
     status = serializers.CharField()
     priority = serializers.CharField()
+    estimated_cost = serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True)
+    final_cost = serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True)
+    cost = serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True)
     created_at = serializers.DateTimeField()
 
 
