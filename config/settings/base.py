@@ -1,5 +1,3 @@
-import datetime
-
 import environ
 from pathlib import Path
 
@@ -22,7 +20,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # third-party
     'rest_framework',
-    'rest_framework_simplejwt',
     'django_filters',
     'corsheaders',
     'drf_spectacular',
@@ -108,8 +105,8 @@ SPECTACULAR_SETTINGS = {
 
 REST_FRAMEWORK = {
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'EXCEPTION_HANDLER': 'config.exceptions.exception_handler',
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'apps.customers.auth.CookieJWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
     ],
     'DEFAULT_PERMISSION_CLASSES': [
@@ -152,11 +149,17 @@ GOOGLE_PLACE_ID = env('GOOGLE_PLACE_ID', default='')
 
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=[])
 
-SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': datetime.timedelta(minutes=15),
-    'REFRESH_TOKEN_LIFETIME': datetime.timedelta(days=7),
-    'ROTATE_REFRESH_TOKENS': False,
-}
+# Session auth: the SPA logs in at /api/auth/login/, which starts a Django session.
+# SESSION_SAVE_EVERY_REQUEST makes the expiry a sliding window measured from the
+# last request, so someone working all day stays logged in while a machine left
+# alone overnight does not. CSRF_COOKIE_HTTPONLY stays False on purpose - the
+# frontend has to read the csrftoken cookie to echo it back as X-CSRFToken.
+SESSION_COOKIE_AGE = 60 * 60 * 12  # 12 h
+SESSION_SAVE_EVERY_REQUEST = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = not DEBUG
 
 # Unhandled view exceptions (500s) get logged with a traceback to stderr,
 # which systemd captures into `journalctl --user -u gearwheel.service` -
