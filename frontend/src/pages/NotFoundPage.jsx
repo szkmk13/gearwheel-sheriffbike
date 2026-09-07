@@ -18,10 +18,10 @@ export default function NotFoundPage() {
                 </p>
 
                 <Button 
-                    onClick={() => navigate('/panel')} 
+                    onClick={() => navigate('/')}
                     className="w-full justify-center"
                 >
-                    Wróć do panelu
+                    Powrót
                 </Button>
             </div>
         </div>
