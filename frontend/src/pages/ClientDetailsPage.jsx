@@ -62,13 +62,15 @@ export default function ClientDetailsPage() {
         
         const fullName = formData.get('fullName').trim();
         const nameParts = fullName.split(' ');
+        const rodoAccepted = formData.get('rodo_accepted') === 'on';
 
         const updatedData = {
             first_name: nameParts[0],
             last_name: nameParts.slice(1).join(' ') || '-',
             email: formData.get('email') || "",
             phone: formData.get('phone'),
-            notes: formData.get('notes') || ""
+            notes: formData.get('notes') || "",
+            rodo_accepted: rodoAccepted
         };
 
         editMutation.mutate({ id, clientData: updatedData });
@@ -115,7 +117,6 @@ export default function ClientDetailsPage() {
             <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 
                 <div className="flex items-center gap-6">
-                    {/* Zastąpiono sztywnego blue-50/500 spójnym akcentem */}
                     <div 
                         className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl shrink-0"
                         style={{ backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}
@@ -123,7 +124,16 @@ export default function ClientDetailsPage() {
                         {getInitials(fullName)}
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{fullName}</h1>
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-3xl font-bold text-gray-900">{fullName}</h1>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                client.rodo_accepted 
+                                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                                    : 'bg-red-100 text-red-800 border border-red-200'
+                            }`}>
+                                {client.rodo_accepted ? 'RODO Zaakceptowane' : 'Brak zgody RODO'}
+                            </span>
+                        </div>
                         <p className="text-gray-500 mt-1">{client.email || 'Brak e-maila'} • {client.phone}</p>
                     </div>
                 </div>
@@ -247,6 +257,19 @@ export default function ClientDetailsPage() {
                                 defaultValue={client.phone}
                                 required={true}
                             />
+
+                            <div className="flex items-center gap-2 pt-2 mt-2 border-t border-gray-100">
+                                <input 
+                                    type="checkbox" 
+                                    id="edit_rodo_accepted" 
+                                    name="rodo_accepted" 
+                                    defaultChecked={client.rodo_accepted}
+                                    className="w-4 h-4 text-[var(--color-accent)] bg-white border-gray-300 rounded focus:ring-[var(--color-accent)] cursor-pointer"
+                                />
+                                <label htmlFor="edit_rodo_accepted" className="text-sm font-medium text-gray-700 cursor-pointer">
+                                    Klient wyraził zgodę na przetwarzanie danych osobowych (RODO)
+                                </label>
+                            </div>
                         </div>
 
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
