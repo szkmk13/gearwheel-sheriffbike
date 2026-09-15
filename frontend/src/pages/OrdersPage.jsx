@@ -1,298 +1,483 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { fetchOrders, createOrder } from "../api/orders";
+import { fetchClients, fetchClientDetails, createClient, createBike } from "../api/clients";
+
 import Button from "../components/Button";
 import SearchInput from "../components/SearchInput";
 import StatusBadge from "../components/StatusBadge";
-import SlidePanel from "../components/SlidePanel";
 import StickyHeader from "../components/StickyHeader";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
 import Select from "../components/Select";
-import { mockClients, mockBikes } from "./ClientsPage";
-
-const mockOrders = [
-  { id: "#2024-001", client: "****", bike: "Giant TCR Advanced", status: "W trakcie", date: "2024-05-08", price: "250 zł" },
-  { id: "#2024-002", client: "****", bike: "Trek Domane SL5", status: "Gotowe", date: "2024-05-08", price: "180 zł" },
-  { id: "#2024-003", client: "****", bike: "Specialized Rockhopper", status: "W trakcie", date: "2024-05-07", price: "320 zł" },
-  { id: "#2024-004", client: "****", bike: "Canyon Endurace CF", status: "Gotowe", date: "2024-05-07", price: "150 zł" },
-  { id: "#2024-005", client: "****", bike: "Scott Spark 900", status: "W trakcie", date: "2024-05-06", price: "420 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-  { id: "#2024-006", client: "****", bike: "BMC Teammachine", status: "Odebrane", date: "2024-05-05", price: "200 zł" },
-];
-
-
 
 export default function OrdersPage() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const formRef = useRef(null);
 
-  const [selectedOrder, setSelectedOrder] = useState(null);
   const [isAddOrderFormOpen, setIsAddOrderFormOpen] = useState(false);
   const [isNewClient, setIsNewClient] = useState(false);
   const [isNewBike, setIsNewBike] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
+
+  // Stan wyszukiwania i filtrowania
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilters, setStatusFilters] = useState([]);
+  const [priorityFilters, setPriorityFilters] = useState([]);
+  const [ordering, setOrdering] = useState("");
+
+  const [openStatusMenu, setOpenStatusMenu] = useState(false);
+  const [openPriorityMenu, setOpenPriorityMenu] = useState(false);
 
   const todayDate = new Date().toISOString().split('T')[0];
-  const clientOptions = mockClients.map(client => ({
+
+  const { data: ordersData, isLoading: isOrdersLoading, isError, error } = useQuery({
+    queryKey: ['orders', { search: searchQuery, status: statusFilters.join(','), priority: priorityFilters.join(','), ordering }],
+    queryFn: () => fetchOrders({ 
+      search: searchQuery || undefined,
+      status: statusFilters.length > 0 ? statusFilters.join(',') : undefined, 
+      priority: priorityFilters.length > 0 ? priorityFilters.join(',') : undefined, 
+      ordering: ordering || undefined 
+    }),
+  });
+  const ordersList = ordersData?.results || [];
+
+  const { data: clientsData } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => fetchClients(),
+  });
+  const clientOptions = (clientsData?.results || []).map(client => ({
     value: client.id,
-    label: client.name
+    label: `${client.first_name} ${client.last_name}`
   }));
-  const bikeOptions = mockBikes.map(bike => ({
+
+  const { data: selectedClientDetails } = useQuery({
+    queryKey: ['client', selectedClientId],
+    queryFn: () => fetchClientDetails(selectedClientId),
+    enabled: !!selectedClientId && !isNewClient,
+  });
+  const bikeOptions = (selectedClientDetails?.bikes || []).map(bike => ({
     value: bike.id,
-    label: `${bike.manufacturer} ${bike.model}`
+    label: `${bike.brand} ${bike.model} (${bike.bike_type})`
   }));
+
+  const mutation = useMutation({
+    mutationFn: async (formData) => {
+      let finalCustomerId = formData.get('customer');
+      let finalBikeId = formData.get('bike');
+
+      if (isNewClient) {
+        const fullName = formData.get('fullName').trim();
+        const nameParts = fullName.split(' ');
+        const rodoAccepted = formData.get('rodo_accepted') === 'on';
+        
+        const newClientData = {
+          first_name: nameParts[0],
+          last_name: nameParts.slice(1).join(' ') || '-',
+          phone: formData.get('phone'),
+          email: formData.get('email') || '',
+          notes: '',
+          rodo_accepted: rodoAccepted
+        };
+        const createdClient = await createClient(newClientData);
+        finalCustomerId = createdClient.id; 
+      }
+
+      if (isNewClient || isNewBike) {
+        const newBikeData = {
+          customer: parseInt(finalCustomerId),
+          brand: formData.get('brand'),
+          model: formData.get('model'),
+          bike_type: formData.get('bike_type')
+        };
+        const createdBike = await createBike(newBikeData);
+        finalBikeId = createdBike.id; 
+      }
+
+      const newOrder = {
+        customer: parseInt(finalCustomerId),
+        bike: parseInt(finalBikeId),
+        bike_tag_number: parseInt(finalBikeId), 
+        description: formData.get('description'),
+        priority: formData.get('priority') || 'normal',
+        estimated_cost: formData.get('estimated_cost') || null,
+      };
+
+      return await createOrder(newOrder);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      formRef.current?.reset();
+      setIsAddOrderFormOpen(false);
+      setIsNewClient(false);
+      setIsNewBike(false);
+      toast.success("Utworzono nowe zlecenie!");
+    },
+    onError: (error) => toast.error(`Wystąpił błąd podczas przetwarzania: ${error.message}`)
+  });
 
   const handleAddOrder = (e) => {
     e.preventDefault();
-    console.log("Zapisywanie zlecenia...");
-    setIsAddOrderFormOpen(false);
-    setIsNewClient(false);
-    setIsNewBike(false);
+    const formData = new FormData(e.target);
+    mutation.mutate(formData);
+  };
+
+  const toggleStatusFilter = (status) => {
+    setStatusFilters(prev => 
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    );
+  };
+
+  const togglePriorityFilter = (priority) => {
+    setPriorityFilters(prev => 
+      prev.includes(priority) ? prev.filter(p => p !== priority) : [...prev, priority]
+    );
+  };
+
+  // Obsługa sortowania na zasadzie 3 kliknięć (rosnąco -> malejąco -> reset)
+  const handleSortClick = (field) => {
+    if (ordering === field) {
+      setOrdering(`-${field}`);
+    } else if (ordering === `-${field}`) {
+      setOrdering("");
+    } else {
+      setOrdering(field);
+    }
   };
 
   return (
-    <div className="px-8 pb-8 relative">
-
+    <div className="px-8 pb-8 relative bg-[var(--color-paper)] min-h-full">
       <StickyHeader>
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Zlecenia serwisowe</h1>
-          <Button onClick={() => setIsAddOrderFormOpen(true)}>+ Przymij rower</Button>
+        <div className="flex justify-between items-center mb-4">
+          <h1 className="text-2xl font-semibold text-[var(--color-ink)]">Zlecenia serwisowe</h1>
+          <Button onClick={() => setIsAddOrderFormOpen(true)}>+ Przyjmij rower</Button>
         </div>
 
-        <div className="flex gap-4">
-          <div className="flex-1"> <SearchInput placeholder="Szukaj po kliencie, numerze zlecenia..."/> </div>
-          <div>
-            <select className="h-[46px] border border-gray-200 rounded-lg px-4 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#009ceb] shadow-sm">
-              <option>Wszystkie</option>
-              <option>W trakcie</option>
-              <option>Gotowe</option>
-              <option>Odebrane</option>
-            </select>
+        <div className="flex items-center gap-4">
+          <div className="flex-1"> 
+            <SearchInput 
+              placeholder="Szukaj po kliencie, numerze zlecenia..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            /> 
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Dropdown filtrowania statusów (wielokrotny wybór) */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setOpenStatusMenu(!openStatusMenu);
+                  setOpenPriorityMenu(false);
+                }}
+                className="flex items-center justify-center gap-2 h-[46px] border border-[var(--color-line)] rounded-lg px-4 bg-[var(--color-paper-2)] text-[var(--color-ink-2)] text-sm hover:bg-[var(--color-paper-3)] transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <span>Statusy {statusFilters.length > 0 && `(${statusFilters.length})`}</span>
+                <svg className="w-4 h-4 text-[var(--color-ink-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+
+              {openStatusMenu && (
+                <div className="absolute right-0 mt-2 w-52 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
+                  <div className="px-4 py-2 text-xs font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Filtruj status</div>
+                  {[
+                    { id: 'accepted', label: 'Przyjęte' },
+                    { id: 'diagnosing', label: 'Diagnoza' },
+                    { id: 'waiting_parts', label: 'Czeka na części' },
+                    { id: 'in_progress', label: 'W trakcie' },
+                    { id: 'done', label: 'Gotowe' },
+                    { id: 'delivered', label: 'Odebrane' },
+                    { id: 'cancelled', label: 'Anulowane' }
+                  ].map(st => (
+                    <label key={st.id} className="flex items-center px-4 py-2 text-sm hover:bg-[var(--color-paper)] cursor-pointer text-[var(--color-ink-2)]">
+                      <input 
+                        type="checkbox" 
+                        checked={statusFilters.includes(st.id)}
+                        onChange={() => toggleStatusFilter(st.id)}
+                        className="w-4 h-4 mr-2 text-[var(--color-accent)] rounded border-[var(--color-line)] focus:ring-[var(--color-accent)] cursor-pointer"
+                      />
+                      {st.label}
+                    </label>
+                  ))}
+                  {statusFilters.length > 0 && (
+                    <div className="border-t border-[var(--color-line)] mt-1 pt-1 px-2">
+                      <button onClick={() => setStatusFilters([])} className="w-full text-center text-xs text-[var(--color-accent)] py-1 font-medium hover:underline">Wyczyść filtry</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Dropdown filtrowania priorytetów (wielokrotny wybór) */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setOpenPriorityMenu(!openPriorityMenu);
+                  setOpenStatusMenu(false);
+                }}
+                className="flex items-center justify-center gap-2 h-[46px] border border-[var(--color-line)] rounded-lg px-4 bg-[var(--color-paper-2)] text-[var(--color-ink-2)] text-sm hover:bg-[var(--color-paper-3)] transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <span>Priorytety {priorityFilters.length > 0 && `(${priorityFilters.length})`}</span>
+                <svg className="w-4 h-4 text-[var(--color-ink-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+
+              {openPriorityMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
+                  <div className="px-4 py-2 text-xs font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Filtruj priorytet</div>
+                  {[
+                    { id: 'low', label: 'Niski' },
+                    { id: 'normal', label: 'Normalny' },
+                    { id: 'high', label: 'Wysoki' },
+                    { id: 'urgent', label: 'Pilny' }
+                  ].map(pr => (
+                    <label key={pr.id} className="flex items-center px-4 py-2 text-sm hover:bg-[var(--color-paper)] cursor-pointer text-[var(--color-ink-2)]">
+                      <input 
+                        type="checkbox" 
+                        checked={priorityFilters.includes(pr.id)}
+                        onChange={() => togglePriorityFilter(pr.id)}
+                        className="w-4 h-4 mr-2 text-[var(--color-accent)] rounded border-[var(--color-line)] focus:ring-[var(--color-accent)] cursor-pointer"
+                      />
+                      {pr.label}
+                    </label>
+                  ))}
+                  {priorityFilters.length > 0 && (
+                    <div className="border-t border-[var(--color-line)] mt-1 pt-1 px-2">
+                      <button onClick={() => setPriorityFilters([])} className="w-full text-center text-xs text-[var(--color-accent)] py-1 font-medium hover:underline">Wyczyść filtry</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </StickyHeader>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Wyświetlanie błędów pobierania, jeśli występują */}
+      {isError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-[var(--color-accent)] font-medium">
+          Wystąpił błąd podczas pobierania danych: {error.message}
+        </div>
+      )}
+
+      <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm overflow-visible">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-gray-50 border-b border-solid border-gray-200 text-sm text-gray-600">
+            <tr className="bg-[var(--color-paper-2)] border-b border-solid border-[var(--color-line)] text-sm text-[var(--color-ink-2)]">
               <th className="py-4 px-6 font-medium">Nr zlecenia</th>
+              <th className="py-4 px-6 font-medium">Zawieszka</th>
               <th className="py-4 px-6 font-medium">Klient</th>
               <th className="py-4 px-6 font-medium">Rower</th>
               <th className="py-4 px-6 font-medium">Status</th>
-              <th className="py-4 px-6 font-medium">Data przyjęcia</th>
-              <th className="py-4 px-6 font-medium">Wartość</th>
+              <th className="py-4 px-6 font-medium">Priorytet</th>
+              
+              {/* Sortowalna kolumna: Data przyjęcia */}
+              <th 
+                onClick={() => handleSortClick('created_at')}
+                className="py-4 px-6 font-medium cursor-pointer hover:text-[var(--color-ink)] transition-colors select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Data przyjęcia</span>
+                  <span className="text-xs text-[var(--color-ink-3)]">
+                    {ordering === 'created_at' ? '▲' : ordering === '-created_at' ? '▼' : '↕'}
+                  </span>
+                </div>
+              </th>
+
+              {/* Sortowalna kolumna: Wartość */}
+              <th 
+                onClick={() => handleSortClick('estimated_cost')}
+                className="py-4 px-6 font-medium cursor-pointer hover:text-[var(--color-ink)] transition-colors select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Wartość</span>
+                  <span className="text-xs text-[var(--color-ink-3)]">
+                    {ordering === 'estimated_cost' ? '▲' : ordering === '-estimated_cost' ? '▼' : '↕'}
+                  </span>
+                </div>
+              </th>
             </tr>
           </thead>
 
-          <tbody className="text-sm text-gray-800">
-            {mockOrders.map((order, index) => (
-              <tr 
-                key={order.id} 
-                onClick={() => setSelectedOrder(order)} 
-                className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index === mockOrders.length - 1 ? 'border-b-0' : '' }`}
-              >
-                <td className="py-4 px-6 font-medium text-gray-600">{order.id}</td>
-                <td className="py-4 px-6">{order.client}</td>
-                <td className="py-4 px-6 text-gray-600">{order.bike}</td>
-                <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
-                <td className="py-4 px-6 text-gray-500">{order.date}</td>
-                <td className="py-4 px-6 font-medium">{order.price}</td>
+          <tbody className="text-sm text-[var(--color-ink)]">
+            {isOrdersLoading ? (
+              <tr>
+                <td colSpan="8" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
+                  Ładowanie listy zleceń...
+                </td>
               </tr>
-            ))}
+            ) : ordersList.length > 0 ? (
+              ordersList.map((order, index) => (
+                <tr 
+                  key={order.id} 
+                  onClick={() => navigate(`/panel/orders/${order.id}`)}
+                  className={`border-b border-[var(--color-line)] hover:bg-[var(--color-paper)] transition-colors cursor-pointer ${index === ordersList.length - 1 ? 'border-b-0' : '' }`}
+                >
+                  <td className="py-4 px-6 font-medium text-[var(--color-ink-2)]">#{order.id}</td>
+                  <td className="py-4 px-6 font-bold text-[var(--color-ink)]">#{order.bike_tag_number}</td>
+                  <td className="py-4 px-6">{order.customer_name}</td>
+                  <td className="py-4 px-6 text-[var(--color-ink-2)]">{order.bike_label}</td>
+                  <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
+                  <td className="py-4 px-6 capitalize text-[var(--color-ink-2)]">{order.priority || 'normal'}</td>
+                  <td className="py-4 px-6 text-[var(--color-ink-3)]">{new Date(order.created_at).toLocaleDateString()}</td>
+                  <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `${order.estimated_cost} zł` : '-')}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="8" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
+                  Brak zleceń spełniających kryteria.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
 
-      {/*Podgląd zlecenia*/}
-      <SlidePanel
-        isOpen={!!selectedOrder}
-        onClose={() => setSelectedOrder(null)}
-      >
-        {selectedOrder && (
-          <div className="space-y-6">
-
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800"> {selectedOrder.id} </h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Klient: <span className="font-medium text-gray-700"> {selectedOrder.client} </span>
-                  </p>
-                </div>
-                <StatusBadge status={selectedOrder.status} />
-              </div>
-            </div>
-
-            <div className="flex justify-between py-6 gap-4 mt-6 pt-6 border-t border-gray-100">
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Rower</p>
-                <p className="font-medium text-gray-800"> {selectedOrder.bike} </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Data przyjęcia</p>
-                <p className="font-medium text-gray-800"> {selectedOrder.date} </p>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-500 mb-1">Wartość</p>
-                <p className="font-medium text-gray-800"> {selectedOrder.price} </p>
-              </div>
-            </div>
-
-            <div className="bg-white border border-gray-800 rounded-lg p-6">
-              <div className="flex justify-between items-center mb-3 pb-2 border-b-4 border-black">
-                <h3 className="text-lg font-semibold text-gray-800">Zakres prac</h3>
-              </div>
-              <p className="text-sm text-gray-600 min-h-[60px]">
-                W trakcie budowy...
-              </p>
-            </div>
-
-            <div className="bg-gray-300 rounded text-gray-600 font-medium p-3 text-sm">Lista użytych części (w budowie)</div>
-
-          </div>
-        )}
-
-      </SlidePanel>
-
-      {/*Formularz dodania zlecenia*/}
       <Modal 
         isOpen={isAddOrderFormOpen} 
         onClose={() => setIsAddOrderFormOpen(false)}
         title="Nowe zlecenie serwisowe"
       >
-        <form onSubmit={handleAddOrder} className="flex flex-col gap-6 mt-2">
-          
-          <div className="flex flex-col gap-6 pb-6 border-b border-gray-100">
-            
-            <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition-all">
-              
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="text-sm font-semibold text-gray-800">
-                  {isNewClient ? "Dane nowego klienta" : "Wybór klienta"}
-                </h4>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="newClientCheckbox"
-                    checked={isNewClient}
-                    onChange={(e) => {
-                      setIsNewClient(e.target.checked);
-                      if (e.target.checked) setIsNewBike(false); 
-                    }}
-                    className="w-4 h-4 text-[#009ceb] bg-white border-gray-300 rounded focus:ring-[#009ceb] cursor-pointer"
-                  />
-                  <label htmlFor="newClientCheckbox" className="text-sm font-medium text-gray-700 cursor-pointer">
-                    Nowy klient
-                  </label>
-                </div>
-              </div>
-
-              {!isNewClient ? (
-                <Select
-                  label="Klient"
-                  options={clientOptions}
-                  placeholder="Wybierz klienta z bazy..."
-                  required={!isNewClient} 
-                />
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Input label="Imię i nazwisko" placeholder="np. Jan Kowalski" required={true} />
-                  <Input label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} />
-                  <div className="lg:col-span-2">
-                    <Input label="Adres e-mail" type="email" placeholder="np. jan.kowalski@email.com" />
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="p-5 bg-gray-50 border border-gray-200 rounded-xl shadow-sm transition-all">
-              
-              <div className="flex justify-between items-center mb-4">
-                <h4 className="text-sm font-semibold text-gray-800">
-                  {(isNewClient || isNewBike) ? "Rejestracja nowego roweru" : "Wybór przypisanego roweru"}
-                </h4>
-                
-                {!isNewClient && (
-                  <div className="flex items-center gap-2">
+        <form ref={formRef} onSubmit={handleAddOrder} className="flex flex-col gap-6 mt-2">
+            <div className="flex flex-col gap-6 pb-6 border-b border-[var(--color-line)]">
+                <div className="p-5 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-xl shadow-sm transition-all">
+                <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-sm font-semibold text-[var(--color-ink)]">
+                    {isNewClient ? "Dane nowego klienta" : "Wybór klienta"}
+                    </h4>
+                    <div className="flex items-center gap-2">
                     <input
-                      type="checkbox"
-                      id="newBikeCheckbox"
-                      checked={isNewBike}
-                      onChange={(e) => setIsNewBike(e.target.checked)}
-                      className="w-4 h-4 text-[#009ceb] bg-white border-gray-300 rounded focus:ring-[#009ceb] cursor-pointer"
+                        type="checkbox" id="newClientCheckbox" checked={isNewClient}
+                        onChange={(e) => {
+                        setIsNewClient(e.target.checked);
+                        if (e.target.checked) setIsNewBike(true); 
+                        }}
+                        className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
                     />
-                    <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-gray-700 cursor-pointer">
-                      Nowy rower
+                    <label htmlFor="newClientCheckbox" className="text-sm font-medium text-[var(--color-ink-2)] cursor-pointer">
+                        Nowy klient
                     </label>
-                  </div>
-                )}
-              </div>
-
-              {(!isNewClient && !isNewBike) ? (
-                <Select
-                  label="Rower"
-                  options={bikeOptions}
-                  placeholder="Wybierz przypisany rower..."
-                  required={(!isNewClient && !isNewBike)}
-                />
-              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <Input label="Producent" placeholder="np. Trek, Giant" required={true} />
-                  <Input label="Model" placeholder="np. Domane SL5" required={true} />
-                  <Input label="Typ" placeholder="np. Szosowy, MTB" required={true} />
+                    </div>
                 </div>
-              )}
+
+                {!isNewClient ? (
+                    <Select
+                      name="customer" label="Klient z bazy" options={clientOptions} placeholder="Wybierz klienta..."
+                      required={!isNewClient} onChange={(e) => setSelectedClientId(e.target.value)}
+                    />
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      <Input name="fullName" label="Imię i nazwisko" placeholder="np. Jan Kowalski" required={true} />
+                      <Input name="phone" label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} />
+                      <div className="lg:col-span-2">
+                          <Input name="email" label="Adres e-mail" type="email" placeholder="np. jan.kowalski@email.com" />
+                      </div>
+                      <div className="lg:col-span-2 flex items-center gap-2 pt-2">
+                          <input 
+                            type="checkbox" 
+                            id="rodo_accepted" 
+                            name="rodo_accepted" 
+                            required={true}
+                            className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
+                          />
+                          <label htmlFor="rodo_accepted" className="text-sm font-medium text-[var(--color-ink-2)] cursor-pointer">
+                            Klient wyraził zgodę na przetwarzanie danych osobowych (RODO) <span className="text-[var(--color-accent)]">*</span>
+                          </label>
+                      </div>
+                    </div>
+                )}
+                </div>
+
+                <div className="p-5 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-xl shadow-sm transition-all">
+                <div className="flex justify-between items-center mb-4">
+                    <h4 className="text-sm font-semibold text-[var(--color-ink)]">
+                    {(isNewClient || isNewBike) ? "Rejestracja nowego roweru" : "Wybór przypisanego roweru"}
+                    </h4>
+                    
+                    {!isNewClient && (
+                    <div className="flex items-center gap-2">
+                        <input
+                        type="checkbox" id="newBikeCheckbox" checked={isNewBike}
+                        onChange={(e) => setIsNewBike(e.target.checked)}
+                        className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
+                        />
+                        <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-[var(--color-ink-2)] cursor-pointer">Nowy rower</label>
+                    </div>
+                    )}
+                </div>
+
+                {(!isNewClient && !isNewBike) ? (
+                    <Select
+                    name="bike" label="Rower przypisany do klienta" options={bikeOptions} placeholder="Wybierz rower..."
+                    required={(!isNewClient && !isNewBike)} disabled={!selectedClientId || bikeOptions.length === 0}
+                    />
+                ) : (
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <Input name="brand" label="Producent" placeholder="np. Trek" required={true} />
+                    <Input name="model" label="Model" placeholder="np. Domane SL5" required={true} />
+                    <Select
+                        name="bike_type" label="Typ roweru" required={true}
+                        options={[
+                            { value: 'road', label: 'Szosowy (road)' },
+                            { value: 'mtb', label: 'Górski (mtb)' },
+                            { value: 'city', label: 'Miejski (city)' },
+                            { value: 'gravel', label: 'Gravel (gravel)' },
+                            { value: 'electric', label: 'Elektryczny (electric)' },
+                            { value: 'other', label: 'Inny (other)' }
+                        ]}
+                    />
+                    </div>
+                )}
+                </div>
             </div>
 
-          </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-[var(--color-line)] pt-4">
+                <Input name="accepted_at" label="Data przyjęcia" type="date" defaultValue={todayDate} disabled={true} />
+                <Select
+                    name="priority"
+                    label="Priorytet"
+                    defaultValue="normal"
+                    options={[
+                        { value: 'low', label: 'Niski' },
+                        { value: 'normal', label: 'Normalny' },
+                        { value: 'high', label: 'Wysoki' },
+                        { value: 'urgent', label: 'Pilny' }
+                    ]}
+                />
+                <Input name="estimated_cost" label="Szacowana wartość (zł)" type="number" placeholder="np. 150" />
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t border-gray-100 pt-4">
-            <Input
-              label="Data przyjęcia"
-              type="date"
-              defaultValue={todayDate}
-              required={true}
-            />
-            
-            <Input
-              label="Szacowana wartość (zł)"
-              type="number"
-              placeholder="np. 150"
-            />
-          </div>
+            <div className="flex flex-col">
+                <label className="text-sm font-medium text-[var(--color-ink-2)] mb-1">
+                Opis usterki / zakres prac <span className="text-[var(--color-accent)]">*</span>
+                </label>
+                <textarea
+                name="description"
+                className="w-full p-3 border border-[var(--color-line)] rounded-lg text-sm bg-[var(--color-paper-2)] placeholder-[var(--color-ink-3)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] min-h-[120px] resize-y"
+                placeholder="Dokładny opis tego, co należy wykonać..." required={true}
+                ></textarea>
+            </div>
 
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-700 mb-1">
-              Opis usterki / zakres prac <span className="text-red-500">*</span>
-            </label>
-            <textarea
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
-              placeholder="Dokładny opis tego, co należy wykonać..."
-              required={true}
-            ></textarea>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setIsAddOrderFormOpen(false)}
-              className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors cursor-pointer"
-            >
-              Anuluj
-            </button>
-            <Button type="submit">Utwórz zlecenie</Button>
-          </div>
-
+            <div className="flex justify-end gap-3 pt-4 border-t border-[var(--color-line)]">
+                <button
+                type="button"
+                onClick={() => {
+                    formRef.current?.reset();
+                    setIsAddOrderFormOpen(false);
+                    setIsNewClient(false);
+                    setIsNewBike(false);
+                }}
+                className="px-5 py-2.5 text-sm font-medium text-[var(--color-ink-2)] hover:bg-[var(--color-paper)] rounded-md transition-colors cursor-pointer"
+                >Anuluj</button>
+                <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending ? "Zapisywanie..." : "Utwórz zlecenie"}
+                </Button>
+            </div>
         </form>
       </Modal>
-    
     </div>
   );
 }

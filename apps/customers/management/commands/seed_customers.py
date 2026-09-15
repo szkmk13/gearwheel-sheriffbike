@@ -143,7 +143,6 @@ class Command(BaseCommand):
                 status=status,
                 priority=random.choice(PRIORITY_CHOICES),
                 description=random.choice(REPAIR_DESCRIPTIONS),
-                mechanic_notes='',
                 estimated_cost=Decimal(random.randint(50, 600)),
             )
 

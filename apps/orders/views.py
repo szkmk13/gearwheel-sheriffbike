@@ -1,9 +1,11 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Case, Count, IntegerField, Sum, When
+from django.db.models import Case, Count, F, IntegerField, Sum, When
 from django.db.models.functions import Coalesce, TruncWeek
 from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -14,7 +16,10 @@ from apps.customers.models import Bike, Customer
 
 from .models import RepairOrder, RepairOrderItem, StatusHistory
 from .serializers import (
+    ChangeOrderStatusSerializer,
+    DashboardSerializer,
     RepairOrderListSerializer,
+    RepairOrderCreateSerializer,
     RepairOrderDetailSerializer,
     RepairOrderWriteSerializer,
     RepairOrderItemSerializer,
@@ -25,24 +30,134 @@ from .serializers import (
 STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted', 'delivered', 'cancelled']
 
 
+@extend_schema_view(
+    list=extend_schema(
+        summary=_('List repair orders'),
+        description=_(
+            'Returns repair orders sorted by status (order: done, in_progress, diagnosing, '
+            'waiting_parts, accepted, delivered, cancelled), and within each status - newest first. '
+            'Supports filtering (`status`, `priority`, `customer`, `bike`), searching '
+            '(`search` over the description and customer data), and ordering (`ordering`). '
+            'Each order also exposes `cost` - its effective price, i.e. `final_cost` once it is '
+            'known, otherwise `estimated_cost`.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                'status', str, OpenApiParameter.QUERY, enum=[c[0] for c in RepairOrder.STATUS_CHOICES],
+                description=_('Filter by exact order status.'),
+            ),
+            OpenApiParameter(
+                'priority', str, OpenApiParameter.QUERY, enum=[c[0] for c in RepairOrder.PRIORITY_CHOICES],
+                description=_('Filter by exact order priority.'),
+            ),
+            OpenApiParameter(
+                'customer', int, OpenApiParameter.QUERY,
+                description=_('Filter by customer ID.'),
+            ),
+            OpenApiParameter(
+                'bike', int, OpenApiParameter.QUERY,
+                description=_('Filter by bike ID.'),
+            ),
+            OpenApiParameter(
+                'search', str, OpenApiParameter.QUERY,
+                description=_(
+                    'Free-text search over `description` and the customer\'s first/last name.'
+                ),
+            ),
+            OpenApiParameter(
+                'ordering', str, OpenApiParameter.QUERY,
+                enum=[
+                    'created_at', '-created_at', 'updated_at', '-updated_at', 'priority', '-priority',
+                    'estimated_cost', '-estimated_cost', 'final_cost', '-final_cost',
+                    'cost', '-cost',
+                ],
+                description=_(
+                    'Order results by the given field; prefix with `-` for descending order. '
+                    'Overrides the default status-based ordering. Orders with no cost set '
+                    '(`null`) are grouped together at one end of a cost-ordered list.'
+                ),
+            ),
+        ],
+    ),
+    create=extend_schema(
+        summary=_('Create a repair order'),
+        description=_(
+            'Opens a new repair order for the given customer and bike. Only `customer`, `bike`, '
+            '`bike_tag_number`, `description`, and `estimated_cost` are accepted. `bike_tag_number` '
+            'is the physical claim-tag number (a plain integer) attached to the bike while it is in '
+            'the shop - it is not a unique identifier and may repeat across different orders/bikes. '
+            '`status` and '
+            '`priority` are not inputs here - new orders always start as `accepted` / `normal` '
+            'priority (change them afterwards via the status endpoint or a regular update). '
+            '`accepted_at`, `delivered_at`, and `final_cost` do not apply to creation and are also '
+            'not accepted. The response returns the full order object (same shape as retrieve), '
+            'including the auto-assigned defaults.'
+        ),
+        request=RepairOrderCreateSerializer,
+        responses={201: RepairOrderDetailSerializer},
+    ),
+    retrieve=extend_schema(
+        summary=_('Retrieve a repair order'),
+        description=_('Returns the full order data, including items (`items`) and status history (`status_history`).'),
+    ),
+    update=extend_schema(
+        summary=_('Update a repair order'),
+        description=_('Overwrites all editable fields of the order.'),
+    ),
+    partial_update=extend_schema(
+        summary=_('Partially update a repair order'),
+        description=_('Updates selected fields of the order without submitting the whole object.'),
+    ),
+    destroy=extend_schema(
+        summary=_('Delete a repair order'),
+        description=_('Permanently deletes the order.'),
+    ),
+)
 class RepairOrderViewSet(ModelViewSet):
     queryset = RepairOrder.objects.select_related('customer', 'bike').annotate(
         status_order=Case(
             *[When(status=status_value, then=position) for position, status_value in enumerate(STATUS_ORDER)],
             output_field=IntegerField(),
-        )
+        ),
+        # The effective cost, mirroring RepairOrderListSerializer.get_cost - annotated so
+        # `?ordering=cost` sorts on the same value the list response shows.
+        cost=Coalesce(F('final_cost'), F('estimated_cost')),
     ).order_by('status_order', '-created_at')
     filterset_fields = ['status', 'priority', 'customer', 'bike']
-    search_fields = ['description', 'mechanic_notes', 'customer__first_name', 'customer__last_name']
-    ordering_fields = ['created_at', 'updated_at', 'priority']
+    search_fields = ['description', 'customer__first_name', 'customer__last_name']
+    ordering_fields = ['created_at', 'updated_at', 'priority', 'estimated_cost', 'final_cost', 'cost']
 
     def get_serializer_class(self):
         if self.action == 'list':
             return RepairOrderListSerializer
-        if self.action in ('create', 'update', 'partial_update'):
+        if self.action == 'create':
+            return RepairOrderCreateSerializer
+        if self.action in ('update', 'partial_update'):
             return RepairOrderWriteSerializer
         return RepairOrderDetailSerializer
 
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        headers = self.get_success_headers(serializer.data)
+        detail = RepairOrderDetailSerializer(serializer.instance)
+        return Response(detail.data, status=status.HTTP_201_CREATED, headers=headers)
+
+    @extend_schema(
+        summary=_('Change a repair order status'),
+        description=_(
+            'Changes the order status and appends an entry to its status history (`old_status`, '
+            '`new_status`, `changed_by`, optional `note`). Transitioning to `accepted` sets '
+            '`accepted_at`, and to `delivered` sets `delivered_at` (unless already set). '
+            'The request is rejected if the given status is invalid or identical to the current one.'
+        ),
+        request=ChangeOrderStatusSerializer,
+        responses={
+            200: RepairOrderDetailSerializer,
+            400: OpenApiResponse(description=_('Invalid status, or the order already has the given status.')),
+        },
+    )
     @action(detail=True, methods=['post'], url_path='status')
     def change_status(self, request, pk=None):
         order = self.get_object()
@@ -71,12 +186,29 @@ class RepairOrderViewSet(ModelViewSet):
         order.save()
         return Response(RepairOrderDetailSerializer(order).data)
 
+    @extend_schema(
+        summary=_('Repair order status history'),
+        description=_('Returns the chronological (newest first) list of status changes for the given order.'),
+        responses=StatusHistorySerializer(many=True),
+    )
     @action(detail=True, methods=['get'], url_path='history')
     def history(self, request, pk=None):
         order = self.get_object()
         qs = order.status_history.all()
         return Response(StatusHistorySerializer(qs, many=True).data)
 
+    @extend_schema(
+        summary=_('Repair order items (parts/labor)'),
+        description=_(
+            'GET - returns the list of items (parts and labor) attached to the order. '
+            'POST - adds a new item; `repair_order` is set automatically from the order in the URL.'
+        ),
+        request=RepairOrderItemSerializer,
+        responses={
+            200: RepairOrderItemSerializer(many=True),
+            201: RepairOrderItemSerializer,
+        },
+    )
     @action(detail=True, methods=['get', 'post'], url_path='items')
     def items(self, request, pk=None):
         order = self.get_object()
@@ -91,6 +223,16 @@ class RepairOrderViewSet(ModelViewSet):
 class DashboardView(APIView):
     WEEKS_OF_TREND = 8
 
+    @extend_schema(
+        summary=_('Dashboard statistics'),
+        description=_(
+            'Returns aggregate dashboard statistics: total bikes and customers in the system, the '
+            'number of orders completed (`done`/`delivered`) this week, the sum of `final_cost` for '
+            'those orders, and a weekly trend (orders completed and profit) for the last %(weeks)d '
+            'weeks, starting from Monday.'
+        ) % {'weeks': WEEKS_OF_TREND},
+        responses=DashboardSerializer,
+    )
     def get(self, request):
         today = timezone.localdate()
         week_start = today - timedelta(days=today.weekday())
