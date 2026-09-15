@@ -106,9 +106,6 @@ export default function OrderDetailsPage() {
                             <p className="text-lg font-medium text-[var(--color-ink)]">
                                 {order.bike?.brand} {order.bike?.model}
                             </p>
-                            {order.bike?.bike_type && (
-                                <p className="text-xs text-[var(--color-ink-3)] capitalize mt-0.5">Typ: {order.bike.bike_type}</p>
-                            )}
                             <div className="mt-3 inline-block px-3 py-1 bg-[var(--color-paper)] rounded text-sm font-semibold text-[var(--color-ink-2)] border border-[var(--color-line)]">
                                 Zawieszka: #{order.bike_tag_number || '-'}
                             </div>

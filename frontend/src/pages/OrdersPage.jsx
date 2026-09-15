@@ -23,21 +23,23 @@ export default function OrdersPage() {
   const [isNewBike, setIsNewBike] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
 
-  const [statusFilter, setStatusFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
+  // Wielokrotny wybór filtrów
+  const [statusFilters, setStatusFilters] = useState([]);
+  const [priorityFilters, setPriorityFilters] = useState([]);
+  
+  // Sortowanie tabeli: np. "created_at", "-created_at", "estimated_cost", "-estimated_cost", etc.
   const [ordering, setOrdering] = useState("");
 
   const [openStatusMenu, setOpenStatusMenu] = useState(false);
   const [openPriorityMenu, setOpenPriorityMenu] = useState(false);
-  const [openSortMenu, setOpenSortMenu] = useState(false);
 
   const todayDate = new Date().toISOString().split('T')[0];
 
   const { data: ordersData, isLoading: isOrdersLoading } = useQuery({
-    queryKey: ['orders', { status: statusFilter, priority: priorityFilter, ordering }],
+    queryKey: ['orders', { status: statusFilters.join(','), priority: priorityFilters.join(','), ordering }],
     queryFn: () => fetchOrders({ 
-      status: statusFilter, 
-      priority: priorityFilter, 
+      status: statusFilters.length > 0 ? statusFilters.join(',') : undefined, 
+      priority: priorityFilters.length > 0 ? priorityFilters.join(',') : undefined, 
       ordering: ordering || undefined 
     }),
   });
@@ -124,6 +126,29 @@ export default function OrdersPage() {
     mutation.mutate(formData);
   };
 
+  const toggleStatusFilter = (status) => {
+    setStatusFilters(prev => 
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    );
+  };
+
+  const togglePriorityFilter = (priority) => {
+    setPriorityFilters(prev => 
+      prev.includes(priority) ? prev.filter(p => p !== priority) : [...prev, priority]
+    );
+  };
+
+  // Obsługa sortowania na zasadzie 3 kliknięć (rosnąco -> malejąco -> reset)
+  const handleSortClick = (field) => {
+    if (ordering === field) {
+      setOrdering(`-${field}`);
+    } else if (ordering === `-${field}`) {
+      setOrdering("");
+    } else {
+      setOrdering(field);
+    }
+  };
+
   return (
     <div className="px-8 pb-8 relative bg-[var(--color-paper)] min-h-full">
       <StickyHeader>
@@ -137,31 +162,91 @@ export default function OrdersPage() {
             <SearchInput placeholder="Szukaj po kliencie, numerze zlecenia..."/> 
           </div>
           
-          <div className="relative">
-            <button
-              onClick={() => {
-                setOpenSortMenu(!openSortMenu);
-                setOpenStatusMenu(false);
-                setOpenPriorityMenu(false);
-              }}
-              className="flex items-center justify-center gap-2 h-[46px] border border-[var(--color-line)] rounded-lg px-4 bg-[var(--color-paper-2)] text-[var(--color-ink-2)] text-sm hover:bg-[var(--color-paper-3)] transition-colors shadow-sm cursor-pointer whitespace-nowrap"
-            >
-              <svg className="w-5 h-5 text-[var(--color-ink-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
-              </svg>
-              <span>Sortowanie</span>
-            </button>
+          <div className="flex items-center gap-3">
+            {/* Dropdown filtrowania statusów (wielokrotny wybór) */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setOpenStatusMenu(!openStatusMenu);
+                  setOpenPriorityMenu(false);
+                }}
+                className="flex items-center justify-center gap-2 h-[46px] border border-[var(--color-line)] rounded-lg px-4 bg-[var(--color-paper-2)] text-[var(--color-ink-2)] text-sm hover:bg-[var(--color-paper-3)] transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <span>Statusy {statusFilters.length > 0 && `(${statusFilters.length})`}</span>
+                <svg className="w-4 h-4 text-[var(--color-ink-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
 
-            {openSortMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
-                <div className="px-4 py-2 text-xs font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Sortuj według</div>
-                <button onClick={() => { setOrdering(""); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${!ordering ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Domyślne</button>
-                <button onClick={() => { setOrdering("-created_at"); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${ordering === '-created_at' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Od najnowszych</button>
-                <button onClick={() => { setOrdering("created_at"); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${ordering === 'created_at' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Od najstarszych</button>
-                <button onClick={() => { setOrdering("-priority"); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${ordering === '-priority' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Najwyższy priorytet</button>
-                <button onClick={() => { setOrdering("-updated_at"); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${ordering === '-updated_at' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Ostatnio modyfikowane</button>
-              </div>
-            )}
+              {openStatusMenu && (
+                <div className="absolute right-0 mt-2 w-52 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
+                  <div className="px-4 py-2 text-xs font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Filtruj status</div>
+                  {[
+                    { id: 'accepted', label: 'Przyjęte' },
+                    { id: 'diagnosing', label: 'Diagnoza' },
+                    { id: 'waiting_parts', label: 'Czeka na części' },
+                    { id: 'in_progress', label: 'W trakcie' },
+                    { id: 'done', label: 'Gotowe' },
+                    { id: 'delivered', label: 'Odebrane' },
+                    { id: 'cancelled', label: 'Anulowane' }
+                  ].map(st => (
+                    <label key={st.id} className="flex items-center px-4 py-2 text-sm hover:bg-[var(--color-paper)] cursor-pointer text-[var(--color-ink-2)]">
+                      <input 
+                        type="checkbox" 
+                        checked={statusFilters.includes(st.id)}
+                        onChange={() => toggleStatusFilter(st.id)}
+                        className="w-4 h-4 mr-2 text-[var(--color-accent)] rounded border-[var(--color-line)] focus:ring-[var(--color-accent)] cursor-pointer"
+                      />
+                      {st.label}
+                    </label>
+                  ))}
+                  {statusFilters.length > 0 && (
+                    <div className="border-t border-[var(--color-line)] mt-1 pt-1 px-2">
+                      <button onClick={() => setStatusFilters([])} className="w-full text-center text-xs text-[var(--color-accent)] py-1 font-medium hover:underline">Wyczyść filtry</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Dropdown filtrowania priorytetów (wielokrotny wybór) */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  setOpenPriorityMenu(!openPriorityMenu);
+                  setOpenStatusMenu(false);
+                }}
+                className="flex items-center justify-center gap-2 h-[46px] border border-[var(--color-line)] rounded-lg px-4 bg-[var(--color-paper-2)] text-[var(--color-ink-2)] text-sm hover:bg-[var(--color-paper-3)] transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+              >
+                <span>Priorytety {priorityFilters.length > 0 && `(${priorityFilters.length})`}</span>
+                <svg className="w-4 h-4 text-[var(--color-ink-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+              </button>
+
+              {openPriorityMenu && (
+                <div className="absolute right-0 mt-2 w-48 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
+                  <div className="px-4 py-2 text-xs font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Filtruj priorytet</div>
+                  {[
+                    { id: 'low', label: 'Niski' },
+                    { id: 'normal', label: 'Normalny' },
+                    { id: 'high', label: 'Wysoki' },
+                    { id: 'urgent', label: 'Pilny' }
+                  ].map(pr => (
+                    <label key={pr.id} className="flex items-center px-4 py-2 text-sm hover:bg-[var(--color-paper)] cursor-pointer text-[var(--color-ink-2)]">
+                      <input 
+                        type="checkbox" 
+                        checked={priorityFilters.includes(pr.id)}
+                        onChange={() => togglePriorityFilter(pr.id)}
+                        className="w-4 h-4 mr-2 text-[var(--color-accent)] rounded border-[var(--color-line)] focus:ring-[var(--color-accent)] cursor-pointer"
+                      />
+                      {pr.label}
+                    </label>
+                  ))}
+                  {priorityFilters.length > 0 && (
+                    <div className="border-t border-[var(--color-line)] mt-1 pt-1 px-2">
+                      <button onClick={() => setPriorityFilters([])} className="w-full text-center text-xs text-[var(--color-accent)] py-1 font-medium hover:underline">Wyczyść filtry</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </StickyHeader>
@@ -174,60 +259,34 @@ export default function OrdersPage() {
               <th className="py-4 px-6 font-medium">Zawieszka</th>
               <th className="py-4 px-6 font-medium">Klient</th>
               <th className="py-4 px-6 font-medium">Rower</th>
+              <th className="py-4 px-6 font-medium">Status</th>
+              <th className="py-4 px-6 font-medium">Priorytet</th>
               
-              <th className="py-4 px-6 font-medium relative">
-                <button 
-                  onClick={() => {
-                    setOpenStatusMenu(!openStatusMenu);
-                    setOpenPriorityMenu(false);
-                    setOpenSortMenu(false);
-                  }}
-                  className="flex items-center gap-1.5 hover:text-[var(--color-ink)] transition-colors cursor-pointer w-full text-left"
-                >
-                  <span>Status</span>
-                  <svg className="w-4 h-4 text-[var(--color-ink-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                </button>
-
-                {openStatusMenu && (
-                  <div className="absolute left-6 mt-2 w-48 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
-                    <button onClick={() => { setStatusFilter(""); setOpenStatusMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${!statusFilter ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Wszystkie statusy</button>
-                    <button onClick={() => { setStatusFilter("accepted"); setOpenStatusMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${statusFilter === 'accepted' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Zaakceptowane</button>
-                    <button onClick={() => { setStatusFilter("diagnosing"); setOpenStatusMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${statusFilter === 'diagnosing' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Diagnoza</button>
-                    <button onClick={() => { setStatusFilter("waiting_parts"); setOpenStatusMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${statusFilter === 'waiting_parts' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Czeka na części</button>
-                    <button onClick={() => { setStatusFilter("in_progress"); setOpenStatusMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${statusFilter === 'in_progress' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>W trakcie</button>
-                    <button onClick={() => { setStatusFilter("done"); setOpenStatusMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${statusFilter === 'done' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Gotowe</button>
-                    <button onClick={() => { setStatusFilter("delivered"); setOpenStatusMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${statusFilter === 'delivered' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Odebrane</button>
-                    <button onClick={() => { setStatusFilter("cancelled"); setOpenStatusMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${statusFilter === 'cancelled' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Anulowane</button>
-                  </div>
-                )}
+              {/* Sortowalna kolumna: Data przyjęcia */}
+              <th 
+                onClick={() => handleSortClick('created_at')}
+                className="py-4 px-6 font-medium cursor-pointer hover:text-[var(--color-ink)] transition-colors select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Data przyjęcia</span>
+                  <span className="text-xs text-[var(--color-ink-3)]">
+                    {ordering === 'created_at' ? '▲' : ordering === '-created_at' ? '▼' : '↕'}
+                  </span>
+                </div>
               </th>
 
-              <th className="py-4 px-6 font-medium relative">
-                <button 
-                  onClick={() => {
-                    setOpenPriorityMenu(!openPriorityMenu);
-                    setOpenStatusMenu(false);
-                    setOpenSortMenu(false);
-                  }}
-                  className="flex items-center gap-1.5 hover:text-[var(--color-ink)] transition-colors cursor-pointer w-full text-left"
-                >
-                  <span>Priorytet</span>
-                  <svg className="w-4 h-4 text-[var(--color-ink-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                </button>
-
-                {openPriorityMenu && (
-                  <div className="absolute left-6 mt-2 w-48 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
-                    <button onClick={() => { setPriorityFilter(""); setOpenPriorityMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${!priorityFilter ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Wszystkie priorytety</button>
-                    <button onClick={() => { setPriorityFilter("low"); setOpenPriorityMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${priorityFilter === 'low' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Niski</button>
-                    <button onClick={() => { setPriorityFilter("normal"); setOpenPriorityMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${priorityFilter === 'normal' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Normalny</button>
-                    <button onClick={() => { setPriorityFilter("high"); setOpenPriorityMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${priorityFilter === 'high' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Wysoki</button>
-                    <button onClick={() => { setPriorityFilter("urgent"); setOpenPriorityMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${priorityFilter === 'urgent' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Pilny</button>
-                  </div>
-                )}
+              {/* Sortowalna kolumna: Wartość */}
+              <th 
+                onClick={() => handleSortClick('estimated_cost')}
+                className="py-4 px-6 font-medium cursor-pointer hover:text-[var(--color-ink)] transition-colors select-none"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span>Wartość</span>
+                  <span className="text-xs text-[var(--color-ink-3)]">
+                    {ordering === 'estimated_cost' ? '▲' : ordering === '-estimated_cost' ? '▼' : '↕'}
+                  </span>
+                </div>
               </th>
-
-              <th className="py-4 px-6 font-medium">Data przyjęcia</th>
-              <th className="py-4 px-6 font-medium">Wartość</th>
             </tr>
           </thead>
 
@@ -248,7 +307,7 @@ export default function OrdersPage() {
                   <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
                   <td className="py-4 px-6 capitalize text-[var(--color-ink-2)]">{order.priority || 'normal'}</td>
                   <td className="py-4 px-6 text-[var(--color-ink-3)]">{new Date(order.created_at).toLocaleDateString()}</td>
-                  <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `~${order.estimated_cost} zł` : '-')}</td>
+                  <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `${order.estimated_cost} zł` : '-')}</td>
                 </tr>
               ))
             ) : (
