@@ -14,10 +14,12 @@ export default function ClientsPage() {
   const navigate = useNavigate();
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   
-  // Stany wyszukiwania, filtrowania i sortowania
+  // Stan przełącznika widoku: 'grid' (kafelki) lub 'table' (tabela)
+  const [viewMode, setViewMode] = useState("grid");
+  
+  // Stany wyszukiwania i sortowania
   const [searchQuery, setSearchQuery] = useState("");
   const [ordering, setOrdering] = useState("");
-  const [openSortMenu, setOpenSortMenu] = useState(false);
 
   const formRef = useRef(null);
   const queryClient = useQueryClient();
@@ -64,8 +66,16 @@ export default function ClientsPage() {
     mutation.mutate(newClient);
   };
 
-  if (isLoading) return <div className="p-8 text-[var(--color-ink-3)] font-medium bg-[var(--color-paper)] min-h-full">Ładowanie danych z serwera...</div>;
-  if (isError) return <div className="p-8 text-[var(--color-accent)] font-medium bg-[var(--color-paper)] min-h-full">Wystąpił błąd: {error.message}</div>;
+  // Obsługa sortowania w nagłówkach tabeli (3 kliknięcia: rosnąco -> malejąco -> reset)
+  const handleSortClick = (field) => {
+    if (ordering === field) {
+      setOrdering(`-${field}`);
+    } else if (ordering === `-${field}`) {
+      setOrdering("");
+    } else {
+      setOrdering(field);
+    }
+  };
 
   return (
     <div className="px-8 pb-8 relative bg-[var(--color-paper)] min-h-full">
@@ -84,46 +94,142 @@ export default function ClientsPage() {
             />
           </div>
 
-          <div className="relative">
+          {/* Przełącznik widoku: Tabela / Kafelki */}
+          <div className="flex items-center bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-1 shadow-sm shrink-0">
             <button
-              onClick={() => setOpenSortMenu(!openSortMenu)}
-              className="flex items-center justify-center gap-2 h-[46px] border border-[var(--color-line)] rounded-lg px-4 bg-[var(--color-paper-2)] text-[var(--color-ink-2)] text-sm hover:bg-[var(--color-paper-3)] transition-colors shadow-sm cursor-pointer whitespace-nowrap"
+              onClick={() => setViewMode("grid")}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                viewMode === "grid" 
+                  ? "bg-[var(--color-paper)] text-[var(--color-ink)] shadow-xs" 
+                  : "text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
+              }`}
+              title="Widok kafelków"
             >
-              <svg className="w-5 h-5 text-[var(--color-ink-3)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12" />
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
               </svg>
-              <span>Sortowanie</span>
+              <span className="hidden sm:inline">Kafelki</span>
             </button>
 
-            {openSortMenu && (
-              <div className="absolute right-0 mt-2 w-56 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
-                <div className="px-4 py-2 text-xs font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Sortuj według</div>
-                <button onClick={() => { setOrdering(""); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${!ordering ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Domyślne</button>
-                <button onClick={() => { setOrdering("-created_at"); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${ordering === '-created_at' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Od najnowszych</button>
-                <button onClick={() => { setOrdering("created_at"); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${ordering === 'created_at' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Od najstarszych</button>
-                <button onClick={() => { setOrdering("last_name"); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${ordering === 'last_name' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Nazwisko (A-Z)</button>
-                <button onClick={() => { setOrdering("-last_name"); setOpenSortMenu(false); }} className={`w-full text-left px-4 py-2 text-sm hover:bg-[var(--color-paper)] ${ordering === '-last_name' ? 'font-semibold text-[var(--color-accent)]' : 'text-[var(--color-ink-2)]'}`}>Nazwisko (Z-A)</button>
-              </div>
-            )}
+            <button
+              onClick={() => setViewMode("table")}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
+                viewMode === "table" 
+                  ? "bg-[var(--color-paper)] text-[var(--color-ink)] shadow-xs" 
+                  : "text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
+              }`}
+              title="Widok tabeli"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+              </svg>
+              <span className="hidden sm:inline">Tabela</span>
+            </button>
           </div>
         </div>
       </StickyHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {clientsList.length > 0 ? (
-          clientsList.map(client => (
-            <ClientCard 
-              key={client.id} 
-              client={client} 
-              onClick={() => navigate(`/panel/clients/${client.id}`)}
-            />
-          ))
-        ) : (
-          <div className="col-span-full py-12 text-center text-[var(--color-ink-3)] bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm">
-            Brak klientów spełniających kryteria wyszukiwania.
-          </div>
-        )}
-      </div>
+      {/* Wyświetlanie błędów pobierania, jeśli występują */}
+      {isError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-[var(--color-accent)] font-medium">
+          Wystąpił błąd podczas pobierania danych: {error.message}
+        </div>
+      )}
+
+      {viewMode === "grid" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {isLoading ? (
+            <div className="col-span-full py-12 text-center text-[var(--color-ink-3)] bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm">
+              Ładowanie listy klientów...
+            </div>
+          ) : clientsList.length > 0 ? (
+            clientsList.map(client => (
+              <ClientCard 
+                key={client.id} 
+                client={client} 
+                onClick={() => navigate(`/panel/clients/${client.id}`)}
+              />
+            ))
+          ) : (
+            <div className="col-span-full py-12 text-center text-[var(--color-ink-3)] bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm">
+              Brak klientów spełniających kryteria wyszukiwania.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm overflow-visible">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-[var(--color-paper-2)] border-b border-solid border-[var(--color-line)] text-sm text-[var(--color-ink-2)]">
+                <th className="py-4 px-6 font-medium">ID</th>
+                
+                {/* Sortowalna kolumna: Nazwisko */}
+                <th 
+                  onClick={() => handleSortClick('last_name')}
+                  className="py-4 px-6 font-medium cursor-pointer hover:text-[var(--color-ink)] transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Imię i nazwisko</span>
+                    <span className="text-xs text-[var(--color-ink-3)]">
+                      {ordering === 'last_name' ? '▲' : ordering === '-last_name' ? '▼' : '↕'}
+                    </span>
+                  </div>
+                </th>
+
+                <th className="py-4 px-6 font-medium">Telefon</th>
+                <th className="py-4 px-6 font-medium">E-mail</th>
+                <th className="py-4 px-6 font-medium">Rowery</th>
+                <th className="py-4 px-6 font-medium">Zlecenia</th>
+
+                {/* Sortowalna kolumna: Data utworzenia */}
+                <th 
+                  onClick={() => handleSortClick('created_at')}
+                  className="py-4 px-6 font-medium cursor-pointer hover:text-[var(--color-ink)] transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Data dodania</span>
+                    <span className="text-xs text-[var(--color-ink-3)]">
+                      {ordering === 'created_at' ? '▲' : ordering === '-created_at' ? '▼' : '↕'}
+                    </span>
+                  </div>
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="text-sm text-[var(--color-ink)]">
+              {isLoading ? (
+                <tr>
+                  <td colSpan="7" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
+                    Ładowanie listy klientów...
+                  </td>
+                </tr>
+              ) : clientsList.length > 0 ? (
+                clientsList.map((client, index) => (
+                  <tr 
+                    key={client.id} 
+                    onClick={() => navigate(`/panel/clients/${client.id}`)}
+                    className={`border-b border-[var(--color-line)] hover:bg-[var(--color-paper)] transition-colors cursor-pointer ${index === clientsList.length - 1 ? 'border-b-0' : ''}`}
+                  >
+                    <td className="py-4 px-6 font-medium text-[var(--color-ink-2)]">#{client.id}</td>
+                    <td className="py-4 px-6 font-semibold text-[var(--color-ink)]">{client.first_name} {client.last_name}</td>
+                    <td className="py-4 px-6 text-[var(--color-ink-2)]">{client.phone}</td>
+                    <td className="py-4 px-6 text-[var(--color-ink-3)]">{client.email || '-'}</td>
+                    <td className="py-4 px-6 font-medium">{client.bikes?.length || 0}</td>
+                    <td className="py-4 px-6 font-medium">{client.repair_orders_count ?? 0}</td>
+                    <td className="py-4 px-6 text-[var(--color-ink-3)]">{new Date(client.created_at).toLocaleDateString()}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
+                    Brak klientów spełniających kryteria wyszukiwania.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
       
       {/* Formularz dodawania klienta */}
       <SlidePanel

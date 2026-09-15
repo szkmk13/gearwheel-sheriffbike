@@ -23,11 +23,10 @@ export default function OrdersPage() {
   const [isNewBike, setIsNewBike] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
 
-  // Wielokrotny wybór filtrów
+  // Stan wyszukiwania i filtrowania
+  const [searchQuery, setSearchQuery] = useState("");
   const [statusFilters, setStatusFilters] = useState([]);
   const [priorityFilters, setPriorityFilters] = useState([]);
-  
-  // Sortowanie tabeli: np. "created_at", "-created_at", "estimated_cost", "-estimated_cost", etc.
   const [ordering, setOrdering] = useState("");
 
   const [openStatusMenu, setOpenStatusMenu] = useState(false);
@@ -35,9 +34,10 @@ export default function OrdersPage() {
 
   const todayDate = new Date().toISOString().split('T')[0];
 
-  const { data: ordersData, isLoading: isOrdersLoading } = useQuery({
-    queryKey: ['orders', { status: statusFilters.join(','), priority: priorityFilters.join(','), ordering }],
+  const { data: ordersData, isLoading: isOrdersLoading, isError, error } = useQuery({
+    queryKey: ['orders', { search: searchQuery, status: statusFilters.join(','), priority: priorityFilters.join(','), ordering }],
     queryFn: () => fetchOrders({ 
+      search: searchQuery || undefined,
       status: statusFilters.length > 0 ? statusFilters.join(',') : undefined, 
       priority: priorityFilters.length > 0 ? priorityFilters.join(',') : undefined, 
       ordering: ordering || undefined 
@@ -159,7 +159,11 @@ export default function OrdersPage() {
 
         <div className="flex items-center gap-4">
           <div className="flex-1"> 
-            <SearchInput placeholder="Szukaj po kliencie, numerze zlecenia..."/> 
+            <SearchInput 
+              placeholder="Szukaj po kliencie, numerze zlecenia..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            /> 
           </div>
           
           <div className="flex items-center gap-3">
@@ -251,6 +255,13 @@ export default function OrdersPage() {
         </div>
       </StickyHeader>
 
+      {/* Wyświetlanie błędów pobierania, jeśli występują */}
+      {isError && (
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl text-[var(--color-accent)] font-medium">
+          Wystąpił błąd podczas pobierania danych: {error.message}
+        </div>
+      )}
+
       <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm overflow-visible">
         <table className="w-full text-left border-collapse">
           <thead>
@@ -292,7 +303,11 @@ export default function OrdersPage() {
 
           <tbody className="text-sm text-[var(--color-ink)]">
             {isOrdersLoading ? (
-              <tr><td colSpan="8" className="py-4 px-6 text-center text-[var(--color-ink-3)]">Ładowanie...</td></tr>
+              <tr>
+                <td colSpan="8" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
+                  Ładowanie listy zleceń...
+                </td>
+              </tr>
             ) : ordersList.length > 0 ? (
               ordersList.map((order, index) => (
                 <tr 
@@ -311,7 +326,11 @@ export default function OrdersPage() {
                 </tr>
               ))
             ) : (
-              <tr><td colSpan="8" className="py-8 px-6 text-center text-[var(--color-ink-3)]">Brak zleceń spełniających kryteria.</td></tr>
+              <tr>
+                <td colSpan="8" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
+                  Brak zleceń spełniających kryteria.
+                </td>
+              </tr>
             )}
           </tbody>
         </table>

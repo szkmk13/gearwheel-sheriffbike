@@ -2,6 +2,7 @@ import { fetcher, post, patch } from './config';
 
 export const fetchOrders = async (filters = {}) => {
   const params = new URLSearchParams();
+  if (filters.search) params.append('search', filters.search);
   if (filters.status) params.append('status', filters.status);
   if (filters.priority) params.append('priority', filters.priority);
   if (filters.ordering) params.append('ordering', filters.ordering);
