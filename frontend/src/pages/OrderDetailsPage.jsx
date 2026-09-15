@@ -85,7 +85,20 @@ export default function OrderDetailsPage() {
                     <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-6 flex flex-col sm:flex-row gap-8">
                         <div className="flex-1">
                             <h3 className="text-sm font-semibold text-[var(--color-ink-3)] uppercase tracking-wider mb-3">Klient</h3>
-                            <p className="text-lg font-medium text-[var(--color-ink)]">{order.customer?.first_name} {order.customer?.last_name}</p>
+                            
+                            {/* Odnośnik do profilu klienta */}
+                            {order.customer?.id ? (
+                                <button
+                                    onClick={() => navigate(`/panel/clients/${order.customer.id}`)}
+                                    className="text-lg font-medium text-[var(--color-accent)] hover:underline text-left cursor-pointer transition-colors block mb-1"
+                                >
+                                    {order.customer.first_name} {order.customer.last_name}
+                                </button>
+                            ) : (
+                                <p className="text-lg font-medium text-[var(--color-ink)]">
+                                    {order.customer?.first_name} {order.customer?.last_name}
+                                </p>
+                            )}
                             
                             <div className="mt-2 text-sm text-[var(--color-ink-2)] space-y-1">
                                 <p className="flex items-center gap-2">

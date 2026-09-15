@@ -99,7 +99,7 @@ export default function ClientDetailsPage() {
     const clientOrders = client.repair_orders || [];
 
     return(
-        <div className="p-8">
+        <div className="p-8 bg-[var(--color-paper)]">
             <div className="flex items-center mb-6">
                 <button
                     onClick={() => navigate('/panel/clients')}
