@@ -14,6 +14,7 @@ from rest_framework.viewsets import ModelViewSet
 
 from apps.customers.models import Bike, Customer
 
+from .filters import RepairOrderFilter
 from .models import RepairOrder, RepairOrderItem, StatusHistory
 from .serializers import (
     ChangeOrderStatusSerializer,
@@ -36,7 +37,8 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
         description=_(
             'Returns repair orders sorted by status (order: done, in_progress, diagnosing, '
             'waiting_parts, accepted, delivered, cancelled), and within each status - newest first. '
-            'Supports filtering (`status`, `priority`, `customer`, `bike`), searching '
+            'Supports filtering (`status`, `priority`, `customer`, `bike`, where `status` and '
+            '`priority` also accept several comma-separated values), searching '
             '(`search` over the description and customer data), and ordering (`ordering`). '
             'Each order also exposes `cost` - its effective price, i.e. `final_cost` once it is '
             'known, otherwise `estimated_cost`.'
@@ -44,11 +46,21 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
         parameters=[
             OpenApiParameter(
                 'status', str, OpenApiParameter.QUERY, enum=[c[0] for c in RepairOrder.STATUS_CHOICES],
-                description=_('Filter by exact order status.'),
+                many=True, style='form', explode=False,
+                description=_(
+                    'Filter by order status. Accepts several statuses separated by commas '
+                    '(e.g. `status=in_progress,waiting_parts`) - orders matching any of them are '
+                    'returned. An unknown status is rejected with a 400.'
+                ),
             ),
             OpenApiParameter(
                 'priority', str, OpenApiParameter.QUERY, enum=[c[0] for c in RepairOrder.PRIORITY_CHOICES],
-                description=_('Filter by exact order priority.'),
+                many=True, style='form', explode=False,
+                description=_(
+                    'Filter by order priority. Accepts several priorities separated by commas '
+                    '(e.g. `priority=normal,high`) - orders matching any of them are returned. '
+                    'An unknown priority is rejected with a 400.'
+                ),
             ),
             OpenApiParameter(
                 'customer', int, OpenApiParameter.QUERY,
@@ -123,8 +135,8 @@ class RepairOrderViewSet(ModelViewSet):
         # `?ordering=cost` sorts on the same value the list response shows.
         cost=Coalesce(F('final_cost'), F('estimated_cost')),
     ).order_by('status_order', '-created_at')
-    filterset_fields = ['status', 'priority', 'customer', 'bike']
-    search_fields = ['description', 'customer__first_name', 'customer__last_name']
+    filterset_class = RepairOrderFilter
+    search_fields = ['description', 'customer__first_name', 'customer__last_name', "bike__brand", "bike__model"]
     ordering_fields = ['created_at', 'updated_at', 'priority', 'estimated_cost', 'final_cost', 'cost']
 
     def get_serializer_class(self):
