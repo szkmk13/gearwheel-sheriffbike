@@ -161,6 +161,12 @@ SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SECURE = not DEBUG
 
+# Gunicorn speaks plain HTTP to nginx over a unix socket, so without this Django
+# treats every production request as insecure: it would then compare an incoming
+# `Origin: https://...` against its own `http://...` and reject every unsafe
+# method as a CSRF failure. Nginx already sets the header (deploy/nginx.conf.example).
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
 # Unhandled view exceptions (500s) get logged with a traceback to stderr,
 # which systemd captures into `journalctl --user -u gearwheel.service` -
 # without this, DEBUG=False leaves them only going to django's default

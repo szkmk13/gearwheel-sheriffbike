@@ -17,7 +17,10 @@ from .serializers import CustomerListSerializer, CustomerDetailSerializer, BikeS
 class CustomerViewSet(ModelViewSet):
     queryset = Customer.objects.prefetch_related(
         'bikes',
-        Prefetch('repair_orders', queryset=RepairOrder.objects.select_related('bike').order_by('-created_at')),
+        Prefetch(
+            'repair_orders',
+            queryset=RepairOrder.objects.prefetch_related('bikes').order_by('-created_at'),
+        ),
     )
     filterset_fields = ['email']
     search_fields = ['first_name', 'last_name', 'phone', 'email']

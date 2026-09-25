@@ -22,6 +22,13 @@ class BikeSerializer(serializers.ModelSerializer):
         fields = '__all__'
         read_only_fields = ('created_at',)
 
+    def validate(self, attrs):
+        category = attrs.get('category', getattr(self.instance, 'category', 'bike'))
+        bike_type = attrs.get('bike_type', getattr(self.instance, 'bike_type', 'other'))
+        if category == 'winter' and bike_type != 'other':
+            raise serializers.ValidationError({'bike_type': 'Typ roweru nie dotyczy sprzetu zimowego.'})
+        return attrs
+
     def to_representation(self, instance):
         representation = super().to_representation(instance)
         representation['customer'] = CustomerBasicSerializer(instance.customer).data
@@ -44,9 +51,10 @@ class RepairOrderHistorySerializer(serializers.Serializer):
     id = serializers.IntegerField()
     customer = serializers.IntegerField()
     customer_name = serializers.CharField()
-    bike = serializers.IntegerField()
+    bike = serializers.IntegerField(allow_null=True)
     bike_label = serializers.CharField()
     bike_tag_number = serializers.IntegerField()
+    bikes = serializers.ListField(child=serializers.DictField())
     status = serializers.CharField()
     priority = serializers.CharField()
     estimated_cost = serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True)

@@ -2,6 +2,8 @@ from django import forms
 from django_filters import rest_framework as filters
 from django_filters.widgets import BaseCSVWidget
 
+from apps.customers.models import Bike
+
 from .models import RepairOrder
 
 
@@ -53,6 +55,21 @@ class RepairOrderFilter(filters.FilterSet):
         help_text='Jeden priorytet lub kilka po przecinku, np. `priority=normal,high`.',
     )
 
+    # Matches the order's equipment set, so an order shows up for any item attached to
+    # it - not just the one that happens to be first.
+    bike = filters.NumberFilter(
+        field_name='bikes',
+        label='Sprzet',
+        help_text='ID sprzetu (roweru lub sprzetu zimowego) przypietego do zlecenia.',
+    )
+    category = ChoiceInFilter(
+        field_name='bikes__category',
+        choices=Bike.CATEGORY_CHOICES,
+        distinct=True,
+        label='Kategoria sprzetu',
+        help_text='Zlecenia zawierajace sprzet danej kategorii, np. `category=winter`.',
+    )
+
     class Meta:
         model = RepairOrder
-        fields = ['status', 'priority', 'customer', 'bike']
+        fields = ['status', 'priority', 'customer', 'bike', 'category']
