@@ -60,13 +60,15 @@ export default function ClientsPage() {
   if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
 
   return (
-    <div className="px-8 pb-8 relative">
+    <div className="px-4 sm:px-6 md:px-8 pb-8 relative">
 
       <StickyHeader>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Baza klientów</h1>
           <div className="flex gap-4">
-            <Button onClick={() => setIsAddFormOpen(true)}>+ Dodaj klienta</Button>
+            <Button onClick={() => setIsAddFormOpen(true)} className="w-full sm:w-auto">
+              + Dodaj klienta
+            </Button>
           </div>  
         </div>
 
@@ -75,7 +77,7 @@ export default function ClientsPage() {
         </div>
       </StickyHeader>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
         {isLoading ? (
           Array.from({ length: 6 }).map((_, i) => (
             <ClientCardSkeleton key={i} />

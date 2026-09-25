@@ -12,7 +12,7 @@ import StickyHeader from "../components/StickyHeader";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
 import Select from "../components/Select";
-import { TableRowsSkeleton } from "../components/Skeleton";
+import { TableRowsSkeleton, MobileOrderCardsSkeleton } from "../components/Skeleton";
 
 export default function OrdersPage() {
   const navigate = useNavigate();
@@ -111,17 +111,21 @@ export default function OrdersPage() {
   };
 
   return (
-    <div className="px-8 pb-8 relative">
+    <div className="px-4 sm:px-6 md:px-8 pb-8 relative">
       <StickyHeader>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 sm:mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Zlecenia serwisowe</h1>
-          <Button onClick={() => setIsAddOrderFormOpen(true)}>+ Przyjmij rower</Button>
+          <Button onClick={() => setIsAddOrderFormOpen(true)} className="w-full sm:w-auto">
+            + Przyjmij rower
+          </Button>
         </div>
 
-        <div className="flex gap-4">
-          <div className="flex-1"> <SearchInput placeholder="Szukaj po kliencie, numerze zlecenia..."/> </div>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex-1">
+            <SearchInput placeholder="Szukaj po kliencie, numerze zlecenia..." className="mb-0"/>
+          </div>
           <div>
-            <select className="h-[46px] border border-gray-200 rounded-lg px-4 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] shadow-sm">
+            <select className="w-full sm:w-auto h-[46px] border border-gray-200 rounded-lg px-4 bg-white text-gray-700 focus:outline-none focus:ring-1 focus:ring-[var(--color-accent)] shadow-sm cursor-pointer">
               <option value="">Wszystkie</option>
               <option value="in_progress">W trakcie</option>
               <option value="done">Gotowe</option>
@@ -131,40 +135,92 @@ export default function OrdersPage() {
         </div>
       </StickyHeader>
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50 border-b border-solid border-gray-200 text-sm text-gray-600">
-              <th className="py-4 px-6 font-medium">Nr zlecenia</th>
-              <th className="py-4 px-6 font-medium">Zawieszka</th>
-              <th className="py-4 px-6 font-medium">Klient</th>
-              <th className="py-4 px-6 font-medium">Rower</th>
-              <th className="py-4 px-6 font-medium">Status</th>
-              <th className="py-4 px-6 font-medium">Data przyjęcia</th>
-              <th className="py-4 px-6 font-medium">Wartość</th>
-            </tr>
-          </thead>
-
-          <tbody className="text-sm text-gray-800">
-            {isOrdersLoading ? (
-              <TableRowsSkeleton rows={6} cols={7} />
-            ) : ordersList.map((order, index) => (
-              <tr 
-                key={order.id} 
-                onClick={() => navigate(`/panel/orders/${order.id}`)}
-                className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index === ordersList.length - 1 ? 'border-b-0' : '' }`}
-              >
-                <td className="py-4 px-6 font-medium text-gray-600">#{order.id}</td>
-                <td className="py-4 px-6 font-bold text-gray-900">#{order.bike_tag_number}</td>
-                <td className="py-4 px-6">{order.customer_name}</td>
-                <td className="py-4 px-6 text-gray-600">{order.bike_label}</td>
-                <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
-                <td className="py-4 px-6 text-gray-500">{new Date(order.created_at).toLocaleDateString()}</td>
-                <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `~${order.estimated_cost} zł` : '-')}</td>
+      {/* Widok tabeli dla ekranów desktop / tablet (z zabezpieczeniem poziomym) */}
+      <div className="hidden md:block bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <div className="overflow-x-auto min-w-full">
+          <table className="w-full text-left border-collapse min-w-[700px]">
+            <thead>
+              <tr className="bg-gray-50 border-b border-solid border-gray-200 text-sm text-gray-600">
+                <th className="py-4 px-6 font-medium">Nr zlecenia</th>
+                <th className="py-4 px-6 font-medium">Zawieszka</th>
+                <th className="py-4 px-6 font-medium">Klient</th>
+                <th className="py-4 px-6 font-medium">Rower</th>
+                <th className="py-4 px-6 font-medium">Status</th>
+                <th className="py-4 px-6 font-medium">Data przyjęcia</th>
+                <th className="py-4 px-6 font-medium">Wartość</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+
+            <tbody className="text-sm text-gray-800">
+              {isOrdersLoading ? (
+                <TableRowsSkeleton rows={6} cols={7} />
+              ) : ordersList.length > 0 ? (
+                ordersList.map((order, index) => (
+                  <tr 
+                    key={order.id} 
+                    onClick={() => navigate(`/panel/orders/${order.id}`)}
+                    className={`border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${index === ordersList.length - 1 ? 'border-b-0' : '' }`}
+                  >
+                    <td className="py-4 px-6 font-medium text-gray-600">#{order.id}</td>
+                    <td className="py-4 px-6 font-bold text-gray-900">#{order.bike_tag_number}</td>
+                    <td className="py-4 px-6 font-medium">{order.customer_name}</td>
+                    <td className="py-4 px-6 text-gray-600">{order.bike_label}</td>
+                    <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
+                    <td className="py-4 px-6 text-gray-500">{new Date(order.created_at).toLocaleDateString()}</td>
+                    <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `~${order.estimated_cost} zł` : '-')}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="7" className="py-8 px-6 text-center text-gray-500">
+                    Brak zleceń w bazie.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Widok kart dla telefonów (rozwiązanie problemu wąskich ekranów) */}
+      <div className="md:hidden space-y-3">
+        {isOrdersLoading ? (
+          <MobileOrderCardsSkeleton count={4} />
+        ) : ordersList.length > 0 ? (
+          ordersList.map((order) => (
+            <div
+              key={order.id}
+              onClick={() => navigate(`/panel/orders/${order.id}`)}
+              className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm active:bg-gray-50 transition-colors cursor-pointer space-y-2.5"
+            >
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-gray-900">#{order.id}</span>
+                  <span className="px-2 py-0.5 bg-gray-100 text-gray-700 font-semibold rounded text-xs border border-gray-200">
+                    Zawieszka: #{order.bike_tag_number || '-'}
+                  </span>
+                </div>
+                <StatusBadge status={order.status} />
+              </div>
+
+              <div>
+                <p className="text-base font-semibold text-gray-900">{order.customer_name}</p>
+                <p className="text-sm text-gray-600">{order.bike_label}</p>
+              </div>
+
+              <div className="pt-2 border-t border-gray-100 flex justify-between items-center text-xs text-gray-500">
+                <span>Przyjęto: {new Date(order.created_at).toLocaleDateString()}</span>
+                <span className="text-sm font-bold text-[var(--color-accent)]">
+                  {order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `~${order.estimated_cost} zł` : '-')}
+                </span>
+              </div>
+            </div>
+          ))
+        ) : (
+          <div className="bg-white border border-gray-200 rounded-xl p-8 text-center text-gray-500 text-sm">
+            Brak zleceń w bazie.
+          </div>
+        )}
       </div>
 
       <Modal 
