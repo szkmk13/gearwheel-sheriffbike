@@ -219,6 +219,17 @@ export function OrderDetailsSkeleton() {
             <Skeleton className="h-5 w-32" />
             <Skeleton className="h-16 w-full rounded-md" />
           </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-4">
+            <div className="flex justify-between items-center mb-2">
+              <Skeleton className="h-5 w-44" />
+              <Skeleton className="h-5 w-16 rounded-full" />
+            </div>
+            <div className="space-y-4 pl-4 border-l-2 border-gray-200">
+              <Skeleton className="h-6 w-52" />
+              <Skeleton className="h-6 w-44" />
+            </div>
+          </div>
         </div>
 
         <div className="space-y-6">

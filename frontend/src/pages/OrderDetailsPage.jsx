@@ -65,14 +65,18 @@ export default function OrderDetailsPage() {
                 <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-600 font-medium">Zmień status:</span>
                     <select 
-                        className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:ring-[#009ceb] focus:border-[#009ceb]"
+                        className="border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] cursor-pointer"
                         value={order.status}
                         onChange={handleStatusChange}
                         disabled={statusMutation.isPending}
                     >
+                        <option value="accepted">Przyjęte</option>
+                        <option value="diagnosing">Diagnoza</option>
+                        <option value="waiting_parts">Czeka na części</option>
                         <option value="in_progress">W trakcie</option>
                         <option value="done">Gotowe do odbioru</option>
                         <option value="delivered">Odebrane (Zakończone)</option>
+                        <option value="cancelled">Anulowane</option>
                     </select>
                 </div>
             </div>
@@ -110,6 +114,60 @@ export default function OrderDetailsPage() {
                         <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-gray-700 whitespace-pre-wrap">
                             {order.description}
                         </div>
+                    </div>
+
+                    {/* Historia zmian statusu */}
+                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
+                                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Historia zmian statusu
+                            </h3>
+                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                                {order.status_history?.length || 0} {order.status_history?.length === 1 ? 'wpis' : (order.status_history?.length > 1 && order.status_history?.length < 5 ? 'wpisy' : 'wpisów')}
+                            </span>
+                        </div>
+
+                        {order.status_history && order.status_history.length > 0 ? (
+                            <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
+                                {order.status_history.map((entry) => (
+                                    <div key={entry.id} className="relative">
+                                        <span className="absolute -left-[19px] top-1.5 w-3 h-3 rounded-full bg-[var(--color-accent)] ring-4 ring-white" />
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                {entry.old_status ? (
+                                                    <>
+                                                        <StatusBadge status={entry.old_status} />
+                                                        <span className="text-gray-400 text-xs">→</span>
+                                                        <StatusBadge status={entry.new_status} />
+                                                    </>
+                                                ) : (
+                                                    <StatusBadge status={entry.new_status} />
+                                                )}
+                                            </div>
+                                            <span className="text-xs text-gray-500 font-medium">
+                                                {new Date(entry.changed_at).toLocaleString('pl-PL', {
+                                                    day: '2-digit',
+                                                    month: '2-digit',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </span>
+                                        </div>
+                                        {entry.note && (
+                                            <p className="mt-2 text-sm text-gray-600 bg-gray-50 p-2.5 rounded-md border border-gray-100 italic">
+                                                „{entry.note}”
+                                            </p>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-sm text-gray-500 text-center py-4">Brak zarejestrowanej historii statusów dla tego zlecenia.</p>
+                        )}
                     </div>
                 </div>
 
