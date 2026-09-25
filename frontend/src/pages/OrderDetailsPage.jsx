@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { fetchOrderDetails, updateOrder } from "../api/orders";
+import { fetchOrderDetails, changeOrderStatus } from "../api/orders";
 
 import StatusBadge from "../components/StatusBadge";
 import { OrderDetailsSkeleton } from "../components/Skeleton";
@@ -17,8 +17,11 @@ export default function OrderDetailsPage() {
     });
 
     const statusMutation = useMutation({
-        mutationFn: updateOrder,
-        onSuccess: () => {
+        mutationFn: ({ status, note }) => changeOrderStatus(id, { status, note }),
+        onSuccess: (updatedOrder) => {
+            if (updatedOrder) {
+                queryClient.setQueryData(['order', id], updatedOrder);
+            }
             queryClient.invalidateQueries({ queryKey: ['order', id] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             toast.success("Status zlecenia został zaktualizowany!"); 
@@ -28,7 +31,8 @@ export default function OrderDetailsPage() {
 
     const handleStatusChange = (e) => {
         const newStatus = e.target.value;
-        statusMutation.mutate({ id, orderData: { status: newStatus } });
+        if (!order || newStatus === order.status) return;
+        statusMutation.mutate({ status: newStatus });
     };
 
     if (isLoading) return <OrderDetailsSkeleton />;
