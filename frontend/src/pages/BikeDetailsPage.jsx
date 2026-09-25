@@ -1,6 +1,7 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import QRCode from "qrcode";
 import toast from "react-hot-toast";
 import { fetchBikeDetails, updateBike } from "../api/bikes";
 
@@ -49,12 +50,22 @@ export default function BikeDetailsPage() {
 
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
   const formRef = useRef(null);
 
   const { data: bike, isLoading, isError, error } = useQuery({
     queryKey: ['bike', id],
     queryFn: () => fetchBikeDetails(id),
   });
+
+  useEffect(() => {
+    const code = bike?.sheriff_code || (bike ? `sheriff-${bike.id}-${bike.uuid}` : '');
+    if (code) {
+      QRCode.toDataURL(code, { width: 180, margin: 1 })
+        .then((url) => setQrDataUrl(url))
+        .catch((err) => console.error(err));
+    }
+  }, [bike?.sheriff_code, bike?.id, bike?.uuid]);
 
   const updateMutation = useMutation({
     mutationFn: (updatedData) => updateBike({ id, bikeData: updatedData }),
@@ -321,6 +332,13 @@ export default function BikeDetailsPage() {
             <p className="text-xs text-gray-500 mb-3">
               Unikalny kod wykorzystywany na naklejkach QR oraz przy szybkim skanowaniu sprzętu:
             </p>
+
+            {qrDataUrl && (
+              <div className="flex flex-col items-center justify-center p-3 mb-3 bg-gray-50 rounded-xl border border-gray-100">
+                <img src={qrDataUrl} alt="QR Code roweru" className="w-32 h-32 rounded-lg bg-white p-1 shadow-2xs" />
+                <span className="text-[11px] font-semibold text-gray-400 mt-1.5 uppercase tracking-wider">Kod QR sprzętu</span>
+              </div>
+            )}
 
             <div className="p-3 bg-gray-50 rounded-lg border border-gray-200 font-mono text-xs text-gray-800 break-all select-all mb-3">
               {bike.sheriff_code || `sheriff-${bike.id}-${bike.uuid}`}

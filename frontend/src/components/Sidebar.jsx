@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext'; 
 
-export default function Sidebar({ isOpen = false, onClose = () => {} }) {
+export default function Sidebar({ isOpen = false, onClose = () => {}, onOpenScanner = () => {} }) {
     const { user, logout } = useAuth();
 
     const navLinkClass = ({ isActive }) =>
@@ -67,6 +67,27 @@ export default function Sidebar({ isOpen = false, onClose = () => {} }) {
                         </svg>
                         <span>Klienci</span>
                     </NavLink>
+
+                    {/* Szybki skaner kodów QR */}
+                    <div className="pt-2 my-2 border-t border-white/5">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                onClose();
+                                if (onOpenScanner) onOpenScanner();
+                            }}
+                            className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg transition-all font-medium text-sm text-[#8C8378] hover:text-[#F6F2EB] hover:bg-white/5 cursor-pointer text-left group"
+                            title="Szybkie skanowanie kodu QR aparatem"
+                        >
+                            <svg className="w-5 h-5 shrink-0 text-[#8C8378] group-hover:text-[var(--color-accent)] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                            <span className="flex-1">Skanuj kod QR</span>
+                            <span className="text-[10px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded bg-white/10 text-[var(--color-accent)]">
+                                Skaner
+                            </span>
+                        </button>
+                    </div>
                 </nav>
 
                 {/* USER PROFILE */}

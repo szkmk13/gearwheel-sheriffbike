@@ -8,6 +8,7 @@ import ClientsPage from "./pages/ClientsPage";
 import ClientDetailsPage from "./pages/ClientDetailsPage"
 import OrderDetailsPage from './pages/OrderDetailsPage';
 import BikeDetailsPage from './pages/BikeDetailsPage';
+import ScanQRPage from './pages/ScanQRPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage'; // <-- IMPORT STRONY BŁĘDU
 import { AuthProvider } from './context/AuthContext';
@@ -45,6 +46,7 @@ function App() {
             <Route path="clients/:id" element={<ClientDetailsPage />} />
             <Route path="orders/:id" element={<OrderDetailsPage />} />
             <Route path="bikes/:id" element={<BikeDetailsPage />} />
+            <Route path="scan" element={<ScanQRPage />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />
