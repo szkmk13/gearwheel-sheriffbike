@@ -16,7 +16,9 @@ class OrderEquipmentTests(APITestCase):
     """Orders covering several pieces of equipment, and the legacy single-bike API shape."""
 
     def setUp(self):
-        self.user = User.objects.create_user(username='mechanik', password='tajne123')
+        # No password anywhere in here on purpose: force_login() signs the user in
+        # directly, so a credential literal would buy nothing and trip secret scanning.
+        self.user = User.objects.create_user(username='mechanik')
         self.client.force_login(self.user)
         self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
         self.bike = Bike.objects.create(customer=self.customer, brand='Trek', model='Marlin 5', bike_type='mtb')
@@ -191,7 +193,7 @@ class BikeDeletionGuardTests(APITestCase):
         order.bikes.add(self.bike)
 
         request = RequestFactory().get('/')
-        request.user = User.objects.create_superuser(username='admin', password='tajne123')
+        request.user = User.objects.create_superuser(username='admin')
         *_, protected = BikeAdmin(Bike, AdminSite()).get_deleted_objects([self.bike], request)
         self.assertEqual(protected, [str(order)])
 
@@ -207,7 +209,7 @@ class BikeDeletionGuardTests(APITestCase):
 
 class BikeCategoryTests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='mechanik', password='tajne123')
+        self.user = User.objects.create_user(username='mechanik')
         self.client.force_login(self.user)
         self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
 
