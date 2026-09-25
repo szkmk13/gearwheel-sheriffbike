@@ -21,6 +21,8 @@ LAST_NAMES = [
 BIKE_BRANDS = ['Trek', 'Giant', 'Kross', 'Specialized', 'Cube', 'Merida', 'Romet', 'Author', 'Orbea', 'Scott']
 BIKE_MODELS = ['Marlin 5', 'Talon', 'Level', 'Rockhopper', 'Aim', 'Big Nine', 'Rambler', 'A6300', 'MX 20', 'Aspect']
 BIKE_TYPES = [c[0] for c in Bike.BIKE_TYPE_CHOICES]
+WINTER_BRANDS = ['Atomic', 'Rossignol', 'Salomon', 'Head', 'Fischer', 'Burton', 'Nidecker']
+WINTER_MODELS = ['Redster X5', 'Experience 78', 'QST 92', 'Supershape', 'RC One', 'Custom 158']
 COLORS = ['czarny', 'czerwony', 'niebieski', 'biały', 'grafitowy', 'zielony', 'żółty']
 
 REPAIR_DESCRIPTIONS = [
@@ -139,6 +141,8 @@ class Command(BaseCommand):
                 for _ in range(random.randint(1, 3)):
                     bike = self._create_bike(customer)
                     orders_created += self._create_repair_history(bike, customer)
+                if random.random() < 0.33:
+                    orders_created += self._create_winter_order(customer)
 
         self.stdout.write(self.style.SUCCESS(
             f'Wygenerowano {count} klientów wraz z rowerami i {orders_created} zleceniami napraw.'
@@ -159,9 +163,33 @@ class Command(BaseCommand):
         self.stdout.write(f'  + Klient: {customer}')
         return customer
 
+    def _create_winter_item(self, customer):
+        item = Bike.objects.create(
+            customer=customer,
+            category='winter',
+            brand=random.choice(WINTER_BRANDS),
+            model=random.choice(WINTER_MODELS),
+            color=random.choice(COLORS),
+            serial_no=f'SN{random.randint(100000, 999999)}',
+            year=random.randint(2015, 2025),
+        )
+        self.stdout.write(f'    - Sprzet zimowy: {item}')
+        return item
+
+    def _create_winter_order(self, customer):
+        # Czesto przyjmujemy kilka sztuk naraz (np. dwie pary nart), wiec czesc zlecen
+        # zimowych jest wielosprzetowa - inaczej nie byloby czego testowac.
+        items = [self._create_winter_item(customer) for _ in range(random.randint(1, 2))]
+        now = timezone.now()
+        order_date = now - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23))
+        self._create_order(items, customer, order_date, now)
+        self.stdout.write(f'      * zlecenie zimowe na {len(items)} szt. sprzetu')
+        return 1
+
     def _create_bike(self, customer):
         bike = Bike.objects.create(
             customer=customer,
+            category='bike',
             brand=random.choice(BIKE_BRANDS),
             model=random.choice(BIKE_MODELS),
             bike_type=random.choice(BIKE_TYPES),
@@ -186,22 +214,22 @@ class Command(BaseCommand):
             dates[-1] = now - timedelta(days=random.randint(0, 25), hours=random.randint(0, 23))
             dates.sort()
         for order_date in dates:
-            self._create_order(bike, customer, order_date, now)
+            self._create_order([bike], customer, order_date, now)
         self.stdout.write(f'      * {num_orders} zleceń napraw dla roweru {bike}')
         return num_orders
 
-    def _create_order(self, bike, customer, order_date, now):
+    def _create_order(self, bikes, customer, order_date, now):
         statuses = self._status_path(order_date, now)
         status = statuses[-1]
 
         order = RepairOrder.objects.create(
             customer=customer,
-            bike=bike,
             bike_tag_number=random.randint(1, 250),
             status=status,
             priority=random.choice([p[0] for p in RepairOrder.PRIORITY_CHOICES]),
             description=random.choice(REPAIR_DESCRIPTIONS),
         )
+        order.bikes.set(bikes)
 
         items_total = self._create_items(order)
         timeline = self._status_timeline(statuses, order_date, now)
@@ -235,6 +263,7 @@ class Command(BaseCommand):
             estimated_cost=estimated_cost,
             final_cost=final_cost,
         )
+        return order
 
     def _status_path(self, order_date, now):
         """Lista statusów, przez które przeszło zlecenie - od 'accepted' do końcowego."""

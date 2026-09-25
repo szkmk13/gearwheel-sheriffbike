@@ -1,7 +1,7 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Case, Count, F, IntegerField, Sum, When
+from django.db.models import Case, Count, F, IntegerField, Prefetch, Sum, When
 from django.db.models.functions import Coalesce, TruncWeek
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -37,7 +37,7 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
         description=_(
             'Returns repair orders sorted by status (order: done, in_progress, diagnosing, '
             'waiting_parts, accepted, delivered, cancelled), and within each status - newest first. '
-            'Supports filtering (`status`, `priority`, `customer`, `bike`, where `status` and '
+            'Supports filtering (`status`, `priority`, `customer`, `bike`, `category`, where `status` and '
             '`priority` also accept several comma-separated values), searching '
             '(`search` over the description and customer data), and ordering (`ordering`). '
             'Each order also exposes `cost` - its effective price, i.e. `final_cost` once it is '
@@ -68,7 +68,17 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
             ),
             OpenApiParameter(
                 'bike', int, OpenApiParameter.QUERY,
-                description=_('Filter by bike ID.'),
+                description=_(
+                    'Filter by equipment ID. Matches orders where the given bike or winter '
+                    'item is attached, whichever position it holds on the order.'
+                ),
+            ),
+            OpenApiParameter(
+                'category', str, OpenApiParameter.QUERY, enum=[c[0] for c in Bike.CATEGORY_CHOICES],
+                description=_(
+                    'Filter by equipment category (`bike` / `winter`); one value or several '
+                    'comma-separated. Matches orders holding at least one item of that category.'
+                ),
             ),
             OpenApiParameter(
                 'search', str, OpenApiParameter.QUERY,
@@ -94,10 +104,13 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
     create=extend_schema(
         summary=_('Create a repair order'),
         description=_(
-            'Opens a new repair order for the given customer and bike. Only `customer`, `bike`, '
-            '`bike_tag_number`, `description`, and `estimated_cost` are accepted. `bike_tag_number` '
-            'is the physical claim-tag number (a plain integer) attached to the bike while it is in '
-            'the shop - it is not a unique identifier and may repeat across different orders/bikes. '
+            'Opens a new repair order for the given customer and equipment. An order can cover '
+            'several pieces of equipment at once (e.g. two pairs of skis) - pass them as `bikes`, '
+            'a list of equipment IDs. The legacy single-item form (`bike`) is still accepted and '
+            'creates a one-item order. `bike_tag_number` is the physical claim-tag number (a plain '
+            'integer) attached to the equipment while it is in the shop; one tag covers the whole '
+            'order, however many items it holds. It is not a unique identifier and may repeat '
+            'across different orders. '
             '`status` and '
             '`priority` are not inputs here - new orders always start as `accepted` / `normal` '
             'priority (change them afterwards via the status endpoint or a regular update). '
@@ -126,7 +139,11 @@ STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted'
     ),
 )
 class RepairOrderViewSet(ModelViewSet):
-    queryset = RepairOrder.objects.select_related('customer', 'bike').annotate(
+    queryset = RepairOrder.objects.select_related('customer').prefetch_related(
+        # Ordered by id so `bike` (the legacy single-equipment field) is the item that
+        # was attached first, not whichever sorts first alphabetically.
+        Prefetch('bikes', queryset=Bike.objects.select_related('customer').order_by('id')),
+    ).annotate(
         status_order=Case(
             *[When(status=status_value, then=position) for position, status_value in enumerate(STATUS_ORDER)],
             output_field=IntegerField(),
@@ -136,7 +153,7 @@ class RepairOrderViewSet(ModelViewSet):
         cost=Coalesce(F('final_cost'), F('estimated_cost')),
     ).order_by('status_order', '-created_at')
     filterset_class = RepairOrderFilter
-    search_fields = ['description', 'customer__first_name', 'customer__last_name', "bike__brand", "bike__model"]
+    search_fields = ['description', 'customer__first_name', 'customer__last_name', 'bikes__brand', 'bikes__model']
     ordering_fields = ['created_at', 'updated_at', 'priority', 'estimated_cost', 'final_cost', 'cost']
 
     def get_serializer_class(self):
@@ -255,7 +272,8 @@ class DashboardView(APIView):
         )
 
         return Response({
-            'bikes_count': Bike.objects.count(),
+            'bikes_count': Bike.objects.filter(category='bike').count(),
+            'winter_items_count': Bike.objects.filter(category='winter').count(),
             'customers_count': Customer.objects.count(),
             'orders_completed_this_week': completed_this_week.count(),
             'profit_this_week': completed_this_week.aggregate(
