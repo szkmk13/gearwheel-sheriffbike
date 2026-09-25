@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { fetchOrderDetails, updateOrder } from "../api/orders";
 
 import StatusBadge from "../components/StatusBadge";
+import { OrderDetailsSkeleton } from "../components/Skeleton";
 
 export default function OrderDetailsPage() {
     const { id } = useParams();
@@ -30,7 +31,7 @@ export default function OrderDetailsPage() {
         statusMutation.mutate({ id, orderData: { status: newStatus } });
     };
 
-    if (isLoading) return <div className="p-8 text-gray-500 font-medium">Ładowanie szczegółów zlecenia...</div>;
+    if (isLoading) return <OrderDetailsSkeleton />;
     if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
     if (!order) return <div className="p-8 text-red-500 font-medium">Nie znaleziono zlecenia.</div>;
 

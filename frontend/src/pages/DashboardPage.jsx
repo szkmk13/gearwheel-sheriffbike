@@ -3,6 +3,7 @@ import { fetchOrders } from '../api/orders';
 import StickyHeader from '../components/StickyHeader';
 import StatusBadge from '../components/StatusBadge';
 import { useNavigate } from 'react-router-dom';
+import { DashboardSkeleton } from '../components/Skeleton';
 
 export default function DashboardPage() {
     const navigate = useNavigate();
@@ -25,7 +26,7 @@ export default function DashboardPage() {
         return acc + (parseFloat(order.final_cost) || parseFloat(order.estimated_cost) || 0);
     }, 0);
 
-    if (isLoading) return <div className="p-8 text-gray-500 font-medium">Ładowanie statystyk dashboardu...</div>;
+    if (isLoading) return <DashboardSkeleton />;
 
     return (
         <div className="px-8 pb-8 relative">

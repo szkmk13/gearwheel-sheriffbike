@@ -12,6 +12,7 @@ import StickyHeader from "../components/StickyHeader";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
 import Select from "../components/Select";
+import { TableRowsSkeleton } from "../components/Skeleton";
 
 export default function OrdersPage() {
   const navigate = useNavigate();
@@ -146,7 +147,7 @@ export default function OrdersPage() {
 
           <tbody className="text-sm text-gray-800">
             {isOrdersLoading ? (
-              <tr><td colSpan="7" className="py-4 px-6 text-center text-gray-500">Ładowanie...</td></tr>
+              <TableRowsSkeleton rows={6} cols={7} />
             ) : ordersList.map((order, index) => (
               <tr 
                 key={order.id} 

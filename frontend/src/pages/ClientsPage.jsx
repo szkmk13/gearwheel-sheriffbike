@@ -8,6 +8,7 @@ import ClientCard from "../components/ClientCard";
 import SlidePanel from "../components/SlidePanel";
 import Input from "../components/Input";
 import StickyHeader from "../components/StickyHeader";
+import { ClientCardSkeleton } from "../components/Skeleton";
 
 
 export default function ClientsPage() {
@@ -56,7 +57,6 @@ export default function ClientsPage() {
     mutation.mutate(newClient);
   };
 
-  if (isLoading) return <div className="p-8 text-gray-500 font-medium">Ładowanie danych z serwera...</div>;
   if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
 
   return (
@@ -76,13 +76,21 @@ export default function ClientsPage() {
       </StickyHeader>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {clientsList.map(client => (
-          <ClientCard 
-            key={client.id} 
-            client={client} 
-            onClick={() => navigate(`/panel/clients/${client.id}`)}
-          />
-        ))}
+        {isLoading ? (
+          Array.from({ length: 6 }).map((_, i) => (
+            <ClientCardSkeleton key={i} />
+          ))
+        ) : clientsList.length > 0 ? (
+          clientsList.map(client => (
+            <ClientCard 
+              key={client.id} 
+              client={client} 
+              onClick={() => navigate(`/panel/clients/${client.id}`)}
+            />
+          ))
+        ) : (
+          <p className="col-span-full py-8 text-center text-gray-500">Brak klientów w bazie.</p>
+        )}
       </div>
       
       {/*Formularz dodawania klienta*/}

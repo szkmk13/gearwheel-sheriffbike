@@ -10,6 +10,7 @@ import Input from "../components/Input";
 import Select from "../components/Select";
 import { getInitials } from "../components/ClientCard";
 import StatusBadge from "../components/StatusBadge"; 
+import { ClientDetailsSkeleton } from "../components/Skeleton"; 
 
 const EditIcon = () => (
   <div className="text-gray-400 transition-colors">
@@ -88,7 +89,7 @@ export default function ClientDetailsPage() {
         bikeMutation.mutate(newBikeData);
     };
 
-    if (isLoading) return <div className="p-8 text-gray-500 font-medium">Ładowanie szczegółów klienta...</div>;
+    if (isLoading) return <ClientDetailsSkeleton />;
     if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
     if (!client) return <div className="p-8 text-red-500 font-medium">Nie znaleziono klienta.</div>;
 
