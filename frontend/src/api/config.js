@@ -36,7 +36,11 @@ const readErrorMessage = async (response, fallback) => {
 };
 
 export const apiFetch = async (endpoint, { method = 'GET', body, headers, ...rest } = {}) => {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+  const url = (API_BASE_URL && endpoint.startsWith(API_BASE_URL)) || endpoint.startsWith('http://') || endpoint.startsWith('https://')
+    ? endpoint
+    : `${API_BASE_URL}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+
+  const response = await fetch(url, {
     method,
     credentials: 'include',
     headers: {
