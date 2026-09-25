@@ -7,6 +7,7 @@ import InventoryPage from "./pages/InventoryPage";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailsPage from "./pages/ClientDetailsPage"
 import OrderDetailsPage from './pages/OrderDetailsPage';
+import BikeDetailsPage from './pages/BikeDetailsPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage'; // <-- IMPORT STRONY BŁĘDU
 import { AuthProvider } from './context/AuthContext';
@@ -43,6 +44,7 @@ function App() {
             <Route path="clients" element={<ClientsPage />} />
             <Route path="clients/:id" element={<ClientDetailsPage />} />
             <Route path="orders/:id" element={<OrderDetailsPage />} />
+            <Route path="bikes/:id" element={<BikeDetailsPage />} />
           </Route>
 
           <Route path="*" element={<NotFoundPage />} />

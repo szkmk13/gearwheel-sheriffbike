@@ -157,12 +157,22 @@ export default function ClientDetailsPage() {
                         {clientBikes.length > 0 ? (
                         <div className="space-y-3">
                             {clientBikes.map(bike => (
-                            <div key={bike.id} className="p-3.5 sm:p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold text-gray-800 text-sm sm:text-base">
-                                        {bike.brand} <span className="font-normal text-gray-600">{bike.model}</span>
+                            <div 
+                                key={bike.id} 
+                                onClick={() => navigate(`/panel/bikes/${bike.id}`)}
+                                className="p-3.5 sm:p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors cursor-pointer group"
+                            >
+                                <div className="min-w-0">
+                                    <p className="font-semibold text-gray-800 text-sm sm:text-base group-hover:text-[var(--color-accent)] transition-colors truncate">
+                                        {bike.brand} <span className="font-normal text-gray-600 ml-1">{bike.model}</span>
                                     </p>
                                     <p className="text-xs text-gray-500 mt-1 capitalize">{bike.bike_type}</p>
+                                </div>
+                                <div className="flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-[var(--color-accent)] shrink-0 ml-3 transition-colors">
+                                    <span>Szczegóły</span>
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                    </svg>
                                 </div>
                             </div>
                             ))}

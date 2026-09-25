@@ -39,6 +39,14 @@ export default function OrderDetailsPage() {
     if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
     if (!order) return <div className="p-8 text-red-500 font-medium">Nie znaleziono zlecenia.</div>;
 
+    const bikeId = order.bike?.id || (typeof order.bike === 'number' ? order.bike : null);
+    const customerId = order.customer?.id || (typeof order.customer === 'number' ? order.customer : null);
+    const bikeBrand = order.bike?.brand || '';
+    const bikeModel = order.bike?.model || '';
+    const bikeFullName = (bikeBrand || bikeModel) 
+        ? `${bikeBrand} ${bikeModel}`.trim() 
+        : (order.bike_label || 'Rower');
+
     return (
         <div className="p-4 sm:p-6 md:p-8">
             <div className="flex items-center mb-4 sm:mb-6">
@@ -89,8 +97,23 @@ export default function OrderDetailsPage() {
                 <div className="lg:col-span-2 space-y-4 sm:space-y-6">
                     <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 flex flex-col sm:flex-row gap-6 sm:gap-8">
                         <div className="flex-1 min-w-0">
-                            <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 sm:mb-3">Klient</h3>
-                            <p className="text-base sm:text-lg font-medium text-gray-900 truncate">{order.customer.first_name} {order.customer.last_name}</p>
+                            <div className="flex items-center justify-between mb-2 sm:mb-3">
+                                <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">Klient</h3>
+                                {customerId && (
+                                    <button
+                                        onClick={() => navigate(`/panel/clients/${customerId}`)}
+                                        className="text-xs font-medium text-[var(--color-accent)] hover:underline cursor-pointer"
+                                    >
+                                        Profil klienta →
+                                    </button>
+                                )}
+                            </div>
+                            <p 
+                                onClick={customerId ? () => navigate(`/panel/clients/${customerId}`) : undefined}
+                                className={`text-base sm:text-lg font-medium text-gray-900 truncate ${customerId ? 'hover:text-[var(--color-accent)] cursor-pointer transition-colors' : ''}`}
+                            >
+                                {order.customer.first_name} {order.customer.last_name}
+                            </p>
                             
                             <div className="mt-2 text-sm text-gray-600 space-y-1">
                                 <p className="flex items-center gap-2">
@@ -106,10 +129,36 @@ export default function OrderDetailsPage() {
                         <div className="w-px bg-gray-200 hidden sm:block"></div>
                         <div className="h-px bg-gray-200 block sm:hidden"></div>
                         <div className="flex-1 min-w-0">
-                            <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 sm:mb-3">Rower i zawieszka</h3>
-                            <p className="text-base sm:text-lg font-medium text-gray-900 truncate">{order.bike_label}</p>
-                            <div className="mt-2 inline-block px-3 py-1 bg-gray-100 rounded text-sm font-semibold text-gray-700 border border-gray-200">
-                                Zawieszka: #{order.bike_tag_number || '-'}
+                            <div className="flex items-center justify-between mb-2 sm:mb-3">
+                                <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">Rower i zawieszka</h3>
+                                {bikeId && (
+                                    <button
+                                        onClick={() => navigate(`/panel/bikes/${bikeId}`)}
+                                        className="text-xs font-medium text-[var(--color-accent)] hover:underline cursor-pointer"
+                                    >
+                                        Karta roweru →
+                                    </button>
+                                )}
+                            </div>
+                            <p 
+                                onClick={bikeId ? () => navigate(`/panel/bikes/${bikeId}`) : undefined}
+                                className={`text-base sm:text-lg font-medium text-gray-900 truncate ${bikeId ? 'hover:text-[var(--color-accent)] cursor-pointer transition-colors' : ''}`}
+                            >
+                                {bikeFullName}
+                            </p>
+                            <div className="mt-2 text-sm text-gray-600 space-y-1">
+                                <p className="flex items-center gap-1.5">
+                                    <span className="text-gray-400 text-xs font-medium">Producent:</span>
+                                    <span className="text-gray-800 font-medium">{bikeBrand || '-'}</span>
+                                    <span className="text-gray-300 mx-1">•</span>
+                                    <span className="text-gray-400 text-xs font-medium">Model:</span>
+                                    <span className="text-gray-800 font-medium">{bikeModel || '-'}</span>
+                                </p>
+                                <div className="pt-1">
+                                    <span className="inline-block px-2.5 py-0.5 bg-gray-100 rounded text-xs font-semibold text-gray-700 border border-gray-200">
+                                        Zawieszka: #{order.bike_tag_number || '-'}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>

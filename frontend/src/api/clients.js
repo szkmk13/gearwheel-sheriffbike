@@ -31,6 +31,16 @@ export const deleteClient = async (id) => {
   return del(`/api/customers/${id}/`);
 };
 
+// GET /api/customers/bikes/{id}/ - Pobiera szczegóły roweru
+export const fetchBikeDetails = async (bikeId) => {
+  return fetcher(`/api/customers/bikes/${bikeId}/`);
+};
+
+// PATCH /api/customers/bikes/{id}/ - Aktualizacja danych roweru
+export const updateBike = async ({ id, bikeData }) => {
+  return patch(`/api/customers/bikes/${id}/`, bikeData);
+};
+
 // GET /api/customers/bikes/lookup/ - Wyszukiwanie roweru po kodzie QR (sheriff-code)
 export const lookupBike = async (code) => {
   return get(`/api/customers/bikes/lookup/?code=${encodeURIComponent(code)}`);

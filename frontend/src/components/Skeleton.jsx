@@ -273,4 +273,62 @@ export function OrderDetailsSkeleton() {
   );
 }
 
+/**
+ * Szkielet widoku szczegółów roweru (w BikeDetailsPage).
+ */
+export function BikeDetailsSkeleton() {
+  return (
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="flex items-center mb-6">
+        <Skeleton className="h-8 w-28 rounded-full" />
+      </div>
+
+      <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <Skeleton className="w-14 h-14 rounded-xl shrink-0" />
+          <div className="space-y-2">
+            <Skeleton className="h-8 w-56" />
+            <Skeleton className="h-4 w-40" />
+          </div>
+        </div>
+        <div className="flex gap-3">
+          <Skeleton className="h-10 w-32 rounded-lg" />
+          <Skeleton className="h-10 w-36 rounded-lg" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 space-y-4">
+            <Skeleton className="h-6 w-44 mb-2" />
+            <div className="grid grid-cols-2 gap-4">
+              <Skeleton className="h-12 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+              <Skeleton className="h-12 w-full rounded-md" />
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 space-y-4">
+            <Skeleton className="h-6 w-48 mb-2" />
+            <Skeleton className="h-16 w-full rounded-lg" />
+            <Skeleton className="h-16 w-full rounded-lg" />
+          </div>
+        </div>
+
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 space-y-3">
+            <Skeleton className="h-5 w-36" />
+            <Skeleton className="h-12 w-full rounded-md" />
+          </div>
+          <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 space-y-3">
+            <Skeleton className="h-5 w-32" />
+            <Skeleton className="h-10 w-full rounded-md" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default Skeleton;

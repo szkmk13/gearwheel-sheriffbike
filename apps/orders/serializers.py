@@ -46,6 +46,7 @@ class RepairOrderListSerializer(serializers.ModelSerializer):
 class RepairOrderDetailSerializer(serializers.ModelSerializer):
     customer = CustomerListSerializer(read_only=True)
     bike = BikeSerializer(read_only=True)
+    bike_label = serializers.SerializerMethodField()
     items = RepairOrderItemSerializer(many=True, read_only=True)
     status_history = StatusHistorySerializer(many=True, read_only=True)
 
@@ -53,6 +54,9 @@ class RepairOrderDetailSerializer(serializers.ModelSerializer):
         model = RepairOrder
         fields = '__all__'
         read_only_fields = ('created_at', 'updated_at')
+
+    def get_bike_label(self, obj):
+        return str(obj.bike)
 
 
 class RepairOrderCreateSerializer(serializers.ModelSerializer):

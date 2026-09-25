@@ -17,6 +17,8 @@ class BikeNestedSerializer(serializers.ModelSerializer):
 
 
 class BikeSerializer(serializers.ModelSerializer):
+    sheriff_code = serializers.CharField(read_only=True)
+
     class Meta:
         model = Bike
         fields = '__all__'
@@ -31,6 +33,7 @@ class BikeSerializer(serializers.ModelSerializer):
 class BikeReadSerializer(serializers.ModelSerializer):
     """Response shape for BikeSerializer, whose `to_representation` nests `customer`."""
     customer = CustomerBasicSerializer(read_only=True)
+    sheriff_code = serializers.CharField(read_only=True)
 
     class Meta:
         model = Bike
@@ -53,6 +56,22 @@ class RepairOrderHistorySerializer(serializers.Serializer):
     final_cost = serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True)
     cost = serializers.DecimalField(max_digits=8, decimal_places=2, allow_null=True)
     created_at = serializers.DateTimeField()
+
+
+class BikeDetailSerializer(serializers.ModelSerializer):
+    customer = CustomerBasicSerializer(read_only=True)
+    sheriff_code = serializers.CharField(read_only=True)
+    repair_orders = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Bike
+        fields = '__all__'
+        read_only_fields = ('created_at',)
+
+    @extend_schema_field(RepairOrderHistorySerializer(many=True))
+    def get_repair_orders(self, obj):
+        from apps.orders.serializers import RepairOrderListSerializer
+        return RepairOrderListSerializer(obj.repair_orders.all(), many=True).data
 
 
 class CustomerListSerializer(serializers.ModelSerializer):
