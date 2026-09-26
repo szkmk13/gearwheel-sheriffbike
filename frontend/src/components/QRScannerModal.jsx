@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
 import toast from 'react-hot-toast';
-import { lookupBike, fetchBikeDetails } from '../api/bikes';
+import { lookupBike } from '../api/bikes';
 
 const playBeep = () => {
   try {
@@ -54,82 +54,16 @@ export default function QRScannerModal({ isOpen, onClose }) {
     setIsProcessing(true);
     playBeep();
 
-    let code = scannedText.trim();
+    const code = scannedText.trim();
 
     try {
-      // 1. Sprawdź czy to bezpośredni link do roweru w aplikacji
-      if (code.includes('/panel/bikes/')) {
-        const match = code.match(/\/panel\/bikes\/(\d+)/);
-        if (match) {
-          toast.success(`Zeskanowano link do roweru #${match[1]}`);
-          stopCamera();
-          onClose();
-          navigate(`/panel/bikes/${match[1]}`);
-          return;
-        }
-      }
-
-      // 2. Sprawdź czy to link do zlecenia
-      if (code.includes('/panel/orders/')) {
-        const match = code.match(/\/panel\/orders\/(\d+)/);
-        if (match) {
-          toast.success(`Zeskanowano link do zlecenia #${match[1]}`);
-          stopCamera();
-          onClose();
-          navigate(`/panel/orders/${match[1]}`);
-          return;
-        }
-      }
-
-      // 3. Wyciągnij parametr code z URL (jeśli podano pełny adres)
-      if (code.includes('code=')) {
-        const match = code.match(/code=([^&]+)/);
-        if (match) {
-          code = decodeURIComponent(match[1]);
-        }
-      }
-
-      // 4. Spróbuj wyszukać przez API lookup (sheriff-code)
-      try {
-        const bike = await lookupBike(code);
-        if (bike && bike.id) {
-          toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
-          stopCamera();
-          onClose();
-          navigate(`/panel/bikes/${bike.id}`);
-          return;
-        }
-      } catch (apiErr) {
-        // Fallback: jeśli kod to np. sheriff-<id>-<uuid>, spróbuj po samym ID
-        if (code.startsWith('sheriff-')) {
-          const parts = code.split('-');
-          if (parts[1] && !isNaN(parts[1])) {
-            try {
-              const bike = await fetchBikeDetails(parts[1]);
-              if (bike && bike.id) {
-                toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
-                stopCamera();
-                onClose();
-                navigate(`/panel/bikes/${bike.id}`);
-                return;
-              }
-            } catch (e) {}
-          }
-        } else if (!isNaN(code)) {
-          // Jeśli podano sam numer ID
-          try {
-            const bike = await fetchBikeDetails(code);
-            if (bike && bike.id) {
-              toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
-              stopCamera();
-              onClose();
-              navigate(`/panel/bikes/${bike.id}`);
-              return;
-            }
-          } catch (e) {}
-        }
-        throw apiErr;
-      }
+      const bike = await lookupBike(code);
+      toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
+      setIsProcessing(false);
+      setManualCode('');
+      stopCamera();
+      onClose();
+      navigate(`/panel/bikes/${bike.id}`);
     } catch (err) {
       toast.error(`Nie znaleziono roweru dla kodu: "${code}"`);
       // Krótkie opóźnienie przed ponownym skanowaniem

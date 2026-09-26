@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import jsQR from 'jsqr';
 import toast from 'react-hot-toast';
-import { lookupBike, fetchBikeDetails } from '../api/bikes';
+import { lookupBike } from '../api/bikes';
 import StickyHeader from '../components/StickyHeader';
 import Button from '../components/Button';
 
@@ -53,71 +53,13 @@ export default function ScanQRPage() {
     setIsProcessing(true);
     playBeep();
 
-    let code = scannedText.trim();
+    const code = scannedText.trim();
 
     try {
-      if (code.includes('/panel/bikes/')) {
-        const match = code.match(/\/panel\/bikes\/(\d+)/);
-        if (match) {
-          toast.success(`Zeskanowano link do roweru #${match[1]}`);
-          stopCamera();
-          navigate(`/panel/bikes/${match[1]}`);
-          return;
-        }
-      }
-
-      if (code.includes('/panel/orders/')) {
-        const match = code.match(/\/panel\/orders\/(\d+)/);
-        if (match) {
-          toast.success(`Zeskanowano link do zlecenia #${match[1]}`);
-          stopCamera();
-          navigate(`/panel/orders/${match[1]}`);
-          return;
-        }
-      }
-
-      if (code.includes('code=')) {
-        const match = code.match(/code=([^&]+)/);
-        if (match) {
-          code = decodeURIComponent(match[1]);
-        }
-      }
-
-      try {
-        const bike = await lookupBike(code);
-        if (bike && bike.id) {
-          toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
-          stopCamera();
-          navigate(`/panel/bikes/${bike.id}`);
-          return;
-        }
-      } catch (apiErr) {
-        if (code.startsWith('sheriff-')) {
-          const parts = code.split('-');
-          if (parts[1] && !isNaN(parts[1])) {
-            try {
-              const bike = await fetchBikeDetails(parts[1]);
-              if (bike && bike.id) {
-                toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
-                stopCamera();
-                navigate(`/panel/bikes/${bike.id}`);
-                return;
-              }
-            } catch (e) {}
-          }
-        } else if (!isNaN(code)) {
-          try {
-            const bike = await fetchBikeDetails(code);
-            if (bike && bike.id) {
-              toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
-              stopCamera();
-              navigate(`/panel/bikes/${bike.id}`);
-              return;
-            }
-          } catch (e) {}
-        }
-        throw apiErr;
-      }
+      const bike = await lookupBike(code);
+      toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
+      stopCamera();
+      navigate(`/panel/bikes/${bike.id}`);
     } catch (err) {
       toast.error(`Nie znaleziono roweru dla kodu: "${code}"`);
       setTimeout(() => {
