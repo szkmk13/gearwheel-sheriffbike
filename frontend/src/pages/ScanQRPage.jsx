@@ -247,12 +247,12 @@ export default function ScanQRPage() {
   };
 
   return (
-    <div className="px-4 sm:px-6 md:px-8 pb-8 relative">
-      <StickyHeader>
+    <div className="px-4 sm:px-6 md:px-8 pb-8 relative bg-[var(--color-paper)] min-h-full">
+      <StickyHeader className="bg-[var(--color-paper)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-gray-900">Skaner kodów QR</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-2xl font-semibold text-[var(--color-ink)]">Skaner kodów QR</h1>
+            <p className="text-sm text-[var(--color-ink-3)] mt-1">
               Szybka identyfikacja rowerów i zleceń serwisowych za pomocą etykiet QR
             </p>
           </div>
@@ -260,7 +260,7 @@ export default function ScanQRPage() {
       </StickyHeader>
 
       <div className="max-w-2xl mx-auto">
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-2xl shadow-sm overflow-hidden">
           {/* Zakładki */}
           <div className="flex border-b border-gray-100 bg-gray-50/50 text-sm font-semibold text-gray-600">
             <button

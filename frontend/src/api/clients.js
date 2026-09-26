@@ -1,17 +1,26 @@
 import { fetcher, get, post, patch, del } from './config';
 
-// GET /api/customers/ - Pobiera listę klientów (wspiera paginację, wyszukiwanie po imieniu/nazwisku)
-export const fetchClients = async (searchQuery = '') => {
-  const url = searchQuery ? `/api/customers/?search=${encodeURIComponent(searchQuery)}` : '/api/customers/';
+// GET /api/customers/ - Pobiera listę klientów (wspiera wyszukiwanie i sortowanie)
+export const fetchClients = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (typeof filters === 'string') {
+    if (filters) params.append('search', filters);
+  } else {
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.ordering) params.append('ordering', filters.ordering);
+  }
+  
+  const queryString = params.toString();
+  const url = queryString ? `/api/customers/?${queryString}` : '/api/customers/';
   return fetcher(url);
 };
 
-// GET /api/customers/{id}/ - Pobiera szczegóły klienta. Obiekt zwrotny zawiera już w sobie tablicę rowerów
+// GET /api/customers/{id}/ - Pobiera szczegóły klienta
 export const fetchClientDetails = async (clientId) => {
   return fetcher(`/api/customers/${clientId}/`);
 };
 
-// POST /api/customers/ - Dodaje nowego klienta
+// POST /api/customers/ - Dodaje nowego klienta (w tym rodo_accepted)
 export const createClient = async (newClientData) => {
   return post('/api/customers/', newClientData);
 };

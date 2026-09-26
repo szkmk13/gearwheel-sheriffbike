@@ -28,7 +28,7 @@ export default function MainLayout() {
     }
     
     return (
-        <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-gray-100">
+        <div className="flex flex-col md:flex-row h-screen overflow-hidden bg-[var(--color-paper)]">
             {/* Pasek górny na urządzeniach mobilnych z przyciskiem skanera i hamburgera */}
             <header className="md:hidden flex items-center justify-between px-4 py-3 bg-[#1A1613] text-[#F6F2EB] border-b border-[#E3DBCE]/10 shrink-0 z-30">
                 <div className="text-lg font-bold tracking-tight">
@@ -76,7 +76,7 @@ export default function MainLayout() {
             />
 
             {/* Główna zawartość */}
-            <main className="flex-1 overflow-y-auto min-w-0">
+            <main className="flex-1 overflow-y-auto min-w-0 bg-[var(--color-paper)]">
                 <Outlet />
             </main>
 

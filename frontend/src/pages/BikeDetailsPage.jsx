@@ -113,7 +113,7 @@ export default function BikeDetailsPage() {
   const repairOrders = bike.repair_orders || [];
 
   return (
-    <div className="p-4 sm:p-6 md:p-8">
+    <div className="p-4 sm:p-6 md:p-8 bg-[var(--color-paper)] min-h-full">
       {/* Przycisk powrotu */}
       <div className="flex items-center mb-4 sm:mb-6">
         <button

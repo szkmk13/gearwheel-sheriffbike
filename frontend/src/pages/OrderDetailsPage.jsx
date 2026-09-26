@@ -1,10 +1,9 @@
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { fetchOrderDetails, changeOrderStatus } from "../api/orders";
-
-import StatusBadge from "../components/StatusBadge";
-import { OrderDetailsSkeleton } from "../components/Skeleton";
+import { fetchOrderDetails, updateOrder } from '../api/orders';
+import StatusBadge from '../components/StatusBadge';
+import { OrderDetailsSkeleton } from '../components/Skeleton';
 
 export default function OrderDetailsPage() {
     const { id } = useParams();
@@ -17,11 +16,8 @@ export default function OrderDetailsPage() {
     });
 
     const statusMutation = useMutation({
-        mutationFn: ({ status, note }) => changeOrderStatus(id, { status, note }),
-        onSuccess: (updatedOrder) => {
-            if (updatedOrder) {
-                queryClient.setQueryData(['order', id], updatedOrder);
-            }
+        mutationFn: ({ status }) => updateOrder({ id, orderData: { status } }),
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['order', id] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
             toast.success("Status zlecenia został zaktualizowany!"); 
@@ -36,8 +32,8 @@ export default function OrderDetailsPage() {
     };
 
     if (isLoading) return <OrderDetailsSkeleton />;
-    if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
-    if (!order) return <div className="p-8 text-red-500 font-medium">Nie znaleziono zlecenia.</div>;
+    if (isError) return <div className="p-8 text-[var(--color-accent)] font-medium bg-[var(--color-paper)] min-h-full">Wystąpił błąd: {error.message}</div>;
+    if (!order) return <div className="p-8 text-[var(--color-accent)] font-medium bg-[var(--color-paper)] min-h-full">Nie znaleziono zlecenia.</div>;
 
     const bikeId = order.bike?.id || (typeof order.bike === 'number' ? order.bike : null);
     const customerId = order.customer?.id || (typeof order.customer === 'number' ? order.customer : null);
@@ -48,36 +44,36 @@ export default function OrderDetailsPage() {
         : (order.bike_label || 'Rower');
 
     return (
-        <div className="p-4 sm:p-6 md:p-8">
+        <div className="p-4 sm:p-6 md:p-8 bg-[var(--color-paper)] min-h-full">
             <div className="flex items-center mb-4 sm:mb-6">
                 <button
                     onClick={() => navigate(-1)}
-                    className="flex items-center p-2 border border-transparent hover:border-gray-200 hover:bg-gray-200 rounded-full transition-colors cursor-pointer mr-2"
+                    className="flex items-center p-2 border border-transparent hover:border-[var(--color-line)] hover:bg-[var(--color-paper-3)] rounded-full transition-colors cursor-pointer mr-2"
                 >
-                    <svg className="w-6 h-6 text-gray-800 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-6 h-6 text-[var(--color-ink)] mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    <span className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors text-sm sm:text-base">
+                    <span className="text-[var(--color-ink-2)] font-medium cursor-pointer hover:text-[var(--color-ink)] transition-colors text-sm sm:text-base">
                         Powrót
                     </span>
                 </button>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
                     <div className="flex flex-wrap items-center gap-3 mb-2">
-                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Zlecenie #{order.id}</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--color-ink)]">Zlecenie #{order.id}</h1>
                         <StatusBadge status={order.status} />
                     </div>
-                    <p className="text-xs sm:text-sm text-gray-500">
-                        Przyjęto: <span className="font-medium text-gray-700">{new Date(order.created_at).toLocaleDateString()}</span>
+                    <p className="text-xs sm:text-sm text-[var(--color-ink-3)]">
+                        Przyjęto: <span className="font-medium text-[var(--color-ink-2)]">{new Date(order.created_at).toLocaleDateString()}</span>
                     </p>
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full md:w-auto">
-                    <span className="text-sm text-gray-600 font-medium">Zmień status:</span>
+                    <span className="text-sm text-[var(--color-ink-2)] font-medium">Zmień status:</span>
                     <select 
-                        className="w-full sm:w-auto border border-gray-300 rounded-md px-3 py-2 text-sm bg-white focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] cursor-pointer"
+                        className="w-full sm:w-auto border border-[var(--color-line)] rounded-md px-3 py-2 text-sm bg-[var(--color-paper-2)] text-[var(--color-ink)] focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] cursor-pointer"
                         value={order.status}
                         onChange={handleStatusChange}
                         disabled={statusMutation.isPending}
@@ -95,10 +91,10 @@ export default function OrderDetailsPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                 <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 flex flex-col sm:flex-row gap-6 sm:gap-8">
+                    <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6 flex flex-col sm:flex-row gap-6 sm:gap-8">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-2 sm:mb-3">
-                                <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">Klient</h3>
+                                <h3 className="text-xs sm:text-sm font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Klient</h3>
                                 {customerId && (
                                     <button
                                         onClick={() => navigate(`/panel/clients/${customerId}`)}
@@ -108,29 +104,39 @@ export default function OrderDetailsPage() {
                                     </button>
                                 )}
                             </div>
-                            <p 
-                                onClick={customerId ? () => navigate(`/panel/clients/${customerId}`) : undefined}
-                                className={`text-base sm:text-lg font-medium text-gray-900 truncate ${customerId ? 'hover:text-[var(--color-accent)] cursor-pointer transition-colors' : ''}`}
-                            >
-                                {order.customer.first_name} {order.customer.last_name}
-                            </p>
                             
-                            <div className="mt-2 text-sm text-gray-600 space-y-1">
+                            {/* Odnośnik do profilu klienta */}
+                            {order.customer?.id ? (
+                                <button
+                                    onClick={() => navigate(`/panel/clients/${order.customer.id}`)}
+                                    className="text-base sm:text-lg font-medium text-[var(--color-accent)] hover:underline text-left cursor-pointer transition-colors block mb-1 truncate"
+                                >
+                                    {order.customer.first_name} {order.customer.last_name}
+                                </button>
+                            ) : (
+                                <p className="text-base sm:text-lg font-medium text-[var(--color-ink)] truncate">
+                                    {order.customer?.first_name} {order.customer?.last_name}
+                                </p>
+                            )}
+                            
+                            <div className="mt-2 text-sm text-[var(--color-ink-2)] space-y-1">
                                 <p className="flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
-                                    <span className="truncate">{order.customer.phone || 'Brak telefonu'}</span>
+                                    <svg className="w-4 h-4 text-[var(--color-ink-3)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                                    <span className="truncate">{order.customer?.phone || 'Brak telefonu'}</span>
                                 </p>
                                 <p className="flex items-center gap-2">
-                                    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
-                                    <span className="truncate">{order.customer.email || 'Brak e-maila'}</span>
+                                    <svg className="w-4 h-4 text-[var(--color-ink-3)] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                                    <span className="truncate">{order.customer?.email || 'Brak e-maila'}</span>
                                 </p>
                             </div>
                         </div>
-                        <div className="w-px bg-gray-200 hidden sm:block"></div>
-                        <div className="h-px bg-gray-200 block sm:hidden"></div>
+
+                        <div className="w-px bg-[var(--color-line)] hidden sm:block"></div>
+                        <div className="h-px bg-[var(--color-line)] block sm:hidden"></div>
+
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-2 sm:mb-3">
-                                <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider">Rower i zawieszka</h3>
+                                <h3 className="text-xs sm:text-sm font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Rower i zawieszka</h3>
                                 {bikeId && (
                                     <button
                                         onClick={() => navigate(`/panel/bikes/${bikeId}`)}
@@ -142,20 +148,20 @@ export default function OrderDetailsPage() {
                             </div>
                             <p 
                                 onClick={bikeId ? () => navigate(`/panel/bikes/${bikeId}`) : undefined}
-                                className={`text-base sm:text-lg font-medium text-gray-900 truncate ${bikeId ? 'hover:text-[var(--color-accent)] cursor-pointer transition-colors' : ''}`}
+                                className={`text-base sm:text-lg font-medium text-[var(--color-ink)] truncate ${bikeId ? 'hover:text-[var(--color-accent)] cursor-pointer transition-colors' : ''}`}
                             >
                                 {bikeFullName}
                             </p>
-                            <div className="mt-2 text-sm text-gray-600 space-y-1">
-                                <p className="flex items-center gap-1.5">
-                                    <span className="text-gray-400 text-xs font-medium">Producent:</span>
-                                    <span className="text-gray-800 font-medium">{bikeBrand || '-'}</span>
-                                    <span className="text-gray-300 mx-1">•</span>
-                                    <span className="text-gray-400 text-xs font-medium">Model:</span>
-                                    <span className="text-gray-800 font-medium">{bikeModel || '-'}</span>
+                            <div className="mt-2 text-sm text-[var(--color-ink-2)] space-y-1">
+                                <p className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[var(--color-ink-3)] text-xs font-medium">Producent:</span>
+                                    <span className="text-[var(--color-ink)] font-medium">{bikeBrand || '-'}</span>
+                                    <span className="text-[var(--color-line)] mx-1">•</span>
+                                    <span className="text-[var(--color-ink-3)] text-xs font-medium">Model:</span>
+                                    <span className="text-[var(--color-ink)] font-medium">{bikeModel || '-'}</span>
                                 </p>
                                 <div className="pt-1">
-                                    <span className="inline-block px-2.5 py-0.5 bg-gray-100 rounded text-xs font-semibold text-gray-700 border border-gray-200">
+                                    <span className="inline-block px-2.5 py-0.5 bg-[var(--color-paper)] rounded text-xs font-semibold text-[var(--color-ink-2)] border border-[var(--color-line)]">
                                         Zawieszka: #{order.bike_tag_number || '-'}
                                     </span>
                                 </div>
@@ -163,29 +169,29 @@ export default function OrderDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-3">Opis usterki / Wymagane prace</h3>
-                        <div className="p-3.5 sm:p-4 bg-gray-50 rounded-lg border border-gray-100 text-sm sm:text-base text-gray-700 whitespace-pre-wrap">
+                    <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6">
+                        <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)] mb-3">Opis usterki / Wymagane prace</h3>
+                        <div className="p-3.5 sm:p-4 bg-[var(--color-paper)] rounded-lg border border-[var(--color-line)] text-sm sm:text-base text-[var(--color-ink-2)] whitespace-pre-wrap">
                             {order.description}
                         </div>
                     </div>
 
                     {/* Historia zmian statusu */}
-                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
+                    <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6">
                         <div className="flex items-center justify-between mb-6">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-800 flex items-center gap-2">
-                                <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)] flex items-center gap-2">
+                                <svg className="w-5 h-5 text-[var(--color-ink-3)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Historia zmian statusu
                             </h3>
-                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[var(--color-paper)] text-[var(--color-ink-2)] border border-[var(--color-line)]">
                                 {order.status_history?.length || 0} {order.status_history?.length === 1 ? 'wpis' : (order.status_history?.length > 1 && order.status_history?.length < 5 ? 'wpisy' : 'wpisów')}
                             </span>
                         </div>
 
                         {order.status_history && order.status_history.length > 0 ? (
-                            <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-200">
+                            <div className="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-[var(--color-line)]">
                                 {order.status_history.map((entry) => (
                                     <div key={entry.id} className="relative">
                                         <span className="absolute -left-[19px] top-1.5 w-3 h-3 rounded-full bg-[var(--color-accent)] ring-4 ring-white" />
@@ -194,14 +200,14 @@ export default function OrderDetailsPage() {
                                                 {entry.old_status ? (
                                                     <>
                                                         <StatusBadge status={entry.old_status} />
-                                                        <span className="text-gray-400 text-xs">→</span>
+                                                        <span className="text-[var(--color-ink-3)] text-xs">→</span>
                                                         <StatusBadge status={entry.new_status} />
                                                     </>
                                                 ) : (
                                                     <StatusBadge status={entry.new_status} />
                                                 )}
                                             </div>
-                                            <span className="text-xs text-gray-500 font-medium">
+                                            <span className="text-xs text-[var(--color-ink-3)] font-medium">
                                                 {new Date(entry.changed_at).toLocaleString('pl-PL', {
                                                     day: '2-digit',
                                                     month: '2-digit',
@@ -212,7 +218,7 @@ export default function OrderDetailsPage() {
                                             </span>
                                         </div>
                                         {entry.note && (
-                                            <p className="mt-2 text-sm text-gray-600 bg-gray-50 p-2.5 rounded-md border border-gray-100 italic">
+                                            <p className="mt-2 text-sm text-[var(--color-ink-2)] bg-[var(--color-paper)] p-2.5 rounded-md border border-[var(--color-line)] italic">
                                                 „{entry.note}”
                                             </p>
                                         )}
@@ -220,32 +226,32 @@ export default function OrderDetailsPage() {
                                 ))}
                             </div>
                         ) : (
-                            <p className="text-sm text-gray-500 text-center py-4">Brak zarejestrowanej historii statusów dla tego zlecenia.</p>
+                            <p className="text-sm text-[var(--color-ink-3)] text-center py-4">Brak zarejestrowanej historii statusów dla tego zlecenia.</p>
                         )}
                     </div>
                 </div>
 
                 <div className="space-y-4 sm:space-y-6">
-                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Podsumowanie kosztów</h3>
+                    <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6">
+                        <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)] mb-4">Podsumowanie kosztów</h3>
                         
-                        <div className="flex justify-between items-center mb-2 pb-2 border-b border-gray-100 text-sm">
-                            <span className="text-gray-500">Szacowany koszt:</span>
-                            <span className="font-medium text-gray-700">{order.estimated_cost ? `${order.estimated_cost} zł` : '-'}</span>
+                        <div className="flex justify-between items-center mb-2 pb-2 border-b border-[var(--color-line)] text-sm">
+                            <span className="text-[var(--color-ink-3)]">Szacowany koszt:</span>
+                            <span className="font-medium text-[var(--color-ink-2)]">{order.estimated_cost ? `${order.estimated_cost} zł` : '-'}</span>
                         </div>
                         
                         <div className="flex justify-between items-center mt-4 pt-2 text-base sm:text-lg">
-                            <span className="font-bold text-gray-900">Do zapłaty:</span>
+                            <span className="font-bold text-[var(--color-ink)]">Do zapłaty:</span>
                             <span className="font-bold text-[var(--color-accent)]">{order.final_cost ? `${order.final_cost} zł` : '0 zł'}</span>
                         </div>
                     </div>
 
-                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 opacity-70">
+                    <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6 opacity-70">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-800">Części i usługi</h3>
+                            <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)]">Części i usługi</h3>
                             <span className="text-xs font-bold bg-yellow-100 text-yellow-800 px-2 py-1 rounded">W BUDOWIE</span>
                         </div>
-                        <p className="text-sm text-gray-500 text-center py-6 sm:py-8">
+                        <p className="text-sm text-[var(--color-ink-3)] text-center py-6 sm:py-8">
                             Moduł dodawania części i robocizny zostanie wdrożony w kolejnym etapie.
                         </p>
                     </div>
