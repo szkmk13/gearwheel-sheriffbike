@@ -3,7 +3,7 @@ import uuid
 from django.db.models import Prefetch
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
-from rest_framework.generics import CreateAPIView
+from rest_framework.generics import CreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
@@ -11,7 +11,10 @@ from rest_framework.viewsets import ModelViewSet
 from apps.orders.models import RepairOrder
 
 from .models import Customer, Bike
-from .serializers import CustomerListSerializer, CustomerDetailSerializer, BikeSerializer, BikeReadSerializer
+from .serializers import (
+    CustomerListSerializer, CustomerDetailSerializer, BikeSerializer,
+    BikeReadSerializer, BikeDetailSerializer
+)
 
 
 class CustomerViewSet(ModelViewSet):
@@ -36,6 +39,18 @@ class CustomerViewSet(ModelViewSet):
 class BikeCreateView(CreateAPIView):
     queryset = Bike.objects.select_related('customer')
     serializer_class = BikeSerializer
+
+
+@extend_schema(responses=BikeDetailSerializer)
+class BikeDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Bike.objects.select_related('customer').prefetch_related(
+        Prefetch('repair_orders', queryset=RepairOrder.objects.select_related('customer').prefetch_related('bikes').order_by('-created_at'))
+    )
+
+    def get_serializer_class(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return BikeSerializer
+        return BikeDetailSerializer
 
 
 class BikeLookupView(APIView):

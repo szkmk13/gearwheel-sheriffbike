@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { fetchMe, loginApi, logoutApi } from '../api/auth';
+import { setSessionExpiredHandler } from '../api/config';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext();
@@ -9,6 +10,10 @@ export const AuthProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        setSessionExpiredHandler(() => {
+            setUser(null);
+        });
+
         fetchMe()
             .then(userData => setUser(userData))
             .catch(() => setUser(null))

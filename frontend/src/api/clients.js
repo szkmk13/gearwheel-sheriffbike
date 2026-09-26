@@ -1,63 +1,56 @@
-import { fetcher, API_BASE_URL } from './config';
+import { fetcher, get, post, patch, del } from './config';
 
-// GET /api/customers/ - Pobiera listę klientów (wspiera paginację, wyszukiwanie po imieniu/nazwisku)
-export const fetchClients = async (searchQuery = '') => {
-  const url = searchQuery ? `/api/customers/?search=${searchQuery}` : '/api/customers/';
+// GET /api/customers/ - Pobiera listę klientów (wspiera wyszukiwanie i sortowanie)
+export const fetchClients = async (filters = {}) => {
+  const params = new URLSearchParams();
+  if (typeof filters === 'string') {
+    if (filters) params.append('search', filters);
+  } else {
+    if (filters?.search) params.append('search', filters.search);
+    if (filters?.ordering) params.append('ordering', filters.ordering);
+  }
+  
+  const queryString = params.toString();
+  const url = queryString ? `/api/customers/?${queryString}` : '/api/customers/';
   return fetcher(url);
 };
 
-// GET /api/customers/{id}/ - Pobiera szczegóły klienta. Obiekt zwrotny zawiera już w sobie tablicę rowerów
+// GET /api/customers/{id}/ - Pobiera szczegóły klienta
 export const fetchClientDetails = async (clientId) => {
   return fetcher(`/api/customers/${clientId}/`);
 };
 
-// POST /api/customers/ - Dodaje nowego klienta
+// POST /api/customers/ - Dodaje nowego klienta (w tym rodo_accepted)
 export const createClient = async (newClientData) => {
-  const response = await fetch(`${API_BASE_URL}/api/customers/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(newClientData),
-  });
-
-  if (!response.ok) {
-    throw new Error('Nie udało się zapisać klienta na serwerze.');
-  }
-
-  return response.json();
+  return post('/api/customers/', newClientData);
 };
 
-// POST /api/customers/bikes/ endpoint do tworzenia roweru 
+// POST /api/customers/bikes/ - Endpoint do tworzenia sprzętu/roweru dla klienta
 export const createBike = async (bikeData) => {
-  const response = await fetch(`${API_BASE_URL}/api/customers/bikes/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(bikeData),
-  });
-
-  if (!response.ok) {
-    throw new Error('Nie udało się zapisać roweru w bazie.');
-  }
-
-  return response.json();
+  return post('/api/customers/bikes/', bikeData);
 };
 
-// Aktualizacja danych klienta
+// PATCH /api/customers/{id}/ - Aktualizacja danych klienta
 export const updateClient = async ({ id, clientData }) => {
-  const response = await fetch(`${API_BASE_URL}/api/customers/${id}/`, {
-    method: 'PATCH', 
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(clientData),
-  });
+  return patch(`/api/customers/${id}/`, clientData);
+};
 
-  if (!response.ok) {
-    throw new Error('Nie udało się zaktualizować danych klienta.');
-  }
+// DELETE /api/customers/{id}/ - Usunięcie klienta
+export const deleteClient = async (id) => {
+  return del(`/api/customers/${id}/`);
+};
 
-  return response.json();
+// GET /api/customers/bikes/{id}/ - Pobiera szczegóły roweru
+export const fetchBikeDetails = async (bikeId) => {
+  return fetcher(`/api/customers/bikes/${bikeId}/`);
+};
+
+// PATCH /api/customers/bikes/{id}/ - Aktualizacja danych roweru
+export const updateBike = async ({ id, bikeData }) => {
+  return patch(`/api/customers/bikes/${id}/`, bikeData);
+};
+
+// GET /api/customers/bikes/lookup/ - Wyszukiwanie roweru po kodzie QR (sheriff-code)
+export const lookupBike = async (code) => {
+  return get(`/api/customers/bikes/lookup/?code=${encodeURIComponent(code)}`);
 };

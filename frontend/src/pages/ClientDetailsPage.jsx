@@ -10,6 +10,7 @@ import Input from "../components/Input";
 import Select from "../components/Select";
 import { getInitials } from "../components/ClientCard";
 import StatusBadge from "../components/StatusBadge"; 
+import { ClientDetailsSkeleton } from "../components/Skeleton"; 
 
 const EditIcon = () => (
   <div className="text-gray-400 transition-colors">
@@ -62,13 +63,15 @@ export default function ClientDetailsPage() {
         
         const fullName = formData.get('fullName').trim();
         const nameParts = fullName.split(' ');
+        const rodoAccepted = formData.get('rodo_accepted') === 'on';
 
         const updatedData = {
             first_name: nameParts[0],
             last_name: nameParts.slice(1).join(' ') || '-',
             email: formData.get('email') || "",
             phone: formData.get('phone'),
-            notes: formData.get('notes') || ""
+            notes: formData.get('notes') || "",
+            rodo_accepted: rodoAccepted
         };
 
         editMutation.mutate({ id, clientData: updatedData });
@@ -88,7 +91,7 @@ export default function ClientDetailsPage() {
         bikeMutation.mutate(newBikeData);
     };
 
-    if (isLoading) return <div className="p-8 text-gray-500 font-medium">Ładowanie szczegółów klienta...</div>;
+    if (isLoading) return <ClientDetailsSkeleton />;
     if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
     if (!client) return <div className="p-8 text-red-500 font-medium">Nie znaleziono klienta.</div>;
 
@@ -97,8 +100,8 @@ export default function ClientDetailsPage() {
     const clientOrders = client.repair_orders || [];
 
     return(
-        <div className="p-8">
-            <div className="flex items-center mb-6">
+        <div className="p-4 sm:p-6 md:p-8 bg-[var(--color-paper)] min-h-full">
+            <div className="flex items-center mb-4 sm:mb-6">
                 <button
                     onClick={() => navigate('/panel/clients')}
                     className="flex items-center p-2 border border-transparent hover:border-gray-200 hover:bg-gray-200 rounded-full transition-colors cursor-pointer mr-2"
@@ -106,62 +109,80 @@ export default function ClientDetailsPage() {
                     <svg className="w-6 h-6 text-gray-800 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    <span className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors">
+                    <span className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors text-sm sm:text-base">
                         Wróć do klientów
                     </span>
                 </button>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 
-                <div className="flex items-center gap-6">
-                    {/* Zastąpiono sztywnego blue-50/500 spójnym akcentem */}
+                <div className="flex items-center gap-4 sm:gap-6 min-w-0">
                     <div 
-                        className="w-16 h-16 rounded-full flex items-center justify-center font-bold text-2xl shrink-0"
+                        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center font-bold text-xl sm:text-2xl shrink-0"
                         style={{ backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}
                     >
                         {getInitials(fullName)}
                     </div>
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{fullName}</h1>
-                        <p className="text-gray-500 mt-1">{client.email || 'Brak e-maila'} • {client.phone}</p>
+                    <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 truncate">{fullName}</h1>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                client.rodo_accepted 
+                                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                                    : 'bg-red-100 text-red-800 border border-red-200'
+                            }`}>
+                                {client.rodo_accepted ? 'RODO Zaakceptowane' : 'Brak zgody RODO'}
+                            </span>
+                        </div>
+                        <p className="text-gray-500 text-xs sm:text-sm mt-1 truncate">{client.email || 'Brak e-maila'} • {client.phone}</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full md:w-auto">
                     <button 
                         onClick={() => setIsEditFormOpen(true)} 
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm cursor-pointer"
                     >
                         <EditIcon /> Edytuj profil
                     </button>
 
-                    <Button onClick={() => setIsAddBikeFormOpen(true)}>
+                    <Button onClick={() => setIsAddBikeFormOpen(true)} className="justify-center">
                         + Dodaj rower
                     </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div className="space-y-4 sm:space-y-6">
                     {client.notes && (
-                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-800 mb-3">Notatki</h3>
                             <p className="text-sm text-gray-600 whitespace-pre-wrap">{client.notes}</p>
                         </div>
                     )}
 
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Zarejestrowane rowery</h3>
                         {clientBikes.length > 0 ? (
                         <div className="space-y-3">
                             {clientBikes.map(bike => (
-                            <div key={bike.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center">
-                                <div>
-                                    <p className="font-semibold text-gray-800">
-                                        {bike.brand} <span className="font-normal text-gray-600">{bike.model}</span>
+                            <div 
+                                key={bike.id} 
+                                onClick={() => navigate(`/panel/bikes/${bike.id}`)}
+                                className="p-3.5 sm:p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors cursor-pointer group"
+                            >
+                                <div className="min-w-0">
+                                    <p className="font-semibold text-gray-800 text-sm sm:text-base group-hover:text-[var(--color-accent)] transition-colors truncate">
+                                        {bike.brand} <span className="font-normal text-gray-600 ml-1">{bike.model}</span>
                                     </p>
                                     <p className="text-xs text-gray-500 mt-1 capitalize">{bike.bike_type}</p>
+                                </div>
+                                <div className="flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-[var(--color-accent)] shrink-0 ml-3 transition-colors">
+                                    <span>Szczegóły</span>
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                    </svg>
                                 </div>
                             </div>
                             ))}
@@ -172,8 +193,8 @@ export default function ClientDetailsPage() {
                     </div>
                 </div>
 
-                <div className="space-y-6">
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="space-y-4 sm:space-y-6">
+                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Historia zleceń</h3>
                         {clientOrders.length > 0 ? (
                             <div className="space-y-3">
@@ -181,17 +202,17 @@ export default function ClientDetailsPage() {
                                     <div 
                                         key={order.id} 
                                         onClick={() => navigate(`/panel/orders/${order.id}`)}
-                                        className="p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors cursor-pointer"
+                                        className="p-3.5 sm:p-4 border border-gray-100 rounded-lg bg-gray-50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 hover:bg-gray-100 transition-colors cursor-pointer"
                                     >
-                                        <div>
-                                            <p className="font-semibold text-gray-800">
-                                                #{order.id} <span className="font-normal text-gray-600 ml-1">{order.bike_label}</span>
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-gray-800 text-sm sm:text-base truncate">
+                                                #{order.id} <span className="font-normal text-gray-600 ml-1">({order.bike_label})</span>
                                             </p>
                                             <p className="text-xs text-gray-500 mt-1">
                                                 {new Date(order.created_at).toLocaleDateString()}
                                             </p>
                                         </div>
-                                        <div>
+                                        <div className="flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0 border-t sm:border-t-0 border-gray-200/60">
                                             <StatusBadge status={order.status} />
                                         </div>
                                     </div>
@@ -247,6 +268,19 @@ export default function ClientDetailsPage() {
                                 defaultValue={client.phone}
                                 required={true}
                             />
+
+                            <div className="flex items-center gap-2 pt-2 mt-2 border-t border-gray-100">
+                                <input 
+                                    type="checkbox" 
+                                    id="edit_rodo_accepted" 
+                                    name="rodo_accepted" 
+                                    defaultChecked={client.rodo_accepted}
+                                    className="w-4 h-4 text-[var(--color-accent)] bg-white border-gray-300 rounded focus:ring-[var(--color-accent)] cursor-pointer"
+                                />
+                                <label htmlFor="edit_rodo_accepted" className="text-sm font-medium text-gray-700 cursor-pointer">
+                                    Klient wyraził zgodę na przetwarzanie danych osobowych (RODO)
+                                </label>
+                            </div>
                         </div>
 
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
