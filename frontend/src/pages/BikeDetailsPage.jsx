@@ -329,9 +329,6 @@ export default function BikeDetailsPage() {
             <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
               Kod identyfikacyjny roweru
             </h3>
-            <p className="text-xs text-gray-500 mb-3">
-              Unikalny kod wykorzystywany na naklejkach QR oraz przy szybkim skanowaniu sprzętu:
-            </p>
 
             {qrDataUrl && (
               <div className="flex flex-col items-center justify-center p-3 mb-3 bg-gray-50 rounded-xl border border-gray-100">
@@ -344,12 +341,6 @@ export default function BikeDetailsPage() {
               {bike.sheriff_code || `sheriff-${bike.id}-${bike.uuid}`}
             </div>
 
-            <button
-              onClick={handleCopyCode}
-              className="w-full py-2 px-3 text-xs font-semibold rounded-md border border-gray-200 hover:bg-gray-50 text-gray-700 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-            >
-              {copied ? "✓ Skopiowano kod" : "Kopiuj kod SheriffBike"}
-            </button>
           </div>
         </div>
       </div>
