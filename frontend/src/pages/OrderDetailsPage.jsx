@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { fetchOrderDetails, updateOrder } from '../api/orders';
+import { fetchOrderDetails, changeOrderStatus } from '../api/orders';
 import StatusBadge from '../components/StatusBadge';
 import { OrderDetailsSkeleton } from '../components/Skeleton';
 
@@ -16,7 +16,7 @@ export default function OrderDetailsPage() {
     });
 
     const statusMutation = useMutation({
-        mutationFn: ({ status }) => updateOrder({ id, orderData: { status } }),
+        mutationFn: ({ status }) => changeOrderStatus(id, { status }),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['order', id] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });

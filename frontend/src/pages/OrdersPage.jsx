@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -32,6 +32,19 @@ export default function OrdersPage() {
 
   const [openStatusMenu, setOpenStatusMenu] = useState(false);
   const [openPriorityMenu, setOpenPriorityMenu] = useState(false);
+  const statusMenuRef = useRef(null);
+  const priorityMenuRef = useRef(null);
+
+  // Zamykanie dropdownów filtrów po kliknięciu poza nimi
+  useEffect(() => {
+    if (!openStatusMenu && !openPriorityMenu) return;
+    const close = (e) => {
+      if (!statusMenuRef.current?.contains(e.target)) setOpenStatusMenu(false);
+      if (!priorityMenuRef.current?.contains(e.target)) setOpenPriorityMenu(false);
+    };
+    document.addEventListener('mousedown', close);
+    return () => document.removeEventListener('mousedown', close);
+  }, [openStatusMenu, openPriorityMenu]);
 
   const todayDate = new Date().toISOString().split('T')[0];
 
@@ -171,7 +184,7 @@ export default function OrdersPage() {
           
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
             {/* Dropdown filtrowania statusów (wielokrotny wybór) */}
-            <div className="relative">
+            <div className="relative" ref={statusMenuRef}>
               <button
                 type="button"
                 onClick={() => {
@@ -216,7 +229,7 @@ export default function OrdersPage() {
             </div>
 
             {/* Dropdown filtrowania priorytetów (wielokrotny wybór) */}
-            <div className="relative">
+            <div className="relative" ref={priorityMenuRef}>
               <button
                 type="button"
                 onClick={() => {
@@ -278,8 +291,7 @@ export default function OrdersPage() {
                 <th className="py-4 px-6 font-medium">Klient</th>
                 <th className="py-4 px-6 font-medium">Rower</th>
                 <th className="py-4 px-6 font-medium">Status</th>
-                <th className="py-4 px-6 font-medium">Priorytet</th>
-                
+
                 {/* Sortowalna kolumna: Data przyjęcia */}
                 <th 
                   onClick={() => handleSortClick('created_at')}
@@ -292,6 +304,8 @@ export default function OrdersPage() {
                     </span>
                   </div>
                 </th>
+
+                <th className="py-4 px-6 font-medium">Priorytet</th>
 
                 {/* Sortowalna kolumna: Wartość */}
                 <th 
@@ -323,8 +337,8 @@ export default function OrdersPage() {
                     <td className="py-4 px-6 font-medium">{order.customer_name}</td>
                     <td className="py-4 px-6 text-[var(--color-ink-2)]">{order.bike_label}</td>
                     <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
+                    <td className="py-4 px-6 text-[var(--color-ink-3)]">{new Date(order.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
                     <td className="py-4 px-6 capitalize text-[var(--color-ink-2)]">{order.priority || 'normal'}</td>
-                    <td className="py-4 px-6 text-[var(--color-ink-3)]">{new Date(order.created_at).toLocaleDateString()}</td>
                     <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `${order.estimated_cost} zł` : '-')}</td>
                   </tr>
                 ))
@@ -374,7 +388,7 @@ export default function OrdersPage() {
               </div>
 
               <div className="pt-2 border-t border-[var(--color-line)] flex justify-between items-center text-xs text-[var(--color-ink-3)]">
-                <span>Przyjęto: {new Date(order.created_at).toLocaleDateString()}</span>
+                <span>Przyjęto: {new Date(order.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
                 <span className="text-sm font-bold text-[var(--color-accent)]">
                   {order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `${order.estimated_cost} zł` : '-')}
                 </span>
