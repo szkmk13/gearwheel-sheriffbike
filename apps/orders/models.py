@@ -1,5 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.db import models
+from django.db.models import ProtectedError
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
+
+from apps.customers.models import Bike
 
 User = get_user_model()
 
@@ -21,9 +26,11 @@ class RepairOrder(models.Model):
         ('urgent', 'Urgent'),
     ]
     customer = models.ForeignKey('customers.Customer', on_delete=models.PROTECT, related_name='repair_orders')
-    bike = models.ForeignKey('customers.Bike', on_delete=models.PROTECT, related_name='repair_orders')
-    # Physical tag number attached to the bike while it's in the shop (e.g. a claim-ticket
-    # number) - not a unique identifier, it can be reused across different orders/bikes.
+    # One order can cover several pieces of equipment at once (e.g. two pairs of skis).
+    bikes = models.ManyToManyField('customers.Bike', related_name='repair_orders', blank=True)
+    # Physical tag number attached to the equipment while it's in the shop (e.g. a claim-ticket
+    # number) - not a unique identifier, it can be reused across different orders. One tag
+    # covers the whole order, however many pieces of equipment it holds.
     bike_tag_number = models.PositiveIntegerField()
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='accepted', db_index=True)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal')
@@ -40,6 +47,34 @@ class RepairOrder(models.Model):
 
     def __str__(self):
         return f'Order #{self.pk} - {self.customer} ({self.status})'
+
+    @property
+    def primary_bike(self):
+        """The order's first piece of equipment, backing the legacy `bike` API field.
+
+        Reads `.all()` so the viewset's Prefetch (ordered by id, i.e. by when the item
+        was attached) is reused instead of firing a fresh query.
+        """
+        items = list(self.bikes.all())
+        return items[0] if items else None
+
+
+@receiver(pre_delete, sender=Bike)
+def protect_bike_used_by_orders(sender, instance, **kwargs):
+    """Keeps equipment that is attached to an order from being deleted.
+
+    `RepairOrder.bikes` is a plain ManyToManyField, so it has no `on_delete=PROTECT`
+    of its own - without this, deleting a bike would silently drop it from every order
+    it appears on and leave the repair history pointing at nothing. Raising
+    ProtectedError mirrors what the old ForeignKey did, so the admin still renders its
+    usual "protected related objects" page and staff can detach the item first.
+    """
+    orders = list(instance.repair_orders.all()[:20])
+    if orders:
+        raise ProtectedError(
+            f'Nie mozna usunac sprzetu "{instance}" - jest przypiety do zlecen.',
+            orders,
+        )
 
 
 class RepairOrderItem(models.Model):

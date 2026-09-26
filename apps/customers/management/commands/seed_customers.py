@@ -21,6 +21,8 @@ LAST_NAMES = [
 BIKE_BRANDS = ['Trek', 'Giant', 'Kross', 'Specialized', 'Cube', 'Merida', 'Romet', 'Author', 'Orbea', 'Scott']
 BIKE_MODELS = ['Marlin 5', 'Talon', 'Level', 'Rockhopper', 'Aim', 'Big Nine', 'Rambler', 'A6300', 'MX 20', 'Aspect']
 BIKE_TYPES = [c[0] for c in Bike.BIKE_TYPE_CHOICES]
+WINTER_BRANDS = ['Atomic', 'Rossignol', 'Salomon', 'Head', 'Fischer', 'Burton', 'Nidecker']
+WINTER_MODELS = ['Redster X5', 'Experience 78', 'QST 92', 'Supershape', 'RC One', 'Custom 158']
 COLORS = ['czarny', 'czerwony', 'niebieski', 'biały', 'grafitowy', 'zielony', 'żółty']
 
 REPAIR_DESCRIPTIONS = [
@@ -40,22 +42,53 @@ REPAIR_DESCRIPTIONS = [
     'Odpowietrzenie hamulców hydraulicznych',
     'Wymiana klamek hamulcowych',
 ]
-ITEM_DESCRIPTIONS = [
-    ('część', 'Dętka'), ('część', 'Opona'), ('część', 'Klocki hamulcowe'),
-    ('część', 'Łańcuch'), ('część', 'Kaseta'), ('część', 'Linka hamulcowa'),
-    ('robocizna', 'Robocizna serwisowa'), ('robocizna', 'Diagnostyka'),
+# (item_type, opis, cena_min, cena_max)
+ITEMS = [
+    ('part', 'Dętka', 15, 25),
+    ('part', 'Opona', 60, 180),
+    ('part', 'Klocki hamulcowe', 30, 60),
+    ('part', 'Łańcuch', 50, 120),
+    ('part', 'Kaseta', 90, 220),
+    ('part', 'Linka hamulcowa', 10, 20),
+    ('labor', 'Robocizna serwisowa', 60, 160),
+    ('labor', 'Diagnostyka', 40, 80),
 ]
-STATUS_CHOICES = [s[0] for s in RepairOrder.STATUS_CHOICES]
-PRIORITY_CHOICES = [p[0] for p in RepairOrder.PRIORITY_CHOICES]
+
+# Ułamek rowerów, dla których ostatnie zlecenie jest świeże (patrz _create_repair_history).
+ACTIVE_BIKE_RATIO = 0.45
+
+# Kolejność, w jakiej zlecenie przechodzi przez statusy w normalnym obiegu.
+STATUS_FLOW = ['accepted', 'diagnosing', 'waiting_parts', 'in_progress', 'done', 'delivered']
+
+NOTES_BY_STATUS = {
+    'accepted': 'Zlecenie przyjęte',
+    'diagnosing': 'Diagnoza usterki',
+    'waiting_parts': 'Oczekiwanie na części',
+    'in_progress': 'Naprawa w toku',
+    'done': 'Naprawa zakończona',
+    'delivered': 'Rower wydany klientowi',
+    'cancelled': 'Zlecenie anulowane',
+}
 
 
 class Command(BaseCommand):
     help = (
-        'Tworzy przykładowych klientów (10) z rowerami (1-3 na klienta) '
+        'Tworzy przykładowych klientów z rowerami (1-3 na klienta) '
         'i historią napraw (1-10 zleceń na rower).'
     )
 
     def add_arguments(self, parser):
+        parser.add_argument(
+            '--customers',
+            type=int,
+            default=10,
+            help='Liczba klientów do wygenerowania (domyślnie 10).',
+        )
+        parser.add_argument(
+            '--random-seed',
+            type=int,
+            help='Ziarno generatora losowego - ta sama wartość daje te same dane.',
+        )
         parser.add_argument(
             '--flush',
             action='store_true',
@@ -68,6 +101,14 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
+        count = options['customers']
+        if count < 1:
+            self.stdout.write(self.style.ERROR('--customers musi być większe od 0.'))
+            return
+
+        if options['random_seed'] is not None:
+            random.seed(options['random_seed'])
+
         existing = Customer.objects.exists()
 
         if existing and not options['flush']:
@@ -93,14 +134,19 @@ class Command(BaseCommand):
             Bike.objects.all().delete()
             Customer.objects.all().delete()
 
+        orders_created = 0
         with transaction.atomic():
-            for i in range(10):
+            for i in range(count):
                 customer = self._create_customer(i)
                 for _ in range(random.randint(1, 3)):
                     bike = self._create_bike(customer)
-                    self._create_repair_history(bike, customer)
+                    orders_created += self._create_repair_history(bike, customer)
+                if random.random() < 0.33:
+                    orders_created += self._create_winter_order(customer)
 
-        self.stdout.write(self.style.SUCCESS('Wygenerowano 10 klientów wraz z rowerami i historią napraw.'))
+        self.stdout.write(self.style.SUCCESS(
+            f'Wygenerowano {count} klientów wraz z rowerami i {orders_created} zleceniami napraw.'
+        ))
 
     def _create_customer(self, index):
         first_name = FIRST_NAMES[index % len(FIRST_NAMES)]
@@ -109,15 +155,41 @@ class Command(BaseCommand):
             first_name=first_name,
             last_name=last_name,
             phone=f'5{random.randint(10000000, 99999999)}',
-            email=f'{first_name.lower()}.{last_name.lower()}@example.com',
+            # indeks w adresie gwarantuje unikalność też przy --customers > len(FIRST_NAMES)
+            email=f'{first_name.lower()}.{last_name.lower()}{index + 1}@example.com',
+            rodo_accepted=random.random() < 0.9,
             notes='',
         )
         self.stdout.write(f'  + Klient: {customer}')
         return customer
 
+    def _create_winter_item(self, customer):
+        item = Bike.objects.create(
+            customer=customer,
+            category='winter',
+            brand=random.choice(WINTER_BRANDS),
+            model=random.choice(WINTER_MODELS),
+            color=random.choice(COLORS),
+            serial_no=f'SN{random.randint(100000, 999999)}',
+            year=random.randint(2015, 2025),
+        )
+        self.stdout.write(f'    - Sprzet zimowy: {item}')
+        return item
+
+    def _create_winter_order(self, customer):
+        # Czesto przyjmujemy kilka sztuk naraz (np. dwie pary nart), wiec czesc zlecen
+        # zimowych jest wielosprzetowa - inaczej nie byloby czego testowac.
+        items = [self._create_winter_item(customer) for _ in range(random.randint(1, 2))]
+        now = timezone.now()
+        order_date = now - timedelta(days=random.randint(0, 60), hours=random.randint(0, 23))
+        self._create_order(items, customer, order_date, now)
+        self.stdout.write(f'      * zlecenie zimowe na {len(items)} szt. sprzetu')
+        return 1
+
     def _create_bike(self, customer):
         bike = Bike.objects.create(
             customer=customer,
+            category='bike',
             brand=random.choice(BIKE_BRANDS),
             model=random.choice(BIKE_MODELS),
             bike_type=random.choice(BIKE_TYPES),
@@ -135,50 +207,107 @@ class Command(BaseCommand):
             now - timedelta(days=random.randint(1, 900), hours=random.randint(0, 23))
             for _ in range(num_orders)
         )
+        # Zlecenia rozrzucone po ~2,5 roku prawie zawsze wypadają jako zamknięte, więc
+        # lista bieżących zleceń byłaby pusta. Części rowerów dokładamy świeże zlecenie,
+        # które ma szansę zostać w trakcie realizacji.
+        if random.random() < ACTIVE_BIKE_RATIO:
+            dates[-1] = now - timedelta(days=random.randint(0, 25), hours=random.randint(0, 23))
+            dates.sort()
         for order_date in dates:
-            status = random.choice(STATUS_CHOICES)
-            order = RepairOrder.objects.create(
-                customer=customer,
-                bike=bike,
-                status=status,
-                priority=random.choice(PRIORITY_CHOICES),
-                description=random.choice(REPAIR_DESCRIPTIONS),
-                estimated_cost=Decimal(random.randint(50, 600)),
-            )
-
-            items_total = Decimal('0')
-            for _ in range(random.randint(1, 3)):
-                item_type_label, item_desc = random.choice(ITEM_DESCRIPTIONS)
-                item_type = 'labor' if item_type_label == 'robocizna' else 'part'
-                quantity = Decimal(1)
-                unit_price = Decimal(random.randint(20, 250))
-                RepairOrderItem.objects.create(
-                    repair_order=order,
-                    item_type=item_type,
-                    description=item_desc,
-                    quantity=quantity,
-                    unit_price=unit_price,
-                )
-                items_total += quantity * unit_price
-
-            accepted_at = order_date + timedelta(hours=1)
-            delivered_at = None
-            final_cost = None
-            if status in ('done', 'delivered'):
-                delivered_at = order_date + timedelta(days=random.randint(1, 5))
-                final_cost = items_total
-
-            StatusHistory.objects.create(
-                repair_order=order,
-                old_status='',
-                new_status=status,
-                note='Utworzono zlecenie',
-            )
-
-            RepairOrder.objects.filter(pk=order.pk).update(
-                created_at=order_date,
-                accepted_at=accepted_at,
-                delivered_at=delivered_at,
-                final_cost=final_cost,
-            )
+            self._create_order([bike], customer, order_date, now)
         self.stdout.write(f'      * {num_orders} zleceń napraw dla roweru {bike}')
+        return num_orders
+
+    def _create_order(self, bikes, customer, order_date, now):
+        statuses = self._status_path(order_date, now)
+        status = statuses[-1]
+
+        order = RepairOrder.objects.create(
+            customer=customer,
+            bike_tag_number=random.randint(1, 250),
+            status=status,
+            priority=random.choice([p[0] for p in RepairOrder.PRIORITY_CHOICES]),
+            description=random.choice(REPAIR_DESCRIPTIONS),
+        )
+        order.bikes.set(bikes)
+
+        items_total = self._create_items(order)
+        timeline = self._status_timeline(statuses, order_date, now)
+
+        # accepted_at i delivered_at ustawiamy tak samo jak endpoint zmiany statusu:
+        # z momentu wejścia w dany status, a delivered_at tylko dla 'delivered'.
+        accepted_at = timeline[0][1]
+        delivered_at = next((at for name, at in timeline if name == 'delivered'), None)
+        # Kwota końcowa jest znana dopiero po zamknięciu naprawy; wycena wstępna
+        # to zaokrąglone przybliżenie tej kwoty (+/- 20%).
+        estimated_cost = (items_total * Decimal(random.randint(80, 120)) / Decimal(100)).quantize(Decimal('1'))
+        final_cost = items_total if status in ('done', 'delivered') else None
+
+        for old_status, new_status, changed_at in self._transitions(timeline):
+            history = StatusHistory.objects.create(
+                repair_order=order,
+                old_status=old_status,
+                new_status=new_status,
+                note=NOTES_BY_STATUS[new_status],
+            )
+            # changed_at ma auto_now_add, więc datę trzeba nadpisać po zapisie.
+            StatusHistory.objects.filter(pk=history.pk).update(changed_at=changed_at)
+
+        RepairOrder.objects.filter(pk=order.pk).update(
+            created_at=order_date,
+            # updated_at ma auto_now - bez nadpisania każde zlecenie wyglądałoby na
+            # zamknięte dzisiaj i psułoby tygodniowe statystyki na dashboardzie.
+            updated_at=timeline[-1][1],
+            accepted_at=accepted_at,
+            delivered_at=delivered_at,
+            estimated_cost=estimated_cost,
+            final_cost=final_cost,
+        )
+        return order
+
+    def _status_path(self, order_date, now):
+        """Lista statusów, przez które przeszło zlecenie - od 'accepted' do końcowego."""
+        age_days = (now - order_date).days
+
+        if random.random() < 0.06:
+            # anulowane - obieg urywa się w losowym miejscu
+            return STATUS_FLOW[:random.randint(1, 3)] + ['cancelled']
+
+        if age_days > 30:
+            # stare zlecenia są praktycznie zawsze zamknięte
+            final = 'delivered' if random.random() < 0.9 else 'done'
+        else:
+            final = random.choice(STATUS_FLOW)
+
+        return STATUS_FLOW[:STATUS_FLOW.index(final) + 1]
+
+    def _status_timeline(self, statuses, order_date, now):
+        """Przypisuje każdemu statusowi datę - rosnąco, od przyjęcia zlecenia."""
+        timeline = [(statuses[0], order_date)]
+        current = order_date
+        for name in statuses[1:]:
+            current = min(current + timedelta(hours=random.randint(4, 72)), now)
+            timeline.append((name, current))
+        return timeline
+
+    def _transitions(self, timeline):
+        """Pierwszy wpis historii to utworzenie zlecenia (pusty old_status), potem kolejne zmiany."""
+        previous = ''
+        for name, changed_at in timeline:
+            yield previous, name, changed_at
+            previous = name
+
+    def _create_items(self, order):
+        items_total = Decimal('0')
+        for item_type, description, min_price, max_price in random.sample(ITEMS, random.randint(1, 3)):
+            quantity = Decimal(random.randint(1, 2)) if item_type == 'part' else Decimal(1)
+            unit_price = Decimal(random.randint(min_price, max_price))
+            RepairOrderItem.objects.create(
+                repair_order=order,
+                item_type=item_type,
+                description=description,
+                quantity=quantity,
+                unit_price=unit_price,
+            )
+            items_total += quantity * unit_price
+        return items_total
