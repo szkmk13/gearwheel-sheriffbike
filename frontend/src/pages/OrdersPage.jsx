@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { fetchOrders, createOrder } from "../api/orders";
-import { fetchClients, fetchClientDetails, createClient, createBike } from "../api/clients";
+import { fetchClients, fetchClientDetails, createClient, createBike, fetchBikeDetails } from "../api/clients";
 
 import Button from "../components/Button";
 import SearchInput from "../components/SearchInput";
@@ -12,10 +12,12 @@ import StickyHeader from "../components/StickyHeader";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
 import Select from "../components/Select";
+import QRScannerModal from "../components/QRScannerModal";
 import { TableRowsSkeleton, MobileOrderCardsSkeleton } from "../components/Skeleton";
 
 export default function OrdersPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const formRef = useRef(null);
 
@@ -23,6 +25,9 @@ export default function OrdersPage() {
   const [isNewClient, setIsNewClient] = useState(false);
   const [isNewBike, setIsNewBike] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedBikeId, setSelectedBikeId] = useState("");
+  const [scannedBike, setScannedBike] = useState(null);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Stan wyszukiwania i filtrowania
   const [searchQuery, setSearchQuery] = useState("");
@@ -48,6 +53,65 @@ export default function OrdersPage() {
 
   const todayDate = new Date().toISOString().split('T')[0];
 
+  // Obsługa otwierania formularza zlecenia z parametrów URL (np. po skanowaniu QR)
+  useEffect(() => {
+    const newOrderParam = searchParams.get('newOrder');
+    const bikeIdParam = searchParams.get('bikeId');
+    const customerIdParam = searchParams.get('customerId');
+
+    if (newOrderParam === 'true') {
+      setIsAddOrderFormOpen(true);
+      setIsNewClient(false);
+      setIsNewBike(false);
+
+      if (bikeIdParam) {
+        setSelectedBikeId(String(bikeIdParam));
+        if (customerIdParam) {
+          setSelectedClientId(String(customerIdParam));
+        }
+
+        // Pobierz dane roweru, aby uzupełnić dane klienta i nazwę roweru w opcjach
+        fetchBikeDetails(bikeIdParam)
+          .then((bike) => {
+            if (bike) {
+              setScannedBike(bike);
+              if (bike.customer?.id && !customerIdParam) {
+                setSelectedClientId(String(bike.customer.id));
+              }
+            }
+          })
+          .catch((err) => {
+            console.error("Błąd pobierania danych roweru:", err);
+          });
+      }
+
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
+  const handleBikeScannedForOrder = (bike) => {
+    setScannedBike(bike);
+    const customerId = bike.customer?.id || (typeof bike.customer === 'number' ? bike.customer : '');
+    if (customerId) {
+      setSelectedClientId(String(customerId));
+    }
+    setSelectedBikeId(String(bike.id));
+    setIsNewClient(false);
+    setIsNewBike(false);
+    setIsAddOrderFormOpen(true);
+    toast.success(`Wybrano rower: ${bike.brand} ${bike.model || ''}`);
+  };
+
+  const handleCloseOrderModal = () => {
+    formRef.current?.reset();
+    setIsAddOrderFormOpen(false);
+    setIsNewClient(false);
+    setIsNewBike(false);
+    setSelectedClientId("");
+    setSelectedBikeId("");
+    setScannedBike(null);
+  };
+
   const { data: ordersData, isLoading: isOrdersLoading, isError, error } = useQuery({
     queryKey: ['orders', { search: searchQuery, status: statusFilters.join(','), priority: priorityFilters.join(','), ordering }],
     queryFn: () => fetchOrders({ 
@@ -64,7 +128,7 @@ export default function OrdersPage() {
     queryFn: () => fetchClients(),
   });
   const clientOptions = (clientsData?.results || []).map(client => ({
-    value: client.id,
+    value: String(client.id),
     label: `${client.first_name} ${client.last_name}`
   }));
 
@@ -73,15 +137,26 @@ export default function OrdersPage() {
     queryFn: () => fetchClientDetails(selectedClientId),
     enabled: !!selectedClientId && !isNewClient,
   });
-  const bikeOptions = (selectedClientDetails?.bikes || []).map(bike => ({
-    value: bike.id,
-    label: `${bike.brand} ${bike.model} (${bike.bike_type})`
+
+  let bikeOptions = (selectedClientDetails?.bikes || []).map(bike => ({
+    value: String(bike.id),
+    label: `${bike.brand} ${bike.model || ''} (${bike.bike_type})`
   }));
+
+  if (scannedBike && !bikeOptions.some(b => String(b.value) === String(scannedBike.id))) {
+    bikeOptions = [
+      {
+        value: String(scannedBike.id),
+        label: `${scannedBike.brand} ${scannedBike.model || ''} (${scannedBike.bike_type})`
+      },
+      ...bikeOptions
+    ];
+  }
 
   const mutation = useMutation({
     mutationFn: async (formData) => {
-      let finalCustomerId = formData.get('customer');
-      let finalBikeId = formData.get('bike');
+      let finalCustomerId = formData.get('customer') || selectedClientId;
+      let finalBikeId = formData.get('bike') || selectedBikeId;
 
       if (isNewClient) {
         const fullName = formData.get('fullName').trim();
@@ -125,10 +200,7 @@ export default function OrdersPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
-      formRef.current?.reset();
-      setIsAddOrderFormOpen(false);
-      setIsNewClient(false);
-      setIsNewBike(false);
+      handleCloseOrderModal();
       toast.success("Utworzono nowe zlecenie!");
     },
     onError: (error) => toast.error(`Wystąpił błąd podczas przetwarzania: ${error.message}`)
@@ -168,9 +240,22 @@ export default function OrdersPage() {
       <StickyHeader className="bg-[var(--color-paper)]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <h1 className="text-2xl font-semibold text-[var(--color-ink)]">Zlecenia serwisowe</h1>
-          <Button onClick={() => setIsAddOrderFormOpen(true)} className="w-full sm:w-auto">
-            + Przyjmij rower
-          </Button>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setIsScannerOpen(true)}
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 bg-[var(--color-paper-2)] border border-[var(--color-line)] hover:bg-white text-[var(--color-ink)] rounded-md font-medium text-sm transition-colors shadow-xs cursor-pointer"
+              title="Zeskanuj kod QR roweru, aby natychmiast utworzyć nowe zlecenie"
+            >
+              <svg className="w-4 h-4 text-[var(--color-accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+              </svg>
+              <span>Skanuj QR i przyjmij</span>
+            </button>
+            <Button onClick={() => setIsAddOrderFormOpen(true)} className="flex-1 sm:flex-initial justify-center">
+              + Przyjmij rower
+            </Button>
+          </div>
         </div>
 
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
@@ -404,7 +489,7 @@ export default function OrdersPage() {
 
       <Modal 
         isOpen={isAddOrderFormOpen} 
-        onClose={() => setIsAddOrderFormOpen(false)}
+        onClose={handleCloseOrderModal}
         title="Nowe zlecenie serwisowe"
       >
         <form ref={formRef} onSubmit={handleAddOrder} className="flex flex-col gap-6 mt-2">
@@ -418,8 +503,11 @@ export default function OrdersPage() {
                     <input
                         type="checkbox" id="newClientCheckbox" checked={isNewClient}
                         onChange={(e) => {
-                        setIsNewClient(e.target.checked);
-                        if (e.target.checked) setIsNewBike(true); 
+                          setIsNewClient(e.target.checked);
+                          if (e.target.checked) {
+                            setIsNewBike(true);
+                            setSelectedBikeId("");
+                          }
                         }}
                         className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
                     />
@@ -431,8 +519,16 @@ export default function OrdersPage() {
 
                 {!isNewClient ? (
                     <Select
-                      name="customer" label="Klient z bazy" options={clientOptions} placeholder="Wybierz klienta..."
-                      required={!isNewClient} onChange={(e) => setSelectedClientId(e.target.value)}
+                      name="customer" 
+                      label="Klient z bazy" 
+                      options={clientOptions} 
+                      placeholder="Wybierz klienta..."
+                      value={selectedClientId}
+                      required={!isNewClient} 
+                      onChange={(e) => {
+                        setSelectedClientId(e.target.value);
+                        setSelectedBikeId("");
+                      }}
                     />
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -463,22 +559,47 @@ export default function OrdersPage() {
                     {(isNewClient || isNewBike) ? "Rejestracja nowego roweru" : "Wybór przypisanego roweru"}
                     </h4>
                     
-                    {!isNewClient && (
-                    <div className="flex items-center gap-2">
-                        <input
-                        type="checkbox" id="newBikeCheckbox" checked={isNewBike}
-                        onChange={(e) => setIsNewBike(e.target.checked)}
-                        className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
-                        />
-                        <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-[var(--color-ink-2)] cursor-pointer">Nowy rower</label>
+                    <div className="flex items-center gap-3">
+                        {!isNewClient && !isNewBike && (
+                            <button
+                                type="button"
+                                onClick={() => setIsScannerOpen(true)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
+                                title="Zeskanuj kod QR roweru"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                                </svg>
+                                <span>Skanuj QR roweru</span>
+                            </button>
+                        )}
+
+                        {!isNewClient && (
+                        <div className="flex items-center gap-2">
+                            <input
+                            type="checkbox" id="newBikeCheckbox" checked={isNewBike}
+                            onChange={(e) => {
+                                setIsNewBike(e.target.checked);
+                                if (e.target.checked) setSelectedBikeId("");
+                            }}
+                            className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
+                            />
+                            <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-[var(--color-ink-2)] cursor-pointer">Nowy rower</label>
+                        </div>
+                        )}
                     </div>
-                    )}
                 </div>
 
                 {(!isNewClient && !isNewBike) ? (
                     <Select
-                    name="bike" label="Rower przypisany do klienta" options={bikeOptions} placeholder="Wybierz rower..."
-                    required={(!isNewClient && !isNewBike)} disabled={!selectedClientId || bikeOptions.length === 0}
+                      name="bike" 
+                      label="Rower przypisany do klienta" 
+                      options={bikeOptions} 
+                      placeholder="Wybierz rower..."
+                      value={selectedBikeId}
+                      onChange={(e) => setSelectedBikeId(e.target.value)}
+                      required={(!isNewClient && !isNewBike)} 
+                      disabled={!selectedClientId || bikeOptions.length === 0}
                     />
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -530,12 +651,7 @@ export default function OrdersPage() {
             <div className="flex justify-end gap-3 pt-4 border-t border-[var(--color-line)]">
                 <button
                 type="button"
-                onClick={() => {
-                    formRef.current?.reset();
-                    setIsAddOrderFormOpen(false);
-                    setIsNewClient(false);
-                    setIsNewBike(false);
-                }}
+                onClick={handleCloseOrderModal}
                 className="px-5 py-2.5 text-sm font-medium text-[var(--color-ink-2)] hover:bg-[var(--color-paper)] rounded-md transition-colors cursor-pointer"
                 >Anuluj</button>
                 <Button type="submit" disabled={mutation.isPending}>
@@ -544,6 +660,14 @@ export default function OrdersPage() {
             </div>
         </form>
       </Modal>
+
+      {/* Skaner QR dedykowany do natychmiastowego otwierania zlecenia */}
+      <QRScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        initialAction="new_order"
+        onBikeScanned={handleBikeScannedForOrder}
+      />
     </div>
   );
 }

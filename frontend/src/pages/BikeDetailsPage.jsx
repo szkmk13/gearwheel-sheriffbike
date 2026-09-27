@@ -156,6 +156,21 @@ export default function BikeDetailsPage() {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full md:w-auto">
+          <Button
+            onClick={() => {
+              const customerId = bike.customer?.id || (typeof bike.customer === 'number' ? bike.customer : '');
+              const params = new URLSearchParams({
+                newOrder: 'true',
+                bikeId: String(bike.id),
+                ...(customerId ? { customerId: String(customerId) } : {})
+              });
+              navigate(`/panel/orders?${params.toString()}`);
+            }}
+            className="justify-center text-sm"
+          >
+            + Przyjmij zlecenie
+          </Button>
+
           <button
             onClick={() => setIsEditOpen(true)}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm cursor-pointer"
@@ -164,12 +179,12 @@ export default function BikeDetailsPage() {
           </button>
 
           {bike.customer && (
-            <Button
+            <button
               onClick={() => navigate(`/panel/clients/${bike.customer.id}`)}
-              className="justify-center text-sm"
+              className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm cursor-pointer"
             >
               Profil właściciela →
-            </Button>
+            </button>
           )}
         </div>
       </div>
