@@ -189,7 +189,7 @@ export default function OrdersPage() {
       const newOrder = {
         customer: parseInt(finalCustomerId),
         bike: parseInt(finalBikeId),
-        bike_tag_number: parseInt(finalBikeId), 
+        bike_tag_number: parseInt(formData.get('bike_tag_number'), 10),
         description: formData.get('description'),
         priority: formData.get('priority') || 'normal',
         estimated_cost: formData.get('estimated_cost') || null,
@@ -621,8 +621,9 @@ export default function OrdersPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-t border-[var(--color-line)] pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 border-t border-[var(--color-line)] pt-4">
                 <Input name="accepted_at" label="Data przyjęcia" type="date" defaultValue={todayDate} disabled={true} />
+                <Input name="bike_tag_number" label="Nr zawieszki" type="number" min="1" step="1" inputMode="numeric" placeholder="np. 12" required={true} />
                 <Select
                     name="priority"
                     label="Priorytet"
