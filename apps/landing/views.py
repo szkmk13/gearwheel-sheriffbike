@@ -5,6 +5,7 @@ defaults to IsAdminUser, so each view opts out explicitly.
 """
 
 from django.utils import timezone
+from django.utils.cache import patch_cache_control
 from django.utils.decorators import method_decorator
 from django.utils.translation import gettext_lazy as _
 from django.views.decorators.csrf import csrf_exempt
@@ -12,6 +13,7 @@ from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from .serializers import ContactFormSerializer
@@ -28,6 +30,9 @@ class ContactFormView(APIView):
     # csrf_exempt, but this makes it explicit regardless of DRF internals.
     permission_classes = [AllowAny]
     authentication_classes = []
+    # Per client IP, so a bot can't flood the leads sheet (rate in settings).
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'contact_form'
 
     @extend_schema(
         summary=_('Submit the contact form'),
@@ -37,7 +42,8 @@ class ContactFormView(APIView):
             'Google service account, `GOOGLE_SHEETS_SPREADSHEET_ID` / '
             '`GOOGLE_SERVICE_ACCOUNT_FILE`/`GOOGLE_SERVICE_ACCOUNT_JSON`). If Google Sheets is not '
             'configured, the append is skipped (with a warning logged), but the endpoint still '
-            'returns `201`. Cloudflare Turnstile verification is present in the code but currently disabled.'
+            'returns `201`. Requires a valid Cloudflare Turnstile token (`turnstile_token`). '
+            'Throttled per client IP.'
         ),
         request=ContactFormSerializer,
         responses={201: ContactFormResponseSerializer},
@@ -61,9 +67,9 @@ class ContactFormView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        remote_ip = request.META.get('HTTP_X_FORWARDED_FOR', request.META.get('REMOTE_ADDR'))
-        if remote_ip:
-            remote_ip = remote_ip.split(',')[0].strip()
+        # X-Real-IP is set by nginx itself; the first X-Forwarded-For entry is
+        # whatever the client chose to send.
+        remote_ip = request.META.get('HTTP_X_REAL_IP') or request.META.get('REMOTE_ADDR') or None
 
         if not verify_turnstile(data['turnstile_token'], remote_ip):
             return Response(
@@ -90,11 +96,21 @@ class GoogleReviewsView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
 
+    # Lets the browser reuse the response across reloads instead of asking us
+    # on every page view. The fallback gets a short life so the real reviews
+    # show up soon once Google is reachable/configured again.
+    MAX_AGE = 60 * 60
+    FALLBACK_MAX_AGE = 60 * 5
+
     def get(self, request):
         data = fetch_google_reviews()
         if data is None:
             # Not configured, or Google is unreachable. The frontend falls back
             # to its own hardcoded numbers, so a 200 with source="fallback"
             # keeps that path simple - this is not an error the user caused.
-            return Response({'source': 'fallback', 'reviews': []})
-        return Response({'source': 'google', **data})
+            response = Response({'source': 'fallback', 'reviews': []})
+            patch_cache_control(response, public=True, max_age=self.FALLBACK_MAX_AGE)
+            return response
+        response = Response({'source': 'google', **data})
+        patch_cache_control(response, public=True, max_age=self.MAX_AGE)
+        return response

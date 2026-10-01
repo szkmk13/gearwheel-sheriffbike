@@ -12,11 +12,15 @@ TURNSTILE_VERIFY_URL = 'https://challenges.cloudflare.com/turnstile/v0/siteverif
 def verify_turnstile(token, remote_ip=None):
     """Verify a Cloudflare Turnstile response token server-side.
 
-    Returns True when TURNSTILE_SECRET_KEY isn't configured, so local dev
-    without Cloudflare credentials doesn't get blocked.
+    Without TURNSTILE_SECRET_KEY it passes in DEBUG, so local dev without
+    Cloudflare credentials isn't blocked, and fails closed otherwise - a
+    production deploy missing the key must not silently accept bot traffic.
     """
     if not settings.TURNSTILE_SECRET_KEY:
-        return True
+        if settings.DEBUG:
+            return True
+        logger.error('TURNSTILE_SECRET_KEY is not set - rejecting contact form submission')
+        return False
 
     payload = {'secret': settings.TURNSTILE_SECRET_KEY, 'response': token}
     if remote_ip:
@@ -73,7 +77,10 @@ def append_lead_to_sheet(row_data):
         service.spreadsheets().values().append(
             spreadsheetId=settings.GOOGLE_SHEETS_SPREADSHEET_ID,
             range=f'{settings.GOOGLE_SHEETS_WORKSHEET_NAME}!A1',
-            valueInputOption='USER_ENTERED',
+            # RAW, not USER_ENTERED: these values come from anonymous visitors,
+            # and USER_ENTERED would evaluate "=IMPORTXML(...)"-style input as a
+            # formula able to read other rows and send them off-site.
+            valueInputOption='RAW',
             insertDataOption='INSERT_ROWS',
             body={'values': [row]},
         ).execute()
