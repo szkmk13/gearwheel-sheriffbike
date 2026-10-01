@@ -1,46 +1,107 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import toast from 'react-hot-toast';
+import { fetchClientDetails, updateClient, createBike } from "../api/clients";
+
 import Button from "../components/Button";
 import SlidePanel from "../components/SlidePanel";
 import Input from "../components/Input";
+import Select from "../components/Select";
 import { getInitials } from "../components/ClientCard";
-import { mockClients } from "./ClientsPage";
-import { mockBikes } from "./ClientsPage";
+import StatusBadge from "../components/StatusBadge"; 
+import { ClientDetailsSkeleton } from "../components/Skeleton"; 
 
 const EditIcon = () => (
-  <button className="text-gray-400 hover:text-gray-700 transition-colors">
+  <div className="text-gray-400 transition-colors">
     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-  </button>
+  </div>
 );
 
 export default function ClientDetailsPage() {
     const { id } = useParams();
     const navigate = useNavigate();
+    const queryClient = useQueryClient();
 
     const [isEditFormOpen, setIsEditFormOpen] = useState(false);
     const [isAddBikeFormOpen, setIsAddBikeFormOpen] = useState(false);
 
+    const editFormRef = useRef(null);
+    const bikeFormRef = useRef(null);
+
+    const { data: client, isLoading, isError, error } = useQuery({
+        queryKey: ['client', id],
+        queryFn: () => fetchClientDetails(id),
+    });
+
+    const editMutation = useMutation({
+        mutationFn: updateClient,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['client', id] });
+            queryClient.invalidateQueries({ queryKey: ['clients'] }); 
+            editFormRef.current?.reset();
+            setIsEditFormOpen(false);
+            toast.success("Dane klienta zostały zaktualizowane!");
+        },
+        onError: (error) => toast.error(`Wystąpił błąd edycji: ${error.message}`)
+    });
+
+    const bikeMutation = useMutation({
+        mutationFn: createBike,
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['client', id] }); 
+            bikeFormRef.current?.reset();
+            setIsAddBikeFormOpen(false);
+            toast.success("Rower został pomyślnie dodany!");
+        },
+        onError: (error) => toast.error(`Wystąpił błąd zapisu roweru: ${error.message}`)
+    });
+
     const handleEditClient = (e) => {
         e.preventDefault();
-        console.log("Miejsce na przesłanie klienta do bazy");
-        setIsEditFormOpen(false); 
+        const formData = new FormData(e.target);
+        
+        const fullName = formData.get('fullName').trim();
+        const nameParts = fullName.split(' ');
+        const rodoAccepted = formData.get('rodo_accepted') === 'on';
+
+        const updatedData = {
+            first_name: nameParts[0],
+            last_name: nameParts.slice(1).join(' ') || '-',
+            email: formData.get('email') || "",
+            phone: formData.get('phone'),
+            notes: formData.get('notes') || "",
+            rodo_accepted: rodoAccepted
+        };
+
+        editMutation.mutate({ id, clientData: updatedData });
     };
+
     const handleAddBike = (e) => {
         e.preventDefault();
-        console.log("Rower przypisany do klienta ID:", client.id);
-        setIsAddBikeFormOpen(false);
+        const formData = new FormData(e.target);
+        
+        const newBikeData = {
+            customer: parseInt(id),
+            brand: formData.get('brand'),
+            model: formData.get('model'),
+            bike_type: formData.get('bike_type')
+        };
+
+        bikeMutation.mutate(newBikeData);
     };
 
-    const client = mockClients.find(c => c.id === parseInt(id));
-    const clientBikes = mockBikes.filter(bike => bike.clientId === client.id);
+    if (isLoading) return <ClientDetailsSkeleton />;
+    if (isError) return <div className="p-8 text-red-500 font-medium">Wystąpił błąd: {error.message}</div>;
+    if (!client) return <div className="p-8 text-red-500 font-medium">Nie znaleziono klienta.</div>;
 
-    if (!client) {
-        return <div className="p-8 text-red-500">Nie znaleziono klienta.</div>;
-    }
+    const fullName = `${client.first_name} ${client.last_name}`.trim();
+    const clientBikes = client.bikes || [];
+    const clientOrders = client.repair_orders || [];
 
     return(
-        <div className="p-8">
-            <div className="flex items-center mb-6">
+        <div className="p-4 sm:p-6 md:p-8 bg-[var(--color-paper)] min-h-full">
+            <div className="flex items-center mb-4 sm:mb-6">
                 <button
                     onClick={() => navigate('/panel/clients')}
                     className="flex items-center p-2 border border-transparent hover:border-gray-200 hover:bg-gray-200 rounded-full transition-colors cursor-pointer mr-2"
@@ -48,59 +109,80 @@ export default function ClientDetailsPage() {
                     <svg className="w-6 h-6 text-gray-800 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                    <span 
-                        onClick={() => navigate('/panel/clients')} 
-                        className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors"
-                    >
+                    <span className="text-gray-700 font-medium cursor-pointer hover:text-gray-900 transition-colors text-sm sm:text-base">
                         Wróć do klientów
                     </span>
                 </button>
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-lg p-6 mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 
-                <div className="flex items-center gap-6">
-                    <div className="w-16 h-16 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center font-bold text-2xl shrink-0">
-                        {getInitials(client.name)}
+                <div className="flex items-center gap-4 sm:gap-6 min-w-0">
+                    <div 
+                        className="w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center font-bold text-xl sm:text-2xl shrink-0"
+                        style={{ backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}
+                    >
+                        {getInitials(fullName)}
                     </div>
-                    <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{client.name}</h1>
-                        <p className="text-gray-500 mt-1">{client.email} • {client.phone}</p>
+                    <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                            <h1 className="text-xl sm:text-3xl font-bold text-gray-900 truncate">{fullName}</h1>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                client.rodo_accepted 
+                                    ? 'bg-green-100 text-green-800 border border-green-200' 
+                                    : 'bg-red-100 text-red-800 border border-red-200'
+                            }`}>
+                                {client.rodo_accepted ? 'RODO Zaakceptowane' : 'Brak zgody RODO'}
+                            </span>
+                        </div>
+                        <p className="text-gray-500 text-xs sm:text-sm mt-1 truncate">{client.email || 'Brak e-maila'} • {client.phone}</p>
                     </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full md:w-auto">
                     <button 
                         onClick={() => setIsEditFormOpen(true)} 
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm"
+                        className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm cursor-pointer"
                     >
                         <EditIcon /> Edytuj profil
                     </button>
 
-                    <Button onClick={() => setIsAddBikeFormOpen(true)}>
+                    <Button onClick={() => setIsAddBikeFormOpen(true)} className="justify-center">
                         + Dodaj rower
                     </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                <div className="space-y-4 sm:space-y-6">
                     {client.notes && (
-                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                        <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                             <h3 className="text-lg font-semibold text-gray-800 mb-3">Notatki</h3>
-                            <p className="text-sm text-gray-600">{client.notes}</p>
+                            <p className="text-sm text-gray-600 whitespace-pre-wrap">{client.notes}</p>
                         </div>
                     )}
 
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Zarejestrowane rowery</h3>
                         {clientBikes.length > 0 ? (
                         <div className="space-y-3">
                             {clientBikes.map(bike => (
-                            <div key={bike.id} className="p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center">
-                                <div>
-                                <p className="font-semibold text-gray-800">{bike.manufacturer} <span className="font-normal text-gray-600">{bike.model}</span></p>
-                                <p className="text-xs text-gray-500 mt-1">{bike.type}</p>
+                            <div 
+                                key={bike.id} 
+                                onClick={() => navigate(`/panel/bikes/${bike.id}`)}
+                                className="p-3.5 sm:p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors cursor-pointer group"
+                            >
+                                <div className="min-w-0">
+                                    <p className="font-semibold text-gray-800 text-sm sm:text-base group-hover:text-[var(--color-accent)] transition-colors truncate">
+                                        {bike.brand} <span className="font-normal text-gray-600 ml-1">{bike.model}</span>
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-1 capitalize">{bike.bike_type}</p>
+                                </div>
+                                <div className="flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-[var(--color-accent)] shrink-0 ml-3 transition-colors">
+                                    <span>Szczegóły</span>
+                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                                    </svg>
                                 </div>
                             </div>
                             ))}
@@ -111,12 +193,36 @@ export default function ClientDetailsPage() {
                     </div>
                 </div>
 
-                <div className="space-y-6">
-                    <div className="bg-white border border-gray-200 rounded-lg p-6">
+                <div className="space-y-4 sm:space-y-6">
+                    <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
                         <h3 className="text-lg font-semibold text-gray-800 mb-4">Historia zleceń</h3>
-                        <div className="bg-gray-100 rounded text-gray-500 text-sm p-4 text-center">
-                            Tu wstawimy historię zamówień klienta
-                        </div>
+                        {clientOrders.length > 0 ? (
+                            <div className="space-y-3">
+                                {clientOrders.map(order => (
+                                    <div 
+                                        key={order.id} 
+                                        onClick={() => navigate(`/panel/orders/${order.id}`)}
+                                        className="p-3.5 sm:p-4 border border-gray-100 rounded-lg bg-gray-50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2 hover:bg-gray-100 transition-colors cursor-pointer"
+                                    >
+                                        <div className="min-w-0">
+                                            <p className="font-semibold text-gray-800 text-sm sm:text-base truncate">
+                                                #{order.id} <span className="font-normal text-gray-600 ml-1">({order.bike_label})</span>
+                                            </p>
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                {new Date(order.created_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0 border-t sm:border-t-0 border-gray-200/60">
+                                            <StatusBadge status={order.status} />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="bg-gray-100 rounded text-gray-500 text-sm p-4 text-center">
+                                Brak zleceń serwisowych dla tego klienta.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -132,64 +238,83 @@ export default function ClientDetailsPage() {
                     </h2>
                     
                     <form 
+                        ref={editFormRef}
                         onSubmit={handleEditClient} 
                         className="flex flex-col gap-6"
                     >
-                        <div className="bg-white border border-gray-200 rounded-lg 
-                                        p-6 flex flex-col gap-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                            Dane kontaktowe
-                        </h3>
+                        <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-4">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                                Dane kontaktowe
+                            </h3>
 
-                        <Input
-                            label="Imię i nazwisko"
-                            defaultValue={client.name}
-                            required={true}
-                        />
+                            <Input
+                                name="fullName"
+                                label="Imię i nazwisko"
+                                defaultValue={fullName}
+                                required={true}
+                            />
 
-                        <Input
-                            label="Adres e-mail"
-                            type="email"
-                            defaultValue={client.email}
-                        />
+                            <Input
+                                name="email"
+                                label="Adres e-mail"
+                                type="email"
+                                defaultValue={client.email}
+                            />
 
-                        <Input
-                            label="Numer telefonu"
-                            type="tel"
-                            defaultValue={client.phone}
-                            required={true}
-                        />
+                            <Input
+                                name="phone"
+                                label="Numer telefonu"
+                                type="tel"
+                                defaultValue={client.phone}
+                                required={true}
+                            />
+
+                            <div className="flex items-center gap-2 pt-2 mt-2 border-t border-gray-100">
+                                <input 
+                                    type="checkbox" 
+                                    id="edit_rodo_accepted" 
+                                    name="rodo_accepted" 
+                                    defaultChecked={client.rodo_accepted}
+                                    className="w-4 h-4 text-[var(--color-accent)] bg-white border-gray-300 rounded focus:ring-[var(--color-accent)] cursor-pointer"
+                                />
+                                <label htmlFor="edit_rodo_accepted" className="text-sm font-medium text-gray-700 cursor-pointer">
+                                    Klient wyraził zgodę na przetwarzanie danych osobowych (RODO)
+                                </label>
+                            </div>
                         </div>
 
                         <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <div className="flex justify-between items-center mb-3 pb-2">
-                            <h3 className="text-lg font-semibold text-gray-800">
-                            Notatki
-                            </h3>
-                        </div>
-                        
-                        <textarea 
-                            defaultValue={client.notes}
-                            className="w-full mt-2 p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 
-                                    focus:outline-none focus:ring-2 focus:ring-[#009ceb]/50 focus:border-[#009ceb] min-h-[120px] resize-y"
-                            placeholder="Dodatkowe informacje o kliencie..."
-                        ></textarea>
+                            <div className="flex justify-between items-center mb-3 pb-2">
+                                <h3 className="text-lg font-semibold text-gray-800">Notatki</h3>
+                            </div>
+                            
+                            <textarea 
+                                name="notes"
+                                defaultValue={client.notes}
+                                className="w-full mt-2 p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 
+                                        focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] min-h-[120px] resize-y"
+                                placeholder="Dodatkowe informacje o kliencie..."
+                            ></textarea>
                         </div>
 
                         <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                        <button
-                            type="button"
-                            onClick={() => setIsEditFormOpen(false)}
-                            className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
-                        >Anuluj</button>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    editFormRef.current?.reset();
+                                    setIsEditFormOpen(false);
+                                }}
+                                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                            >Anuluj</button>
 
-                        <Button type="submit">Zapisz zmiany</Button>
+                            <Button type="submit" disabled={editMutation.isPending}>
+                                {editMutation.isPending ? "Zapisywanie..." : "Zapisz zmiany"}
+                            </Button>
                         </div>
                     </form>
                 </div>
             </SlidePanel>
             
-
             {/* Formularz dodania roweru */}
             <SlidePanel 
                 isOpen={isAddBikeFormOpen}
@@ -198,45 +323,59 @@ export default function ClientDetailsPage() {
                 <div className="space-y-6">
                     <h2 className="text-2xl font-bold text-gray-900 px-1">Nowy rower</h2>
 
-                    <form onSubmit={handleAddBike} className="flex flex-col gap-6">
-                    <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-4">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Dane roweru</h3>
+                    <form ref={bikeFormRef} onSubmit={handleAddBike} className="flex flex-col gap-6">
+                        <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-4">
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Dane roweru</h3>
 
-                        <div className="mb-2">
-                            <p className="text-sm font-medium text-gray-700">Właściciel</p>
-                            <p className="text-sm text-gray-900 mt-1 font-semibold">{client.name}</p>
+                            <div className="mb-2">
+                                <p className="text-sm font-medium text-gray-700">Właściciel</p>
+                                <p className="text-sm text-gray-900 mt-1 font-semibold">{fullName}</p>
+                            </div>
+
+                            <Input
+                                name="brand"
+                                label="Producent"
+                                placeholder="np. Trek, Giant, Kross"
+                                required={true}
+                            />
+                            <Input
+                                name="model"
+                                label="Model"
+                                placeholder="np. Domane SL5"
+                                required={true}
+                            />
+                            <Select
+                                name="bike_type"
+                                label="Typ roweru"
+                                required={true}
+                                options={[
+                                    { value: 'road', label: 'Szosowy (road)' },
+                                    { value: 'mtb', label: 'Górski (mtb)' },
+                                    { value: 'city', label: 'Miejski (city)' },
+                                    { value: 'gravel', label: 'Gravel (gravel)' },
+                                    { value: 'electric', label: 'Elektryczny (electric)' },
+                                    { value: 'other', label: 'Inny (other)' }
+                                ]}
+                            />
                         </div>
+                        
+                        <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    bikeFormRef.current?.reset();
+                                    setIsAddBikeFormOpen(false);
+                                }}
+                                className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                            >Anuluj</button>
 
-                        <Input
-                        label="Producent"
-                        placeholder="np. Trek, Giant, Kross"
-                        required={true}
-                        />
-                        <Input
-                        label="Model"
-                        placeholder="np. Domane SL5"
-                        required={true}
-                        />
-                        <Input
-                        label="Typ"
-                        placeholder="np. Szosowy, MTB, Gravel"
-                        required={true}
-                        />
-                    </div>
-                    <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                        <button
-                        type="button"
-                        onClick={() => setIsAddBikeFormOpen(false)}
-                        className="px-5 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-md transiton-colors"
-                        >Anuluj</button>
-
-                        <Button type="submit">Zapisz rower</Button>
-
-                    </div>
+                            <Button type="submit" disabled={bikeMutation.isPending}>
+                                {bikeMutation.isPending ? "Zapisywanie..." : "Zapisz rower"}
+                            </Button>
+                        </div>
                     </form>
                 </div>
             </SlidePanel>
         </div>
-
     )
 }

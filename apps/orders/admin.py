@@ -16,7 +16,15 @@ class StatusHistoryInline(admin.TabularInline):
 
 @admin.register(RepairOrder)
 class RepairOrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'customer', 'bike', 'status', 'priority', 'created_at')
+    list_display = ('id', 'customer', 'equipment', 'status', 'priority', 'created_at')
     list_filter = ('status', 'priority')
     search_fields = ('customer__first_name', 'customer__last_name', 'description')
+    filter_horizontal = ('bikes',)
     inlines = [RepairOrderItemInline, StatusHistoryInline]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related('bikes')
+
+    @admin.display(description='Sprzet')
+    def equipment(self, obj):
+        return ', '.join(str(bike) for bike in obj.bikes.all()) or '-'

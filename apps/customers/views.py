@@ -1,14 +1,30 @@
 import uuid
 
-from rest_framework.decorators import action
+from django.db.models import Prefetch
+from django.utils.translation import gettext_lazy as _
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework.generics import CreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
+
+from apps.orders.models import RepairOrder
+
 from .models import Customer, Bike
-from .serializers import CustomerListSerializer, CustomerDetailSerializer, BikeSerializer
+from .serializers import (
+    CustomerListSerializer, CustomerDetailSerializer, BikeSerializer,
+    BikeReadSerializer, BikeDetailSerializer
+)
 
 
 class CustomerViewSet(ModelViewSet):
-    queryset = Customer.objects.all()
+    queryset = Customer.objects.prefetch_related(
+        'bikes',
+        Prefetch(
+            'repair_orders',
+            queryset=RepairOrder.objects.prefetch_related('bikes').order_by('-created_at'),
+        ),
+    )
     filterset_fields = ['email']
     search_fields = ['first_name', 'last_name', 'phone', 'email']
     ordering_fields = ['last_name', 'created_at']
@@ -19,14 +35,43 @@ class CustomerViewSet(ModelViewSet):
         return CustomerDetailSerializer
 
 
-class BikeViewSet(ModelViewSet):
-    queryset = Bike.objects.select_related('customer').all()
+@extend_schema(responses=BikeReadSerializer)
+class BikeCreateView(CreateAPIView):
+    queryset = Bike.objects.select_related('customer')
     serializer_class = BikeSerializer
-    filterset_fields = ['customer', 'bike_type']
-    search_fields = ['brand', 'model', 'serial_no']
 
-    @action(detail=False, methods=['get'], url_path='lookup')
-    def lookup(self, request):
+
+@extend_schema(responses=BikeDetailSerializer)
+class BikeDetailView(RetrieveUpdateDestroyAPIView):
+    queryset = Bike.objects.select_related('customer').prefetch_related(
+        Prefetch('repair_orders', queryset=RepairOrder.objects.select_related('customer').prefetch_related('bikes').order_by('-created_at'))
+    )
+
+    def get_serializer_class(self):
+        if self.request.method in ('PUT', 'PATCH'):
+            return BikeSerializer
+        return BikeDetailSerializer
+
+
+class BikeLookupView(APIView):
+    @extend_schema(
+        summary=_('Look up a bike by QR code'),
+        description=_(
+            'Looks up a bike by its `sheriff_code` (format `sheriff-<id>-<uuid>`), as scanned from '
+            'the QR code attached to the bike.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                'code', str, OpenApiParameter.QUERY, required=True,
+                description=_('The bike\'s `sheriff_code`, e.g. `sheriff-5-9c1e2f2a-1234-4a5b-8b1c-abcdef123456`.'),
+            ),
+        ],
+        responses={
+            200: BikeReadSerializer,
+            404: OpenApiResponse(description=_('No bike found for the given code.')),
+        },
+    )
+    def get(self, request):
         code = request.query_params.get('code', '').strip()
 
         prefix = 'sheriff-'
@@ -45,5 +90,5 @@ class BikeViewSet(ModelViewSet):
         if not bike:
             return Response({'detail': 'Nie znaleziono roweru dla podanego kodu.'}, status=404)
 
-        serializer = self.get_serializer(bike)
+        serializer = BikeSerializer(bike)
         return Response(serializer.data)

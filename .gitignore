@@ -11,6 +11,7 @@ __pycache__/
 *.pyc
 /static/frontend/
 /staticfiles/
+/node_modules/
 
 # Google service-account keys (e.g. sheriff-bike-*.json) - never commit these
 /*.json

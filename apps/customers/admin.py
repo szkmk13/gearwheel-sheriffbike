@@ -12,19 +12,35 @@ class BikeInline(admin.TabularInline):
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ('last_name', 'first_name', 'phone', 'email', 'created_at')
+    list_display = ('last_name', 'first_name', 'phone', 'email', 'rodo_accepted', 'created_at')
+    list_filter = ('rodo_accepted',)
     search_fields = ('first_name', 'last_name', 'phone', 'email')
     inlines = [BikeInline]
 
 
 @admin.register(Bike)
 class BikeAdmin(admin.ModelAdmin):
-    list_display = ('brand_model', 'customer', 'sheriff_code', 'customer_phone', 'qr_code')
-    list_filter = ('bike_type',)
+    list_display = ('brand_model', 'category', 'customer', 'sheriff_code', 'customer_phone', 'qr_code')
+    list_filter = ('category', 'bike_type')
     search_fields = ('brand', 'model', 'serial_no', 'uuid')
     readonly_fields = ('uuid', 'sheriff_code', 'photo_thumbnail', 'qr_code')
 
-    @admin.display(description='Rower')
+    def get_deleted_objects(self, objs, request):
+        """Reports equipment that is still on an order as protected.
+
+        `RepairOrder.bikes` is a plain ManyToManyField, so Django's collector does not
+        treat it as protected and would happily show the confirmation page - only for
+        the pre_delete guard to blow up mid-delete. Listing the orders here gives the
+        usual "cannot be deleted" page instead, and detaching the item from its orders
+        still frees it for deletion.
+        """
+        from apps.orders.models import RepairOrder
+
+        deletable, model_count, perms_needed, protected = super().get_deleted_objects(objs, request)
+        blocking = RepairOrder.objects.filter(bikes__in=objs).distinct()
+        return deletable, model_count, perms_needed, list(protected) + [str(order) for order in blocking]
+
+    @admin.display(description='Sprzet')
     def brand_model(self, obj):
         return f'{obj.brand} {obj.model}'
 

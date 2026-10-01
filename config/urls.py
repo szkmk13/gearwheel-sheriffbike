@@ -8,12 +8,7 @@ from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from rest_framework.permissions import AllowAny
 
-from config.auth_views import (
-    CookieTokenRefreshView,
-    LoginView,
-    LogoutView,
-    MeView,
-)
+from config.auth_views import LoginView, LogoutView, MeView
 
 # ensure_csrf_cookie: the SPA is served from this shell with no server-rendered
 # form, so nothing else would ever set the csrftoken cookie the frontend needs
@@ -38,12 +33,10 @@ def robots_txt(request):
 _docs_view_kwargs = {'permission_classes': [AllowAny]} if settings.DEBUG else {}
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
     path('robots.txt', robots_txt, name='robots-txt'),
-
+    path('admin/', admin.site.urls),
     # Auth
     path('api/auth/login/', LoginView.as_view(), name='login'),
-    path('api/auth/token/refresh/', CookieTokenRefreshView.as_view(), name='token_refresh'),
     path('api/auth/logout/', LogoutView.as_view(), name='logout'),
     path('api/auth/me/', MeView.as_view(), name='me'),
 
@@ -56,9 +49,9 @@ urlpatterns = [
     # Apps
     path('api/customers/', include('apps.customers.urls')),
     path('api/orders/', include('apps.orders.urls')),
-    path('api/appointments/', include('apps.appointments.urls')),
-    path('api/inventory/', include('apps.inventory.urls')),
-    path('api/storage/', include('apps.storage.urls')),
+    # path('api/appointments/', include('apps.appointments.urls')),
+    # path('api/inventory/', include('apps.inventory.urls')),
+    # path('api/storage/', include('apps.storage.urls')),
     path('api/', include('apps.landing.urls')),
 ]
 
