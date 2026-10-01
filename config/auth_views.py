@@ -7,6 +7,7 @@ from rest_framework import serializers, status
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
+from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.customers.auth import AuthenticatedUserSerializer
@@ -26,6 +27,9 @@ class LoginView(APIView):
 
     permission_classes = [AllowAny]
     authentication_classes = []
+    # Per client IP, against password guessing (rate in REST_FRAMEWORK settings).
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = 'login'
 
     @extend_schema(
         summary=_('Log in a user'),
@@ -40,6 +44,7 @@ class LoginView(APIView):
         responses={
             200: AuthenticatedUserSerializer,
             401: OpenApiResponse(description=_('Invalid username or password.')),
+            429: OpenApiResponse(description=_('Too many login attempts, try again later.')),
         },
     )
     def post(self, request, *args, **kwargs):
@@ -47,7 +52,9 @@ class LoginView(APIView):
         serializer.is_valid(raise_exception=True)
 
         user = authenticate(request, **serializer.validated_data)
-        if user is None:
+        # The whole API is staff-only, so a non-staff session would be useless.
+        # Same message as a bad password, so it doesn't reveal the account exists.
+        if user is None or not user.is_staff:
             raise AuthenticationFailed(_('Invalid username or password.'))
 
         # Also rotates the CSRF token, so the frontend must read the csrftoken

@@ -18,7 +18,7 @@ class OrderEquipmentTests(APITestCase):
     def setUp(self):
         # No password anywhere in here on purpose: force_login() signs the user in
         # directly, so a credential literal would buy nothing and trip secret scanning.
-        self.user = User.objects.create_user(username='mechanik')
+        self.user = User.objects.create_user(username='mechanik', is_staff=True)
         self.client.force_login(self.user)
         self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
         self.bike = Bike.objects.create(customer=self.customer, brand='Trek', model='Marlin 5', bike_type='mtb')
@@ -209,7 +209,7 @@ class BikeDeletionGuardTests(APITestCase):
 
 class BikeCategoryTests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='mechanik')
+        self.user = User.objects.create_user(username='mechanik', is_staff=True)
         self.client.force_login(self.user)
         self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
 

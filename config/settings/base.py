@@ -109,8 +109,10 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
         'rest_framework.authentication.SessionAuthentication',
     ],
+    # Staff only: the panel is the shop's internal tool, so a plain (non-staff)
+    # Django account must not reach customer data even with a valid session.
     'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.IsAdminUser',
     ],
     'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
@@ -119,6 +121,16 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 50,
+    # Throttles are opted into per view (ScopedRateThrottle + throttle_scope),
+    # only on the public endpoints an anonymous visitor can hammer.
+    'DEFAULT_THROTTLE_RATES': {
+        'login': '5/min',
+        'contact_form': '5/hour',
+    },
+    # Gunicorn sits behind exactly one nginx, over a unix socket (so REMOTE_ADDR
+    # is empty). With NUM_PROXIES set, DRF takes the client IP nginx appended to
+    # X-Forwarded-For instead of trusting the whole, client-controlled header.
+    'NUM_PROXIES': 1,
 }
 
 GROQ_API_KEY = env('GROQ_API_KEY', default='')
@@ -166,6 +178,12 @@ CSRF_COOKIE_SECURE = not DEBUG
 # `Origin: https://...` against its own `http://...` and reject every unsafe
 # method as a CSRF failure. Nginx already sets the header (deploy/nginx.conf.example).
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Off by default so an HTTP-only deploy doesn't lock itself out. Turn on only
+# once the site is reachable exclusively over HTTPS - browsers remember HSTS
+# for SECURE_HSTS_SECONDS and refuse plain HTTP for that long.
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
 
 # Unhandled view exceptions (500s) get logged with a traceback to stderr,
 # which systemd captures into `journalctl --user -u gearwheel.service` -

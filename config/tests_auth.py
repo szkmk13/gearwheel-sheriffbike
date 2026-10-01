@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.core.cache import cache
 from django.test import Client, TestCase
 
 
@@ -6,6 +7,7 @@ class SessionAuthTests(TestCase):
     """End-to-end cover for the session/CSRF login flow the SPA depends on."""
 
     def setUp(self):
+        cache.clear()  # login throttle counters live in the cache
         User.objects.create_user('bob', password='pass12345', is_staff=True)
         self.client = Client(enforce_csrf_checks=True)
 
@@ -56,3 +58,22 @@ class SessionAuthTests(TestCase):
                          content_type='application/json', HTTP_X_CSRFTOKEN=token)
         r = self.client.post('/api/customers/', {'first_name': 'A'}, content_type='application/json')
         self.assertEqual(r.status_code, 403)
+
+    def _login(self, username, password):
+        return self.client.post('/api/auth/login/', {'username': username, 'password': password},
+                                content_type='application/json', HTTP_X_CSRFTOKEN=self._csrf())
+
+    def test_non_staff_login_is_401(self):
+        User.objects.create_user('klient', password='pass12345')
+        self.assertEqual(self._login('klient', 'pass12345').status_code, 401)
+        self.assertNotIn('sessionid', self.client.cookies)
+
+    def test_non_staff_session_is_403(self):
+        user = User.objects.create_user('klient')
+        self.client.force_login(user)
+        self.assertEqual(self.client.get('/api/customers/').status_code, 403)
+
+    def test_login_is_throttled(self):
+        for _ in range(5):
+            self.assertEqual(self._login('bob', 'zle').status_code, 401)
+        self.assertEqual(self._login('bob', 'pass12345').status_code, 429)
