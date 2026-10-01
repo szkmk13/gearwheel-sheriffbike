@@ -24,20 +24,30 @@ const playBeep = () => {
   }
 };
 
-export default function QRScannerModal({ isOpen, onClose }) {
+export default function QRScannerModal({ 
+  isOpen, 
+  onClose, 
+  initialAction = 'details', 
+  onBikeScanned = null 
+}) {
   const navigate = useNavigate();
 
+  const [scanAction, setScanAction] = useState(initialAction); // 'details' | 'new_order'
   const [hasCamera, setHasCamera] = useState(true);
   const [cameraError, setCameraError] = useState(null);
   const [facingMode, setFacingMode] = useState('environment'); // 'environment' (tył) lub 'user' (przód)
-  const [manualCode, setManualCode] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [activeTab, setActiveTab] = useState('camera'); // 'camera' | 'upload' | 'manual'
 
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
-  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setScanAction(initialAction);
+      setIsProcessing(false);
+    }
+  }, [isOpen, initialAction]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -49,21 +59,109 @@ export default function QRScannerModal({ isOpen, onClose }) {
     }
   }, []);
 
+  const handleSuccessWithBike = useCallback((bike) => {
+    toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
+    stopCamera();
+    onClose();
+
+    if (scanAction === 'new_order') {
+      if (onBikeScanned) {
+        onBikeScanned(bike);
+      } else {
+        const customerId = bike.customer?.id || (typeof bike.customer === 'number' ? bike.customer : '');
+        navigate(`/panel/orders?newOrder=true&bikeId=${bike.id}${customerId ? `&customerId=${customerId}` : ''}`);
+      }
+    } else {
+      navigate(`/panel/bikes/${bike.id}`);
+    }
+  }, [scanAction, onBikeScanned, stopCamera, onClose, navigate]);
+
   const handleCodeFound = useCallback(async (scannedText) => {
     if (!scannedText || isProcessing) return;
     setIsProcessing(true);
     playBeep();
 
-    const code = scannedText.trim();
+    let code = scannedText.trim();
 
     try {
-      const bike = await lookupBike(code);
-      toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
-      setIsProcessing(false);
-      setManualCode('');
-      stopCamera();
-      onClose();
-      navigate(`/panel/bikes/${bike.id}`);
+      // 1. Sprawdź czy to bezpośredni link do roweru w aplikacji
+      if (code.includes('/panel/bikes/')) {
+        const match = code.match(/\/panel\/bikes\/(\d+)/);
+        if (match) {
+          const bikeId = match[1];
+          if (scanAction === 'new_order') {
+            try {
+              const bike = await fetchBikeDetails(bikeId);
+              handleSuccessWithBike(bike);
+              return;
+            } catch (e) {
+              stopCamera();
+              onClose();
+              navigate(`/panel/orders?newOrder=true&bikeId=${bikeId}`);
+              return;
+            }
+          } else {
+            toast.success(`Zeskanowano link do roweru #${bikeId}`);
+            stopCamera();
+            onClose();
+            navigate(`/panel/bikes/${bikeId}`);
+            return;
+          }
+        }
+      }
+
+      // 2. Sprawdź czy to link do zlecenia
+      if (code.includes('/panel/orders/')) {
+        const match = code.match(/\/panel\/orders\/(\d+)/);
+        if (match) {
+          toast.success(`Zeskanowano link do zlecenia #${match[1]}`);
+          stopCamera();
+          onClose();
+          navigate(`/panel/orders/${match[1]}`);
+          return;
+        }
+      }
+
+      // 3. Wyciągnij parametr code z URL (jeśli podano pełny adres)
+      if (code.includes('code=')) {
+        const match = code.match(/code=([^&]+)/);
+        if (match) {
+          code = decodeURIComponent(match[1]);
+        }
+      }
+
+      // 4. Spróbuj wyszukać przez API lookup (sheriff-code)
+      try {
+        const bike = await lookupBike(code);
+        if (bike && bike.id) {
+          handleSuccessWithBike(bike);
+          return;
+        }
+      } catch (apiErr) {
+        // Fallback: jeśli kod to np. sheriff-<id>-<uuid>, spróbuj po samym ID
+        if (code.startsWith('sheriff-')) {
+          const parts = code.split('-');
+          if (parts[1] && !isNaN(parts[1])) {
+            try {
+              const bike = await fetchBikeDetails(parts[1]);
+              if (bike && bike.id) {
+                handleSuccessWithBike(bike);
+                return;
+              }
+            } catch (e) {}
+          }
+        } else if (!isNaN(code)) {
+          // Jeśli podano sam numer ID
+          try {
+            const bike = await fetchBikeDetails(code);
+            if (bike && bike.id) {
+              handleSuccessWithBike(bike);
+              return;
+            }
+          } catch (e) {}
+        }
+        throw apiErr;
+      }
     } catch (err) {
       toast.error(`Nie znaleziono roweru dla kodu: "${code}"`);
       // Krótkie opóźnienie przed ponownym skanowaniem
@@ -71,14 +169,14 @@ export default function QRScannerModal({ isOpen, onClose }) {
         setIsProcessing(false);
       }, 1500);
     }
-  }, [isProcessing, navigate, onClose, stopCamera]);
+  }, [isProcessing, scanAction, handleSuccessWithBike, stopCamera, onClose, navigate]);
 
   // Uruchomienie strumienia z kamery
   useEffect(() => {
     let animationFrameId = null;
     let isMounted = true;
 
-    if (!isOpen || activeTab !== 'camera') {
+    if (!isOpen) {
       stopCamera();
       return;
     }
@@ -90,7 +188,6 @@ export default function QRScannerModal({ isOpen, onClose }) {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setHasCamera(false);
         setCameraError('Twoja przeglądarka nie obsługuje bezpośredniego dostępu do aparatu.');
-        setActiveTab('manual');
         return;
       }
 
@@ -120,8 +217,8 @@ export default function QRScannerModal({ isOpen, onClose }) {
         if (!isMounted) return;
         setCameraError(
           err.name === 'NotAllowedError'
-            ? 'Dostęp do aparatu został zablokowany w ustawieniach przeglądarki.'
-            : 'Nie udało się uruchomić aparatu. Użyj wgrywania pliku lub wpisz kod ręcznie.'
+            ? 'Dostęp do aparatu został zablokowany w ustawieniach przeglądarki. Zezwól na dostęp do kamery, aby skanować kody QR.'
+            : 'Nie udało się uruchomić aparatu. Sprawdź uprawnienia lub czy kamera nie jest zajęta.'
         );
       }
     };
@@ -162,42 +259,7 @@ export default function QRScannerModal({ isOpen, onClose }) {
       }
       stopCamera();
     };
-  }, [isOpen, activeTab, facingMode, stopCamera, handleCodeFound]);
-
-  // Obsługa odczytu kodu QR z pliku graficznego
-  const handleImageUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width;
-        canvas.height = img.height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0);
-        const imageData = ctx.getImageData(0, 0, img.width, img.height);
-        const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
-
-        if (qrCode && qrCode.data) {
-          handleCodeFound(qrCode.data);
-        } else {
-          toast.error('Nie znaleziono kodu QR na wybranym zdjęciu.');
-        }
-      };
-      img.src = event.target.result;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  // Obsługa ręcznego wpisania kodu
-  const handleManualSubmit = (e) => {
-    e.preventDefault();
-    if (!manualCode.trim()) return;
-    handleCodeFound(manualCode.trim());
-  };
+  }, [isOpen, facingMode, stopCamera, handleCodeFound]);
 
   if (!isOpen) return null;
 
@@ -228,7 +290,9 @@ export default function QRScannerModal({ isOpen, onClose }) {
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-bold text-gray-900">Skaner SheriffBike QR</h2>
-              <p className="text-xs text-gray-500">Skieruj aparat na etykietę roweru</p>
+              <p className="text-xs text-gray-500">
+                {scanAction === 'new_order' ? 'Zeskanuj rower, by natychmiast utworzyć zlecenie' : 'Skieruj aparat na etykietę roweru'}
+              </p>
             </div>
           </div>
 
@@ -246,165 +310,100 @@ export default function QRScannerModal({ isOpen, onClose }) {
           </button>
         </div>
 
-        {/* Zakładki: Kamera / Plik / Ręcznie */}
-        <div className="flex border-b border-gray-100 bg-gray-50/50 text-xs font-semibold text-gray-600">
-          <button
-            type="button"
-            onClick={() => setActiveTab('camera')}
-            className={`flex-1 py-2.5 text-center transition-colors border-b-2 cursor-pointer ${
-              activeTab === 'camera'
-                ? 'border-[var(--color-accent)] text-[var(--color-accent)] bg-white font-bold'
-                : 'border-transparent hover:text-gray-900'
-            }`}
-          >
-            Aparat na żywo
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('upload')}
-            className={`flex-1 py-2.5 text-center transition-colors border-b-2 cursor-pointer ${
-              activeTab === 'upload'
-                ? 'border-[var(--color-accent)] text-[var(--color-accent)] bg-white font-bold'
-                : 'border-transparent hover:text-gray-900'
-            }`}
-          >
-            Wgraj zdjęcie
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('manual')}
-            className={`flex-1 py-2.5 text-center transition-colors border-b-2 cursor-pointer ${
-              activeTab === 'manual'
-                ? 'border-[var(--color-accent)] text-[var(--color-accent)] bg-white font-bold'
-                : 'border-transparent hover:text-gray-900'
-            }`}
-          >
-            Wpisz kod
-          </button>
+        {/* Przełącznik akcji po zeskanowaniu */}
+        <div className="px-4 sm:px-5 py-2.5 bg-gray-100/70 border-b border-gray-200/70 flex items-center justify-between gap-2">
+          <span className="text-xs font-medium text-gray-600 shrink-0">Cel skanowania:</span>
+          <div className="inline-flex p-0.5 bg-gray-200/80 rounded-lg text-xs font-semibold">
+            <button
+              type="button"
+              onClick={() => setScanAction('details')}
+              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                scanAction === 'details'
+                  ? 'bg-white text-gray-900 shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              <span>Karta roweru</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setScanAction('new_order')}
+              className={`px-2.5 sm:px-3 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                scanAction === 'new_order'
+                  ? 'bg-[var(--color-accent)] text-white shadow-xs'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Nowe zlecenie</span>
+            </button>
+          </div>
         </div>
 
-        {/* Zawartość zakładek */}
-        <div className="p-4 sm:p-5">
-          {activeTab === 'camera' && (
-            <div className="space-y-3">
-              <div className="relative aspect-square max-h-[340px] w-full bg-black rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
-                {cameraError ? (
-                  <div className="p-6 text-center text-white space-y-3">
-                    <svg className="w-12 h-12 text-red-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                    </svg>
-                    <p className="text-sm font-medium">{cameraError}</p>
-                    <button
-                      onClick={() => setActiveTab('manual')}
-                      className="px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-                    >
-                      Wpisz kod ręcznie →
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                    <video
-                      ref={videoRef}
-                      className="w-full h-full object-cover"
-                      muted
-                      autoPlay
-                      playsInline
-                    />
-
-                    {/* Celownik wizjera QR */}
-                    <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                      <div className="w-56 h-56 relative border-2 border-white/40 rounded-2xl">
-                        {/* 4 narożniki akcentujące */}
-                        <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-[var(--color-accent)] rounded-tl-lg" />
-                        <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-[var(--color-accent)] rounded-tr-lg" />
-                        <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-[var(--color-accent)] rounded-bl-lg" />
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-[var(--color-accent)] rounded-br-lg" />
-
-                        {/* Animowany promień lasera */}
-                        <div className="absolute inset-x-2 h-0.5 bg-[var(--color-accent)] shadow-[0_0_8px_var(--color-accent)] animate-bounce top-1/2 -translate-y-1/2" />
-                      </div>
-                    </div>
-
-                    {isProcessing && (
-                      <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center text-white text-sm font-semibold">
-                        Rozpoznawanie kodu...
-                      </div>
-                    )}
-                  </>
-                )}
+        {/* Widok aparatu na żywo */}
+        <div className="p-4 sm:p-5 space-y-3">
+          <div className="relative aspect-square max-h-[340px] w-full bg-black rounded-xl overflow-hidden shadow-inner flex items-center justify-center">
+            {cameraError ? (
+              <div className="p-6 text-center text-white space-y-3">
+                <svg className="w-12 h-12 text-red-400 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <p className="text-sm font-medium">{cameraError}</p>
               </div>
-
-              {/* Opcje kamery (np. zmiana aparat przód/tył) */}
-              {!cameraError && (
-                <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
-                  <span>Trzymaj kod QR wewnątrz zaznaczonego obszaru</span>
-                  <button
-                    type="button"
-                    onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))}
-                    className="flex items-center gap-1 text-[var(--color-accent)] font-semibold hover:underline cursor-pointer"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Zmień aparat
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'upload' && (
-            <div className="py-6 px-4 text-center space-y-4">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="hidden"
-              />
-
-              <div 
-                onClick={() => fileInputRef.current?.click()}
-                className="border-2 border-dashed border-gray-300 hover:border-[var(--color-accent)] rounded-xl p-8 cursor-pointer transition-colors group flex flex-col items-center justify-center"
-              >
-                <div className="w-12 h-12 rounded-full bg-gray-100 group-hover:bg-orange-50 text-gray-500 group-hover:text-[var(--color-accent)] flex items-center justify-center transition-colors mb-3">
-                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <p className="text-sm font-semibold text-gray-800">Kliknij, aby wybrać zdjęcie z kodem QR</p>
-                <p className="text-xs text-gray-400 mt-1">Obsługuje pliki PNG, JPG, WEBP</p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'manual' && (
-            <form onSubmit={handleManualSubmit} className="space-y-4 py-2">
-              <div>
-                <label className="block text-xs font-semibold text-gray-700 uppercase mb-1.5">
-                  Identyfikator roweru lub kod SheriffBike
-                </label>
-                <input
-                  type="text"
-                  value={manualCode}
-                  onChange={(e) => setManualCode(e.target.value)}
-                  placeholder="np. sheriff-1-9c1e2f... lub numer ID (np. 1)"
-                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] font-mono"
-                  autoFocus
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  muted
+                  autoPlay
+                  playsInline
                 />
-                <p className="text-xs text-gray-500 mt-1.5">
-                  Możesz wpisać pełny kod QR, identyfikator lub wkleić link do roweru/zlecenia.
-                </p>
-              </div>
 
+                {/* Celownik wizjera QR */}
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div className="w-56 h-56 relative border-2 border-white/40 rounded-2xl">
+                    {/* 4 narożniki akcentujące */}
+                    <div className="absolute -top-1 -left-1 w-6 h-6 border-t-4 border-l-4 border-[var(--color-accent)] rounded-tl-lg" />
+                    <div className="absolute -top-1 -right-1 w-6 h-6 border-t-4 border-r-4 border-[var(--color-accent)] rounded-tr-lg" />
+                    <div className="absolute -bottom-1 -left-1 w-6 h-6 border-b-4 border-l-4 border-[var(--color-accent)] rounded-bl-lg" />
+                    <div className="absolute -bottom-1 -right-1 w-6 h-6 border-b-4 border-r-4 border-[var(--color-accent)] rounded-br-lg" />
+
+                    {/* Animowany promień lasera */}
+                    <div className="absolute inset-x-2 h-0.5 bg-[var(--color-accent)] shadow-[0_0_8px_var(--color-accent)] animate-bounce top-1/2 -translate-y-1/2" />
+                  </div>
+                </div>
+
+                {isProcessing && (
+                  <div className="absolute inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center text-white text-sm font-semibold">
+                    Rozpoznawanie kodu...
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Opcje kamery (np. zmiana aparat przód/tył) */}
+          {!cameraError && (
+            <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
+              <span>Trzymaj kod QR wewnątrz zaznaczonego obszaru</span>
               <button
-                type="submit"
-                disabled={isProcessing || !manualCode.trim()}
-                className="w-full py-2.5 px-4 bg-[var(--color-accent)] hover:opacity-90 disabled:opacity-50 text-white font-semibold rounded-lg text-sm transition-all cursor-pointer shadow-sm flex items-center justify-center gap-2"
+                type="button"
+                onClick={() => setFacingMode((prev) => (prev === 'environment' ? 'user' : 'environment'))}
+                className="flex items-center gap-1 text-[var(--color-accent)] font-semibold hover:underline cursor-pointer"
               >
-                {isProcessing ? 'Szukanie...' : 'Wyszukaj rower →'}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Zmień aparat
               </button>
-            </form>
+            </div>
           )}
         </div>
 
@@ -415,7 +414,7 @@ export default function QRScannerModal({ isOpen, onClose }) {
             onClick={() => {
               stopCamera();
               onClose();
-              navigate('/panel/scan');
+              navigate(`/panel/scan?action=${scanAction}`);
             }}
             className="text-[var(--color-accent)] hover:underline font-medium cursor-pointer"
           >
