@@ -154,7 +154,9 @@ class RepairOrderViewSet(ModelViewSet):
     ).order_by('status_order', '-created_at')
     filterset_class = RepairOrderFilter
     search_fields = ['description', 'customer__first_name', 'customer__last_name', 'bikes__brand', 'bikes__model']
-    ordering_fields = ['created_at', 'updated_at', 'priority', 'estimated_cost', 'final_cost', 'cost']
+    ordering_fields = ['created_at', 'updated_at', 'priority', 'estimated_cost', 'final_cost', 'cost',
+        'estimated_pickup_date',
+    ]
 
     def get_serializer_class(self):
         if self.action == 'list':

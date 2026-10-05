@@ -38,6 +38,9 @@ class RepairOrder(models.Model):
     estimated_cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     final_cost = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     accepted_at = models.DateTimeField(null=True, blank=True)
+    # When the customer is told they can collect the equipment. Required when the order is
+    # created through the API; nullable only because orders from before it existed have none.
+    estimated_pickup_date = models.DateField(null=True, blank=True)
     delivered_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

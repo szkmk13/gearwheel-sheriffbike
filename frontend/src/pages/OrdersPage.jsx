@@ -11,9 +11,11 @@ import StatusBadge from "../components/StatusBadge";
 import StickyHeader from "../components/StickyHeader";
 import Modal from "../components/Modal";
 import Input from "../components/Input";
+import DateInput from "../components/DateInput";
 import Select from "../components/Select";
 import QRScannerModal from "../components/QRScannerModal";
 import { TableRowsSkeleton, MobileOrderCardsSkeleton } from "../components/Skeleton";
+import { todayISODate, defaultPickupDate, isOrderOverdue, formatDate } from "../utils/dates";
 
 export default function OrdersPage() {
   const navigate = useNavigate();
@@ -51,7 +53,7 @@ export default function OrdersPage() {
     return () => document.removeEventListener('mousedown', close);
   }, [openStatusMenu, openPriorityMenu]);
 
-  const todayDate = new Date().toISOString().split('T')[0];
+  const todayDate = todayISODate();
 
   // Obsługa otwierania formularza zlecenia z parametrów URL (np. po skanowaniu QR)
   useEffect(() => {
@@ -193,6 +195,7 @@ export default function OrdersPage() {
         description: formData.get('description'),
         priority: formData.get('priority') || 'normal',
         estimated_cost: formData.get('estimated_cost') || null,
+        estimated_pickup_date: formData.get('estimated_pickup_date'),
       };
 
       return await createOrder(newOrder);
@@ -368,7 +371,7 @@ export default function OrdersPage() {
       {/* Widok tabeli dla ekranów desktop / tablet */}
       <div className="hidden md:block bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto min-w-full">
-          <table className="w-full text-left border-collapse min-w-[760px]">
+          <table className="w-full text-left border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[var(--color-paper-2)] border-b border-solid border-[var(--color-line)] text-sm text-[var(--color-ink-2)]">
                 <th className="py-4 px-6 font-medium">Nr zlecenia</th>
@@ -386,6 +389,19 @@ export default function OrdersPage() {
                     <span>Data przyjęcia</span>
                     <span className="text-xs text-[var(--color-ink-3)]">
                       {ordering === 'created_at' ? '▲' : ordering === '-created_at' ? '▼' : '↕'}
+                    </span>
+                  </div>
+                </th>
+
+                {/* Sortowalna kolumna: Planowany odbiór */}
+                <th 
+                  onClick={() => handleSortClick('estimated_pickup_date')}
+                  className="py-4 px-6 font-medium cursor-pointer hover:text-[var(--color-ink)] transition-colors select-none"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Odbiór</span>
+                    <span className="text-xs text-[var(--color-ink-3)]">
+                      {ordering === 'estimated_pickup_date' ? '▲' : ordering === '-estimated_pickup_date' ? '▼' : '↕'}
                     </span>
                   </div>
                 </th>
@@ -409,7 +425,7 @@ export default function OrdersPage() {
 
             <tbody className="text-sm text-[var(--color-ink)]">
               {isOrdersLoading ? (
-                <TableRowsSkeleton rows={6} cols={8} />
+                <TableRowsSkeleton rows={6} cols={9} />
               ) : ordersList.length > 0 ? (
                 ordersList.map((order, index) => (
                   <tr 
@@ -422,14 +438,18 @@ export default function OrdersPage() {
                     <td className="py-4 px-6 font-medium">{order.customer_name}</td>
                     <td className="py-4 px-6 text-[var(--color-ink-2)]">{order.bike_label}</td>
                     <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
-                    <td className="py-4 px-6 text-[var(--color-ink-3)]">{new Date(order.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                    <td className="py-4 px-6 text-[var(--color-ink-3)]">{formatDate(order.created_at)}</td>
+                    <td className={`py-4 px-6 ${isOrderOverdue(order) ? 'font-semibold text-red-600' : 'text-[var(--color-ink-3)]'}`}>
+                      {formatDate(order.estimated_pickup_date)}
+                      {isOrderOverdue(order) && <span className="block text-[10px] uppercase tracking-wider">Po terminie</span>}
+                    </td>
                     <td className="py-4 px-6 capitalize text-[var(--color-ink-2)]">{order.priority || 'normal'}</td>
                     <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `${order.estimated_cost} zł` : '-')}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="8" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
+                  <td colSpan="9" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
                     Brak zleceń spełniających kryteria.
                   </td>
                 </tr>
@@ -473,7 +493,14 @@ export default function OrdersPage() {
               </div>
 
               <div className="pt-2 border-t border-[var(--color-line)] flex justify-between items-center text-xs text-[var(--color-ink-3)]">
-                <span>Przyjęto: {new Date(order.created_at).toLocaleDateString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+                <div className="flex flex-col gap-0.5">
+                  <span>Przyjęto: {formatDate(order.created_at)}</span>
+                  {order.estimated_pickup_date && (
+                    <span className={isOrderOverdue(order) ? 'font-semibold text-red-600' : ''}>
+                      Odbiór: {formatDate(order.estimated_pickup_date)}{isOrderOverdue(order) && ' - po terminie'}
+                    </span>
+                  )}
+                </div>
                 <span className="text-sm font-bold text-[var(--color-accent)]">
                   {order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `${order.estimated_cost} zł` : '-')}
                 </span>
@@ -621,8 +648,9 @@ export default function OrdersPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 border-t border-[var(--color-line)] pt-4">
-                <Input name="accepted_at" label="Data przyjęcia" type="date" defaultValue={todayDate} disabled={true} />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 border-t border-[var(--color-line)] pt-4">
+                <DateInput name="accepted_at" label="Data przyjęcia" defaultValue={todayDate} disabled={true} />
+                <DateInput name="estimated_pickup_date" label="Planowany odbiór" defaultValue={defaultPickupDate()} min={todayDate} required={true} />
                 <Input name="bike_tag_number" label="Nr zawieszki" type="number" min="1" step="1" inputMode="numeric" placeholder="np. 12" required={true} />
                 <Select
                     name="priority"

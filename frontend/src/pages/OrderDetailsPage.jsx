@@ -4,6 +4,7 @@ import toast from 'react-hot-toast';
 import { fetchOrderDetails, changeOrderStatus } from '../api/orders';
 import StatusBadge from '../components/StatusBadge';
 import { OrderDetailsSkeleton } from '../components/Skeleton';
+import { isOrderOverdue, formatDate, formatDateTime } from '../utils/dates';
 
 export default function OrderDetailsPage() {
     const { id } = useParams();
@@ -66,7 +67,7 @@ export default function OrderDetailsPage() {
                         <StatusBadge status={order.status} />
                     </div>
                     <p className="text-xs sm:text-sm text-[var(--color-ink-3)]">
-                        Przyjęto: <span className="font-medium text-[var(--color-ink-2)]">{new Date(order.created_at).toLocaleDateString()}</span>
+                        Przyjęto: <span className="font-medium text-[var(--color-ink-2)]">{formatDate(order.created_at)}</span>
                     </p>
                 </div>
 
@@ -160,9 +161,12 @@ export default function OrderDetailsPage() {
                                     <span className="text-[var(--color-ink-3)] text-xs font-medium">Model:</span>
                                     <span className="text-[var(--color-ink)] font-medium">{bikeModel || '-'}</span>
                                 </p>
-                                <div className="pt-1">
+                                <div className="pt-1 flex flex-wrap gap-2">
                                     <span className="inline-block px-2.5 py-0.5 bg-[var(--color-paper)] rounded text-xs font-semibold text-[var(--color-ink-2)] border border-[var(--color-line)]">
                                         Zawieszka: #{order.bike_tag_number || '-'}
+                                    </span>
+                                    <span className={`inline-block px-2.5 py-0.5 rounded text-xs font-semibold border ${isOrderOverdue(order) ? 'bg-red-50 text-red-700 border-red-200' : 'bg-[var(--color-paper)] text-[var(--color-ink-2)] border-[var(--color-line)]'}`}>
+                                        Planowany odbiór: {formatDate(order.estimated_pickup_date)}{isOrderOverdue(order) && ' - po terminie'}
                                     </span>
                                 </div>
                             </div>
@@ -208,13 +212,7 @@ export default function OrderDetailsPage() {
                                                 )}
                                             </div>
                                             <span className="text-xs text-[var(--color-ink-3)] font-medium">
-                                                {new Date(entry.changed_at).toLocaleString('pl-PL', {
-                                                    day: '2-digit',
-                                                    month: '2-digit',
-                                                    year: 'numeric',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                })}
+                                                {formatDateTime(entry.changed_at)}
                                             </span>
                                         </div>
                                         {entry.note && (

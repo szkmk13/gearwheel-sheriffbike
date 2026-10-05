@@ -12,6 +12,7 @@ import Select from "../components/Select";
 import StatusBadge from "../components/StatusBadge";
 import { getInitials } from "../components/ClientCard";
 import { BikeDetailsSkeleton } from "../components/Skeleton";
+import { formatDate } from "../utils/dates";
 
 const BIKE_TYPE_LABELS = {
   road: 'Szosowy (road)',
@@ -233,7 +234,7 @@ export default function BikeDetailsPage() {
             </div>
 
             <div className="mt-4 pt-3 border-t border-gray-100 text-xs text-gray-400">
-              Zarejestrowano w systemie: {new Date(bike.created_at).toLocaleDateString()}
+              Zarejestrowano w systemie: {formatDate(bike.created_at)}
             </div>
           </div>
 
@@ -272,7 +273,7 @@ export default function BikeDetailsPage() {
                         )}
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        Przyjęto: {new Date(order.created_at).toLocaleDateString()}
+                        Przyjęto: {formatDate(order.created_at)}
                       </p>
                     </div>
 

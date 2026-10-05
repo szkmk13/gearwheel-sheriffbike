@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
@@ -47,6 +48,7 @@ class RepairOrderListSerializer(LegacyBikeFieldsMixin, serializers.ModelSerializ
         fields = (
             'id', 'customer', 'customer_name', 'bike', 'bike_label', 'bike_tag_number',
             'bikes', 'status', 'priority', 'estimated_cost', 'final_cost', 'cost', 'created_at',
+            'estimated_pickup_date',
         )
 
     def get_customer_name(self, obj):
@@ -76,7 +78,7 @@ class RepairOrderDetailSerializer(LegacyBikeFieldsMixin, serializers.ModelSerial
         fields = (
             'id', 'customer', 'bike', 'bike_label', 'bike_tag_number', 'bikes',
             'status', 'priority', 'description', 'estimated_cost', 'final_cost',
-            'accepted_at', 'delivered_at', 'created_at', 'updated_at',
+            'accepted_at', 'estimated_pickup_date', 'delivered_at', 'created_at', 'updated_at',
             'items', 'status_history',
         )
         read_only_fields = ('created_at', 'updated_at')
@@ -118,7 +120,18 @@ class RepairOrderCreateSerializer(BikesWriteMixin, serializers.ModelSerializer):
 
     class Meta:
         model = RepairOrder
-        fields = ('customer', 'bike', 'bikes', 'bike_tag_number', 'description', 'estimated_cost')
+        fields = (
+            'customer', 'bike', 'bikes', 'bike_tag_number', 'description', 'estimated_cost',
+            'estimated_pickup_date',
+        )
+        # The model allows null only for orders created before the field existed.
+        extra_kwargs = {'estimated_pickup_date': {'required': True, 'allow_null': False}}
+
+    def validate_estimated_pickup_date(self, value):
+        # Only checked on create: an existing order may legitimately keep a date that has passed.
+        if value < timezone.localdate():
+            raise serializers.ValidationError('Planowana data odbioru nie moze byc w przeszlosci.')
+        return value
 
     def validate(self, attrs):
         if not attrs.get('bikes') and not attrs.get('bike'):
@@ -147,8 +160,8 @@ class RepairOrderWriteSerializer(BikesWriteMixin, serializers.ModelSerializer):
         model = RepairOrder
         fields = (
             'id', 'customer', 'bike', 'bikes', 'bike_tag_number', 'status', 'priority',
-            'description', 'estimated_cost', 'final_cost', 'accepted_at', 'delivered_at',
-            'created_at', 'updated_at',
+            'description', 'estimated_cost', 'final_cost', 'accepted_at', 'estimated_pickup_date',
+            'delivered_at', 'created_at', 'updated_at',
         )
         read_only_fields = ('created_at', 'updated_at')
 

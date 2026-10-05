@@ -10,6 +10,7 @@ import SlidePanel from "../components/SlidePanel";
 import Input from "../components/Input";
 import StickyHeader from "../components/StickyHeader";
 import { ClientCardSkeleton } from "../components/Skeleton";
+import { formatDate } from "../utils/dates";
 
 export default function ClientsPage() {
   const navigate = useNavigate();
@@ -219,7 +220,7 @@ export default function ClientsPage() {
                     <td className="py-4 px-6 text-[var(--color-ink-3)]">{client.email || '-'}</td>
                     <td className="py-4 px-6 font-medium">{client.bikes?.length || 0}</td>
                     <td className="py-4 px-6 font-medium">{client.repair_orders_count ?? 0}</td>
-                    <td className="py-4 px-6 text-[var(--color-ink-3)]">{new Date(client.created_at).toLocaleDateString()}</td>
+                    <td className="py-4 px-6 text-[var(--color-ink-3)]">{formatDate(client.created_at)}</td>
                   </tr>
                 ))
               ) : (

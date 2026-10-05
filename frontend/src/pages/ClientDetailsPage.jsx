@@ -11,6 +11,7 @@ import Select from "../components/Select";
 import { getInitials } from "../components/ClientCard";
 import StatusBadge from "../components/StatusBadge"; 
 import { ClientDetailsSkeleton } from "../components/Skeleton"; 
+import { formatDate } from "../utils/dates";
 
 const EditIcon = () => (
   <div className="text-gray-400 transition-colors">
@@ -209,7 +210,7 @@ export default function ClientDetailsPage() {
                                                 #{order.id} <span className="font-normal text-gray-600 ml-1">({order.bike_label})</span>
                                             </p>
                                             <p className="text-xs text-gray-500 mt-1">
-                                                {new Date(order.created_at).toLocaleDateString()}
+                                                {formatDate(order.created_at)}
                                             </p>
                                         </div>
                                         <div className="flex items-center justify-between sm:justify-end gap-2 pt-1 sm:pt-0 border-t sm:border-t-0 border-gray-200/60">

@@ -16,7 +16,7 @@ class StatusHistoryInline(admin.TabularInline):
 
 @admin.register(RepairOrder)
 class RepairOrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'customer', 'equipment', 'status', 'priority', 'created_at')
+    list_display = ('id', 'customer', 'equipment', 'status', 'priority', 'created_at', 'estimated_pickup_date')
     list_filter = ('status', 'priority')
     search_fields = ('customer__first_name', 'customer__last_name', 'description')
     filter_horizontal = ('bikes',)

@@ -259,6 +259,7 @@ class Command(BaseCommand):
             # zamknięte dzisiaj i psułoby tygodniowe statystyki na dashboardzie.
             updated_at=timeline[-1][1],
             accepted_at=accepted_at,
+            estimated_pickup_date=timezone.localdate(order_date) + timedelta(days=random.randint(2, 7)),
             delivered_at=delivered_at,
             estimated_cost=estimated_cost,
             final_cost=final_cost,

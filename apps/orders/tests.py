@@ -1,8 +1,11 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.db import connection, transaction
 from django.db.models import ProtectedError
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.customers.models import Bike, Customer
@@ -33,6 +36,7 @@ class OrderEquipmentTests(APITestCase):
         payload.setdefault('customer', self.customer.pk)
         payload.setdefault('bike_tag_number', 42)
         payload.setdefault('description', 'Serwis.')
+        payload.setdefault('estimated_pickup_date', str(timezone.localdate() + timedelta(days=3)))
         return self.client.post(reverse('order-list'), payload, format='json')
 
     def _order_with(self, *bikes, tag=42):
@@ -118,6 +122,58 @@ class OrderEquipmentTests(APITestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(list(order.bikes.all()), [self.bike])
+
+    def test_create_stores_estimated_pickup_date(self):
+        pickup = timezone.localdate() + timedelta(days=3)
+        response = self._create_order(bike=self.bike.pk, estimated_pickup_date=str(pickup))
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(RepairOrder.objects.get(pk=response.data['id']).estimated_pickup_date, pickup)
+
+    def test_create_requires_estimated_pickup_date(self):
+        response = self.client.post(reverse('order-list'), {
+            'customer': self.customer.pk, 'bike': self.bike.pk,
+            'bike_tag_number': 42, 'description': 'Serwis.',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('estimated_pickup_date', response.data)
+
+    def test_create_rejects_null_estimated_pickup_date(self):
+        response = self._create_order(bike=self.bike.pk, estimated_pickup_date=None)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('estimated_pickup_date', response.data)
+
+    def test_create_rejects_past_estimated_pickup_date(self):
+        yesterday = timezone.localdate() - timedelta(days=1)
+        response = self._create_order(bike=self.bike.pk, estimated_pickup_date=str(yesterday))
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('estimated_pickup_date', response.data)
+
+    def test_create_accepts_today_as_pickup_date(self):
+        response = self._create_order(bike=self.bike.pk, estimated_pickup_date=str(timezone.localdate()))
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_update_can_move_pickup_date_into_the_past(self):
+        """Correcting an existing order is not blocked by the create-time past-date rule."""
+        order = self._order_with(self.bike)
+        past = timezone.localdate() - timedelta(days=5)
+        response = self.client.patch(
+            reverse('order-detail', args=[order.pk]),
+            {'estimated_pickup_date': str(past)},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        order.refresh_from_db()
+        self.assertEqual(order.estimated_pickup_date, past)
+        self.assertEqual(response.data['estimated_pickup_date'], str(past))
+
+    def test_list_exposes_estimated_pickup_date(self):
+        order = self._order_with(self.bike)
+        order.estimated_pickup_date = timezone.localdate()
+        order.save()
+        response = self.client.get(reverse('order-list'))
+        self.assertEqual(response.status_code, 200)
+        results = response.data['results'] if isinstance(response.data, dict) else response.data
+        self.assertEqual(results[0]['estimated_pickup_date'], str(timezone.localdate()))
 
     def test_filter_by_equipment_matches_any_item(self):
         order = self._order_with(self.skis_left, self.skis_right)
