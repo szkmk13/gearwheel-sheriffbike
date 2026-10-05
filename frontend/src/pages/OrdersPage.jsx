@@ -17,6 +17,16 @@ import QRScannerModal from "../components/QRScannerModal";
 import { TableRowsSkeleton, MobileOrderCardsSkeleton } from "../components/Skeleton";
 import { todayISODate, defaultPickupDate, isOrderOverdue, formatDate } from "../utils/dates";
 
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Niski' },
+  { value: 'normal', label: 'Normalny' },
+  { value: 'high', label: 'Wysoki' },
+  { value: 'urgent', label: 'Pilny' },
+];
+
+const priorityLabel = (priority) =>
+  PRIORITY_OPTIONS.find((p) => p.value === priority)?.label ?? priority;
+
 export default function OrdersPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -290,7 +300,7 @@ export default function OrdersPage() {
                   <div className="px-4 py-2 text-xs font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Filtruj status</div>
                   {[
                     { id: 'accepted', label: 'Przyjęte' },
-                    { id: 'diagnosing', label: 'Diagnoza' },
+                    { id: 'estimating', label: 'Wycena' },
                     { id: 'waiting_parts', label: 'Czeka na części' },
                     { id: 'in_progress', label: 'W trakcie' },
                     { id: 'done', label: 'Gotowe' },
@@ -333,17 +343,12 @@ export default function OrdersPage() {
               {openPriorityMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-lg py-2 z-50">
                   <div className="px-4 py-2 text-xs font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Filtruj priorytet</div>
-                  {[
-                    { id: 'low', label: 'Niski' },
-                    { id: 'normal', label: 'Normalny' },
-                    { id: 'high', label: 'Wysoki' },
-                    { id: 'urgent', label: 'Pilny' }
-                  ].map(pr => (
-                    <label key={pr.id} className="flex items-center px-4 py-2 text-sm hover:bg-[var(--color-paper)] cursor-pointer text-[var(--color-ink-2)]">
+                  {PRIORITY_OPTIONS.map(pr => (
+                    <label key={pr.value} className="flex items-center px-4 py-2 text-sm hover:bg-[var(--color-paper)] cursor-pointer text-[var(--color-ink-2)]">
                       <input 
                         type="checkbox" 
-                        checked={priorityFilters.includes(pr.id)}
-                        onChange={() => togglePriorityFilter(pr.id)}
+                        checked={priorityFilters.includes(pr.value)}
+                        onChange={() => togglePriorityFilter(pr.value)}
                         className="w-4 h-4 mr-2 text-[var(--color-accent)] rounded border-[var(--color-line)] focus:ring-[var(--color-accent)] cursor-pointer"
                       />
                       {pr.label}
@@ -443,7 +448,7 @@ export default function OrdersPage() {
                       {formatDate(order.estimated_pickup_date)}
                       {isOrderOverdue(order) && <span className="block text-[10px] uppercase tracking-wider">Po terminie</span>}
                     </td>
-                    <td className="py-4 px-6 capitalize text-[var(--color-ink-2)]">{order.priority || 'normal'}</td>
+                    <td className="py-4 px-6 text-[var(--color-ink-2)]">{priorityLabel(order.priority || 'normal')}</td>
                     <td className="py-4 px-6 font-medium">{order.final_cost ? `${order.final_cost} zł` : (order.estimated_cost ? `${order.estimated_cost} zł` : '-')}</td>
                   </tr>
                 ))
@@ -480,7 +485,7 @@ export default function OrdersPage() {
                 <div className="flex items-center gap-2">
                   {order.priority && order.priority !== 'normal' && (
                     <span className="px-1.5 py-0.5 text-[10px] uppercase font-bold tracking-wider rounded bg-orange-100 text-orange-800">
-                      {order.priority}
+                      {priorityLabel(order.priority)}
                     </span>
                   )}
                   <StatusBadge status={order.status} />
@@ -656,12 +661,7 @@ export default function OrdersPage() {
                     name="priority"
                     label="Priorytet"
                     defaultValue="normal"
-                    options={[
-                        { value: 'low', label: 'Niski' },
-                        { value: 'normal', label: 'Normalny' },
-                        { value: 'high', label: 'Wysoki' },
-                        { value: 'urgent', label: 'Pilny' }
-                    ]}
+                    options={PRIORITY_OPTIONS}
                 />
                 <Input name="estimated_cost" label="Szacowana wartość (zł)" type="number" placeholder="np. 150" />
             </div>
