@@ -1,6 +1,6 @@
 const statusMap = {
     accepted: { label: 'Przyjęte', className: 'bg-blue-100 text-blue-700' },
-    diagnosing: { label: 'Diagnoza', className: 'bg-yellow-100 text-yellow-800' },
+    estimating: { label: 'Wycena', className: 'bg-yellow-100 text-yellow-800' },
     waiting_parts: { label: 'Czeka na części', className: 'bg-purple-100 text-purple-700' },
     in_progress: { label: 'W trakcie', className: 'bg-blue-100 text-blue-700' },
     done: { label: 'Gotowe', className: 'bg-green-100 text-green-700' },

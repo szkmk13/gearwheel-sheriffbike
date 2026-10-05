@@ -28,14 +28,14 @@ from .serializers import (
 )
 
 
-STATUS_ORDER = ['done', 'in_progress', 'diagnosing', 'waiting_parts', 'accepted', 'delivered', 'cancelled']
+STATUS_ORDER = ['done', 'in_progress', 'estimating', 'waiting_parts', 'accepted', 'delivered', 'cancelled']
 
 
 @extend_schema_view(
     list=extend_schema(
         summary=_('List repair orders'),
         description=_(
-            'Returns repair orders sorted by status (order: done, in_progress, diagnosing, '
+            'Returns repair orders sorted by status (order: done, in_progress, estimating, '
             'waiting_parts, accepted, delivered, cancelled), and within each status - newest first. '
             'Supports filtering (`status`, `priority`, `customer`, `bike`, `category`, where `status` and '
             '`priority` also accept several comma-separated values), searching '

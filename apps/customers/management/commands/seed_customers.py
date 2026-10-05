@@ -58,11 +58,11 @@ ITEMS = [
 ACTIVE_BIKE_RATIO = 0.45
 
 # Kolejność, w jakiej zlecenie przechodzi przez statusy w normalnym obiegu.
-STATUS_FLOW = ['accepted', 'diagnosing', 'waiting_parts', 'in_progress', 'done', 'delivered']
+STATUS_FLOW = ['accepted', 'estimating', 'waiting_parts', 'in_progress', 'done', 'delivered']
 
 NOTES_BY_STATUS = {
     'accepted': 'Zlecenie przyjęte',
-    'diagnosing': 'Diagnoza usterki',
+    'estimating': 'Wycena naprawy',
     'waiting_parts': 'Oczekiwanie na części',
     'in_progress': 'Naprawa w toku',
     'done': 'Naprawa zakończona',

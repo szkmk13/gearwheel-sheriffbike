@@ -2,7 +2,9 @@ from datetime import timedelta
 
 from django.contrib.auth import get_user_model
 from django.db import connection, transaction
+from django.db.migrations.executor import MigrationExecutor
 from django.db.models import ProtectedError
+from django.test import TransactionTestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
@@ -128,6 +130,16 @@ class OrderEquipmentTests(APITestCase):
         response = self._create_order(bike=self.bike.pk, estimated_pickup_date=str(pickup))
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(RepairOrder.objects.get(pk=response.data['id']).estimated_pickup_date, pickup)
+
+    def test_create_stores_priority(self):
+        response = self._create_order(bike=self.bike.pk, priority='urgent')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(RepairOrder.objects.get(pk=response.data['id']).priority, 'urgent')
+
+    def test_create_defaults_priority_to_normal(self):
+        response = self._create_order(bike=self.bike.pk)
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(RepairOrder.objects.get(pk=response.data['id']).priority, 'normal')
 
     def test_create_requires_estimated_pickup_date(self):
         response = self.client.post(reverse('order-list'), {
@@ -299,3 +311,54 @@ class BikeCategoryTests(APITestCase):
         data = self.client.get(reverse('dashboard')).data
         self.assertEqual(data['bikes_count'], 1)
         self.assertEqual(data['winter_items_count'], 1)
+
+
+class RenameDiagnosingToEstimatingMigrationTests(TransactionTestCase):
+    """0011 moves existing orders and their status history from `diagnosing` to `estimating`."""
+
+    before = [('orders', '0010_repairorder_estimated_pickup_date')]
+    after = [('orders', '0011_rename_diagnosing_to_estimating')]
+
+    def _migrate(self, targets):
+        executor = MigrationExecutor(connection)
+        executor.loader.build_graph()
+        executor.migrate(targets)
+        return executor.loader.project_state(targets).apps
+
+    def tearDown(self):
+        # Leave the schema at the latest state for the tests that follow.
+        executor = MigrationExecutor(connection)
+        executor.migrate(executor.loader.graph.leaf_nodes())
+
+    def _seed(self, apps, status):
+        Customer = apps.get_model('customers', 'Customer')
+        RepairOrder = apps.get_model('orders', 'RepairOrder')
+        StatusHistory = apps.get_model('orders', 'StatusHistory')
+        customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
+        order = RepairOrder.objects.create(
+            customer=customer, bike_tag_number=1, description='Serwis.', status=status,
+        )
+        StatusHistory.objects.create(repair_order=order, old_status='accepted', new_status=status)
+        StatusHistory.objects.create(repair_order=order, old_status=status, new_status='in_progress')
+        return order.pk
+
+    def _statuses(self, apps, order_pk):
+        RepairOrder = apps.get_model('orders', 'RepairOrder')
+        StatusHistory = apps.get_model('orders', 'StatusHistory')
+        history = StatusHistory.objects.filter(repair_order_id=order_pk).order_by('pk')
+        return (
+            RepairOrder.objects.get(pk=order_pk).status,
+            [(h.old_status, h.new_status) for h in history],
+        )
+
+    def test_forward_renames_order_and_history(self):
+        order_pk = self._seed(self._migrate(self.before), 'diagnosing')
+        status, history = self._statuses(self._migrate(self.after), order_pk)
+        self.assertEqual(status, 'estimating')
+        self.assertEqual(history, [('accepted', 'estimating'), ('estimating', 'in_progress')])
+
+    def test_backward_restores_diagnosing(self):
+        order_pk = self._seed(self._migrate(self.after), 'estimating')
+        status, history = self._statuses(self._migrate(self.before), order_pk)
+        self.assertEqual(status, 'diagnosing')
+        self.assertEqual(history, [('accepted', 'diagnosing'), ('diagnosing', 'in_progress')])

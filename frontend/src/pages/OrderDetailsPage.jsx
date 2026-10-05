@@ -80,7 +80,7 @@ export default function OrderDetailsPage() {
                         disabled={statusMutation.isPending}
                     >
                         <option value="accepted">Przyjęte</option>
-                        <option value="diagnosing">Diagnoza</option>
+                        <option value="estimating">Wycena</option>
                         <option value="waiting_parts">Czeka na części</option>
                         <option value="in_progress">W trakcie</option>
                         <option value="done">Gotowe do odbioru</option>

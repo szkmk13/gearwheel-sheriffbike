@@ -12,7 +12,7 @@ User = get_user_model()
 class RepairOrder(models.Model):
     STATUS_CHOICES = [
         ('accepted', 'Accepted'),
-        ('diagnosing', 'Diagnosing'),
+        ('estimating', 'Estimating'),
         ('waiting_parts', 'Waiting for Parts'),
         ('in_progress', 'In Progress'),
         ('done', 'Done'),

@@ -121,7 +121,7 @@ class RepairOrderCreateSerializer(BikesWriteMixin, serializers.ModelSerializer):
     class Meta:
         model = RepairOrder
         fields = (
-            'customer', 'bike', 'bikes', 'bike_tag_number', 'description', 'estimated_cost',
+            'customer', 'bike', 'bikes', 'bike_tag_number', 'priority', 'description', 'estimated_cost',
             'estimated_pickup_date',
         )
         # The model allows null only for orders created before the field existed.
