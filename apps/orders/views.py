@@ -39,7 +39,8 @@ STATUS_ORDER = ['done', 'in_progress', 'estimating', 'waiting_parts', 'accepted'
             'waiting_parts, accepted, delivered, cancelled), and within each status - newest first. '
             'Supports filtering (`status`, `priority`, `customer`, `bike`, `category`, where `status` and '
             '`priority` also accept several comma-separated values), searching '
-            '(`search` over the description and customer data), and ordering (`ordering`). '
+            '(`search` over the description, customer and equipment data, plus the claim-tag '
+            'number), and ordering (`ordering`). '
             'Each order also exposes `cost` - its effective price, i.e. `final_cost` once it is '
             'known, otherwise `estimated_cost`.'
         ),
@@ -83,7 +84,9 @@ STATUS_ORDER = ['done', 'in_progress', 'estimating', 'waiting_parts', 'accepted'
             OpenApiParameter(
                 'search', str, OpenApiParameter.QUERY,
                 description=_(
-                    'Free-text search over `description` and the customer\'s first/last name.'
+                    'Free-text search over `description`, the customer\'s first/last name and the '
+                    'equipment brand/model. Also matches the claim-tag number '
+                    '(`bike_tag_number`) partially, e.g. `search=9` finds tags 9, 19 and 91.'
                 ),
             ),
             OpenApiParameter(
@@ -91,7 +94,7 @@ STATUS_ORDER = ['done', 'in_progress', 'estimating', 'waiting_parts', 'accepted'
                 enum=[
                     'created_at', '-created_at', 'updated_at', '-updated_at', 'priority', '-priority',
                     'estimated_cost', '-estimated_cost', 'final_cost', '-final_cost',
-                    'cost', '-cost',
+                    'cost', '-cost', 'estimated_pickup_date', '-estimated_pickup_date',
                 ],
                 description=_(
                     'Order results by the given field; prefix with `-` for descending order. '
@@ -111,9 +114,9 @@ STATUS_ORDER = ['done', 'in_progress', 'estimating', 'waiting_parts', 'accepted'
             'integer) attached to the equipment while it is in the shop; one tag covers the whole '
             'order, however many items it holds. It is not a unique identifier and may repeat '
             'across different orders. '
-            '`status` and '
-            '`priority` are not inputs here - new orders always start as `accepted` / `normal` '
-            'priority (change them afterwards via the status endpoint or a regular update). '
+            '`priority` is optional and defaults to `normal`. `status` is not an input here - '
+            'new orders always start as `accepted` (change it afterwards via the status endpoint). '
+            '`estimated_pickup_date` is required and cannot be in the past. '
             '`accepted_at`, `delivered_at`, and `final_cost` do not apply to creation and are also '
             'not accepted. The response returns the full order object (same shape as retrieve), '
             'including the auto-assigned defaults.'
@@ -153,7 +156,11 @@ class RepairOrderViewSet(ModelViewSet):
         cost=Coalesce(F('final_cost'), F('estimated_cost')),
     ).order_by('status_order', '-created_at')
     filterset_class = RepairOrderFilter
-    search_fields = ['description', 'customer__first_name', 'customer__last_name', 'bikes__brand', 'bikes__model']
+    # `bike_tag_number` is an integer, but icontains casts it to text - `9` matches tags 9, 19, 91...
+    search_fields = [
+        'description', 'customer__first_name', 'customer__last_name', 'bikes__brand', 'bikes__model',
+        'bike_tag_number',
+    ]
     ordering_fields = ['created_at', 'updated_at', 'priority', 'estimated_cost', 'final_cost', 'cost',
         'estimated_pickup_date',
     ]

@@ -224,6 +224,42 @@ class OrderEquipmentTests(APITestCase):
         results = self.client.get(reverse('order-list'), {'search': 'Serwis'}).data['results']
         self.assertEqual(len(results), 1)
 
+    def _search_ids(self, term):
+        response = self.client.get(reverse('order-list'), {'search': term})
+        self.assertEqual(response.status_code, 200, response.data)
+        return {row['id'] for row in response.data['results']}
+
+    def test_search_matches_tag_number_partially(self):
+        tag_9 = self._order_with(self.bike, tag=9)
+        tag_19 = self._order_with(self.skis_left, tag=19)
+        tag_91 = self._order_with(self.skis_right, tag=91)
+        self._order_with(self.bike, tag=42)
+        self.assertEqual(self._search_ids('9'), {tag_9.pk, tag_19.pk, tag_91.pk})
+        self.assertEqual(self._search_ids('91'), {tag_91.pk})
+
+    def test_search_by_tag_does_not_duplicate_multi_equipment_orders(self):
+        order = self._order_with(self.skis_left, self.skis_right, tag=7)
+        response = self.client.get(reverse('order-list'), {'search': '7'})
+        self.assertEqual([row['id'] for row in response.data['results']], [order.pk])
+
+    def test_text_search_still_works_alongside_tag_search(self):
+        order = self._order_with(self.bike, tag=42)
+        self.assertEqual(self._search_ids('Nowak'), {order.pk})
+        self.assertEqual(self._search_ids('Kowalski'), set())
+
+    def test_numeric_term_still_matches_text_fields(self):
+        """A number in the description is found too - the tag is an extra field, not a replacement."""
+        order = self._order_with(self.bike, tag=1)
+        order.description = 'Wymiana lancucha 11 rzedow.'
+        order.save()
+        self.assertEqual(self._search_ids('11'), {order.pk})
+
+    def test_tag_combines_with_other_terms(self):
+        """Every term must match somewhere, the tag counting as one of the fields."""
+        order = self._order_with(self.bike, tag=42)
+        self.assertEqual(self._search_ids('Nowak 42'), {order.pk})
+        self.assertEqual(self._search_ids('Kowalski 42'), set())
+
 
 class BikeDeletionGuardTests(APITestCase):
     """`bikes` is a plain M2M, so deletion protection has to be enforced by hand."""

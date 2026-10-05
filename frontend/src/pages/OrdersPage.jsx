@@ -274,7 +274,7 @@ export default function OrdersPage() {
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <div className="flex-1"> 
             <SearchInput 
-              placeholder="Szukaj po kliencie, numerze zlecenia..."
+              placeholder="Szukaj po kliencie, nr zawieszki, sprzęcie..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             /> 
@@ -379,7 +379,6 @@ export default function OrdersPage() {
           <table className="w-full text-left border-collapse min-w-[860px]">
             <thead>
               <tr className="bg-[var(--color-paper-2)] border-b border-solid border-[var(--color-line)] text-sm text-[var(--color-ink-2)]">
-                <th className="py-4 px-6 font-medium">Nr zlecenia</th>
                 <th className="py-4 px-6 font-medium">Zawieszka</th>
                 <th className="py-4 px-6 font-medium">Klient</th>
                 <th className="py-4 px-6 font-medium">Rower</th>
@@ -430,7 +429,7 @@ export default function OrdersPage() {
 
             <tbody className="text-sm text-[var(--color-ink)]">
               {isOrdersLoading ? (
-                <TableRowsSkeleton rows={6} cols={9} />
+                <TableRowsSkeleton rows={6} cols={8} />
               ) : ordersList.length > 0 ? (
                 ordersList.map((order, index) => (
                   <tr 
@@ -438,7 +437,6 @@ export default function OrdersPage() {
                     onClick={() => navigate(`/panel/orders/${order.id}`)}
                     className={`border-b border-[var(--color-line)] hover:bg-[var(--color-paper)] transition-colors cursor-pointer ${index === ordersList.length - 1 ? 'border-b-0' : '' }`}
                   >
-                    <td className="py-4 px-6 font-medium text-[var(--color-ink-2)]">#{order.id}</td>
                     <td className="py-4 px-6 font-bold text-[var(--color-ink)]">#{order.bike_tag_number}</td>
                     <td className="py-4 px-6 font-medium">{order.customer_name}</td>
                     <td className="py-4 px-6 text-[var(--color-ink-2)]">{order.bike_label}</td>
@@ -454,7 +452,7 @@ export default function OrdersPage() {
                 ))
               ) : (
                 <tr>
-                  <td colSpan="9" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
+                  <td colSpan="8" className="py-8 px-6 text-center text-[var(--color-ink-3)]">
                     Brak zleceń spełniających kryteria.
                   </td>
                 </tr>
@@ -477,10 +475,7 @@ export default function OrdersPage() {
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-[var(--color-ink)]">#{order.id}</span>
-                  <span className="px-2 py-0.5 bg-[var(--color-paper)] text-[var(--color-ink-2)] font-semibold rounded text-xs border border-[var(--color-line)]">
-                    Zawieszka: #{order.bike_tag_number || '-'}
-                  </span>
+                  <span className="text-sm font-bold text-[var(--color-ink)]">Zawieszka #{order.bike_tag_number || '-'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {order.priority && order.priority !== 'normal' && (
