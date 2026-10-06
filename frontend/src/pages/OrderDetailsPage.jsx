@@ -5,6 +5,7 @@ import { fetchOrderDetails, changeOrderStatus } from '../api/orders';
 import StatusBadge from '../components/StatusBadge';
 import { OrderDetailsSkeleton } from '../components/Skeleton';
 import { isOrderOverdue, formatDate, formatDateTime } from '../utils/dates';
+import PrintIntakeButton from '../print/PrintIntakeButton';
 
 export default function OrderDetailsPage() {
     const { id } = useParams();
@@ -72,6 +73,10 @@ export default function OrderDetailsPage() {
                 </div>
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 w-full md:w-auto">
+                    <PrintIntakeButton
+                        order={order}
+                        className="flex items-center justify-center gap-2 px-3 py-2 border border-[var(--color-line)] rounded-md text-sm font-medium text-[var(--color-ink)] bg-[var(--color-paper-2)] hover:bg-[var(--color-paper-3)] transition-colors cursor-pointer"
+                    />
                     <span className="text-sm text-[var(--color-ink-2)] font-medium">Zmień status:</span>
                     <select 
                         className="w-full sm:w-auto border border-[var(--color-line)] rounded-md px-3 py-2 text-sm bg-[var(--color-paper-2)] text-[var(--color-ink)] focus:ring-[var(--color-accent)] focus:border-[var(--color-accent)] cursor-pointer"
