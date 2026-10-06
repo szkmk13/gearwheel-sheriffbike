@@ -5,19 +5,14 @@ import toast from 'react-hot-toast';
 import { fetchClients, createClient } from "../api/clients";
 import Button from "../components/Button";
 import SearchInput from "../components/SearchInput";
-import ClientCard from "../components/ClientCard";
 import SlidePanel from "../components/SlidePanel";
 import Input from "../components/Input";
 import StickyHeader from "../components/StickyHeader";
-import { ClientCardSkeleton } from "../components/Skeleton";
 import { formatDate } from "../utils/dates";
 
 export default function ClientsPage() {
   const navigate = useNavigate();
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
-  
-  // Stan przełącznika widoku: 'grid' (kafelki) lub 'table' (tabela)
-  const [viewMode, setViewMode] = useState("grid");
   
   // Stany wyszukiwania i sortowania
   const [searchQuery, setSearchQuery] = useState("");
@@ -97,39 +92,6 @@ export default function ClientsPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-
-          {/* Przełącznik widoku: Tabela / Kafelki */}
-          <div className="flex items-center justify-end bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-1 shadow-sm shrink-0 self-end sm:self-auto">
-            <button
-              onClick={() => setViewMode("grid")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                viewMode === "grid" 
-                  ? "bg-[var(--color-paper)] text-[var(--color-ink)] shadow-xs" 
-                  : "text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
-              }`}
-              title="Widok kafelków"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-              </svg>
-              <span className="hidden sm:inline">Kafelki</span>
-            </button>
-
-            <button
-              onClick={() => setViewMode("table")}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-md text-sm font-medium transition-colors cursor-pointer ${
-                viewMode === "table" 
-                  ? "bg-[var(--color-paper)] text-[var(--color-ink)] shadow-xs" 
-                  : "text-[var(--color-ink-3)] hover:text-[var(--color-ink)]"
-              }`}
-              title="Widok tabeli"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-              <span className="hidden sm:inline">Tabela</span>
-            </button>
-          </div>
         </div>
       </StickyHeader>
 
@@ -140,27 +102,6 @@ export default function ClientsPage() {
         </div>
       )}
 
-      {viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
-          {isLoading ? (
-            Array.from({ length: 6 }).map((_, i) => (
-              <ClientCardSkeleton key={i} />
-            ))
-          ) : clientsList.length > 0 ? (
-            clientsList.map(client => (
-              <ClientCard 
-                key={client.id} 
-                client={client} 
-                onClick={() => navigate(`/panel/clients/${client.id}`)}
-              />
-            ))
-          ) : (
-            <div className="col-span-full py-12 text-center text-[var(--color-ink-3)] bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm">
-              Brak klientów spełniających kryteria wyszukiwania.
-            </div>
-          )}
-        </div>
-      ) : (
         <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl shadow-sm overflow-x-auto">
           <table className="w-full text-left border-collapse min-w-[640px]">
             <thead>
@@ -233,7 +174,6 @@ export default function ClientsPage() {
             </tbody>
           </table>
         </div>
-      )}
       
       {/* Formularz dodawania klienta */}
       <SlidePanel
