@@ -8,10 +8,17 @@ class RepairOrderItemInline(admin.TabularInline):
 
 
 class StatusHistoryInline(admin.TabularInline):
+    """History is written by the status-change endpoint; here only the note can be corrected."""
+
     model = StatusHistory
     extra = 0
-    readonly_fields = ('old_status', 'new_status', 'changed_by', 'note', 'changed_at')
+    fields = ('old_status', 'new_status', 'changed_by', 'changed_at', 'note')
+    readonly_fields = ('old_status', 'new_status', 'changed_by', 'changed_at')
     can_delete = False
+
+    def has_add_permission(self, request, obj=None):
+        # A row added by hand would have no status change behind it.
+        return False
 
 
 @admin.register(RepairOrder)

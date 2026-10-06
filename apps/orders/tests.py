@@ -12,7 +12,7 @@ from rest_framework.test import APITestCase
 
 from apps.customers.models import Bike, Customer
 
-from .models import RepairOrder
+from .models import RepairOrder, StatusHistory
 
 User = get_user_model()
 
@@ -398,3 +398,60 @@ class RenameDiagnosingToEstimatingMigrationTests(TransactionTestCase):
         status, history = self._statuses(self._migrate(self.before), order_pk)
         self.assertEqual(status, 'diagnosing')
         self.assertEqual(history, [('accepted', 'diagnosing'), ('diagnosing', 'in_progress')])
+
+
+class StatusHistoryAdminInlineTests(APITestCase):
+    """On the order's admin page only the note of a status-history entry is editable."""
+
+    def setUp(self):
+        self.admin = User.objects.create_superuser(username='admin')
+        self.client.force_login(self.admin)
+        customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
+        self.bike = Bike.objects.create(customer=customer, brand='Trek', model='Marlin 5', bike_type='mtb')
+        self.order = RepairOrder.objects.create(
+            customer=customer, bike_tag_number=5, description='Serwis.', status='estimating',
+        )
+        self.order.bikes.add(self.bike)
+        self.entry = StatusHistory.objects.create(
+            repair_order=self.order, old_status='accepted', new_status='estimating', note='Stara notatka',
+        )
+        self.url = reverse('admin:orders_repairorder_change', args=[self.order.pk])
+
+    def _post(self, **history):
+        data = {
+            'customer': self.order.customer_id,
+            'bikes': [self.bike.pk],
+            'bike_tag_number': 5,
+            'status': 'estimating',
+            'priority': 'normal',
+            'description': 'Serwis.',
+            'items-TOTAL_FORMS': 0, 'items-INITIAL_FORMS': 0,
+            'status_history-TOTAL_FORMS': 1, 'status_history-INITIAL_FORMS': 1,
+            'status_history-0-id': self.entry.pk,
+            'status_history-0-repair_order': self.order.pk,
+            'status_history-0-note': 'Poprawiona notatka',
+        }
+        data.update(history)
+        return self.client.post(self.url, data)
+
+    def test_change_page_offers_note_only(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'name="status_history-0-note"')
+        self.assertNotContains(response, 'name="status_history-0-new_status"')
+        self.assertNotContains(response, 'name="status_history-0-old_status"')
+
+    def test_note_is_saved(self):
+        response = self._post()
+        self.assertEqual(response.status_code, 302)
+        self.entry.refresh_from_db()
+        self.assertEqual(self.entry.note, 'Poprawiona notatka')
+
+    def test_status_fields_cannot_be_changed(self):
+        self._post(**{'status_history-0-new_status': 'done', 'status_history-0-old_status': 'done'})
+        self.entry.refresh_from_db()
+        self.assertEqual((self.entry.old_status, self.entry.new_status), ('accepted', 'estimating'))
+
+    def test_history_rows_cannot_be_added(self):
+        response = self.client.get(self.url)
+        self.assertNotContains(response, 'status_history-empty')

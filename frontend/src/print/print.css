@@ -69,6 +69,14 @@
   font-weight: 400;
 }
 
+.field.wide {
+  grid-column: span 2;
+}
+
+.field-value.bold {
+  font-weight: 700;
+}
+
 .field-value .line {
   display: block;
   white-space: nowrap;
@@ -183,6 +191,10 @@
   font-weight: 600;
   /* Linia do dopisania dlugopisem, gdy brak wartosci. */
   border-bottom: 0.5pt dotted #999;
+}
+
+.stub-value.strong {
+  font-weight: 700;
 }
 
 @media print {
