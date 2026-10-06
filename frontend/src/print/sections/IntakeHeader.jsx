@@ -16,8 +16,15 @@ export default function IntakeHeader({ data }) {
 
                 <Field label="Data odbioru" bold>{data.plannedPickupAt && formatDate(data.plannedPickupAt)}</Field>
                 <Field label="Model roweru i numer" wide>
+                    {/* Jedna zawieszka obejmuje cale zlecenie, wiec tylko przed pierwsza pozycja. */}
+                    {data.bikes.length === 0 && data.order.tagNumber && (
+                        <span className="line"><strong>#{data.order.tagNumber}</strong></span>
+                    )}
                     {data.bikes.map((bike, i) => (
                         <span key={i} className="line">
+                            {i === 0 && data.order.tagNumber && (
+                                <><strong>#{data.order.tagNumber}</strong> - </>
+                            )}
                             {bike.model}
                             {bike.serialNumber && (data.bikes.length > 1 ? `, nr ${bike.serialNumber}` : null)}
                         </span>
