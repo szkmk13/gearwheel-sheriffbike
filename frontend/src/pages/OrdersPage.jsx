@@ -210,11 +210,15 @@ export default function OrdersPage() {
 
       return await createOrder(newOrder);
     },
-    onSuccess: () => {
+    onSuccess: (createdOrder) => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['clients'] });
+      // POST zwraca pełne zlecenie (jak retrieve) - wkładamy je do cache, żeby strona
+      // szczegółów nie czekała na ponowne pobranie. Klucz jak w OrderDetailsPage (id z URL-a to string).
+      queryClient.setQueryData(['order', String(createdOrder.id)], createdOrder);
       handleCloseOrderModal();
       toast.success("Utworzono nowe zlecenie!");
+      navigate(`/panel/orders/${createdOrder.id}`);
     },
     onError: (error) => toast.error(`Wystąpił błąd podczas przetwarzania: ${error.message}`)
   });
