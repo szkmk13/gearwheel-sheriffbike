@@ -106,6 +106,14 @@ SPECTACULAR_SETTINGS = {
     'DESCRIPTION': 'System zarządzania warsztatem rowerowym',
     'VERSION': '1.0.0',
     'SERVE_INCLUDE_SCHEMA': False,
+    # Several models call their state field `status`, so without explicit names
+    # drf-spectacular emits hash-suffixed enums (StatusC7bEnum) that change shape
+    # whenever a choice list is edited - useless for a generated client.
+    'ENUM_NAME_OVERRIDES': {
+        'RepairOrderStatusEnum': 'apps.orders.models.RepairOrder.STATUS_CHOICES',
+        'StorageBookingStatusEnum': 'apps.storage.models.StorageBooking.STATUS_CHOICES',
+        'StorageEventTypeEnum': 'apps.storage.models.StorageEvent.EVENT_CHOICES',
+    },
 }
 
 REST_FRAMEWORK = {
@@ -137,6 +145,12 @@ REST_FRAMEWORK = {
     # X-Forwarded-For instead of trusting the whole, client-controlled header.
     'NUM_PROXIES': 1,
 }
+
+# Winter storage (apps.storage). Only the default price lives here - the shop has no
+# numbered parking spots and staff see the free space on site, so there is no capacity
+# limit to configure. The price is copied onto each booking when it's created, so
+# changing it later never rewrites what was already agreed with a customer.
+STORAGE_DEFAULT_PRICE = env('STORAGE_DEFAULT_PRICE', default='550.00')
 
 GROQ_API_KEY = env('GROQ_API_KEY', default='')
 OCR_BACKEND = env('OCR_BACKEND', default='groq')
