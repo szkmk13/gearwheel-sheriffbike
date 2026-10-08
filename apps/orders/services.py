@@ -33,7 +33,7 @@ def ready_for_pickup_sms_preview(order):
     """Number and suggested text of the ready-for-pickup SMS, or None if the order isn't ready."""
     if order.status != READY_FOR_PICKUP:
         return None
-    return {'to': order.customer.phone, 'message': build_ready_for_pickup_message(order)}
+    return {'to': str(order.customer.phone), 'message': build_ready_for_pickup_message(order)}
 
 
 class SmsNotAllowed(Exception):
@@ -49,7 +49,7 @@ def send_ready_for_pickup_sms(order, message):
     if order.status != READY_FOR_PICKUP:
         raise SmsNotAllowed('SMS o odbiorze mozna wyslac tylko dla zlecenia gotowego do odbioru.')
 
-    result = send_sms(order.customer.phone, message)
+    result = send_sms(str(order.customer.phone), message)
     if result['sent']:
         suffix = ' (symulacja)' if result['mocked'] else ''
         entry = order.status_history.filter(new_status=READY_FOR_PICKUP).order_by('-changed_at', '-pk').first()

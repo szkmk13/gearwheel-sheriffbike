@@ -8,6 +8,7 @@ Django==5.2.13
 django-cors-headers==4.9.0
 django-environ==0.13.0
 django-filter==25.2
+django-phonenumber-field==8.5.0
 djangorestframework==3.17.1
 drf-spectacular==0.29.0
 google-api-core==2.33.0
@@ -26,6 +27,7 @@ inflection==0.5.1
 jsonschema==4.26.0
 jsonschema-specifications==2025.9.1
 packaging==26.0
+phonenumberslite==9.0.40
 pdf2image==1.17.0
 pillow==12.2.0
 proto-plus==1.28.2

@@ -151,10 +151,14 @@ class Command(BaseCommand):
     def _create_customer(self, index):
         first_name = FIRST_NAMES[index % len(FIRST_NAMES)]
         last_name = LAST_NAMES[index % len(LAST_NAMES)]
+        phone = f'+485{random.randint(10000000, 99999999)}'
+        # numer jest unikalny, a seed bez --flush dopisuje do istniejących klientów
+        while Customer.objects.filter(phone=phone).exists():
+            phone = f'+485{random.randint(10000000, 99999999)}'
         customer = Customer.objects.create(
             first_name=first_name,
             last_name=last_name,
-            phone=f'5{random.randint(10000000, 99999999)}',
+            phone=phone,
             # indeks w adresie gwarantuje unikalność też przy --customers > len(FIRST_NAMES)
             email=f'{first_name.lower()}.{last_name.lower()}{index + 1}@example.com',
             rodo_accepted=random.random() < 0.9,

@@ -1,5 +1,7 @@
 from drf_spectacular.utils import extend_schema_field
+from phonenumber_field.serializerfields import PhoneNumberField
 from rest_framework import serializers
+from rest_framework.validators import UniqueValidator
 from .models import Customer, Bike
 
 
@@ -99,6 +101,10 @@ class CustomerListSerializer(serializers.ModelSerializer):
 
 
 class CustomerDetailSerializer(serializers.ModelSerializer):
+    phone = PhoneNumberField(validators=[UniqueValidator(
+        queryset=Customer.objects.all(),
+        message='Klient z tym numerem telefonu juz istnieje.',
+    )])
     bikes = BikeNestedSerializer(many=True, read_only=True)
     repair_orders = serializers.SerializerMethodField()
 

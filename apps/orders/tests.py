@@ -486,7 +486,7 @@ class ReadyForPickupSmsTests(APITestCase):
             response = self._change_status('done')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data['sms_preview'], {
-            'to': '600100200',
+            'to': '+48600100200',
             'message': 'Sheriff Bike: Dzień dobry! Państwa sprzęt (zawieszka #86) jest gotowy do odbioru. '
                        'Do zapłaty: 250 zł. Zapraszamy!',
         })
@@ -516,12 +516,12 @@ class ReadyForPickupSmsTests(APITestCase):
             response = self._send_sms('Rower gotowy, prosimy o odbiór do piątku.')
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(response.data, {
-            'sent': True, 'mocked': True, 'to': '600100200',
+            'sent': True, 'mocked': True, 'to': '+48600100200',
             'message': 'Rower gotowy, prosimy o odbiór do piątku.', 'error': None,
         })
         self.assertIn('prosimy o odbiór do piątku', logs.output[0])
         entry = self.order.status_history.get(new_status='done')
-        self.assertEqual(entry.note, 'Wymieniony łańcuch.\nSMS do 600100200 (symulacja)')
+        self.assertEqual(entry.note, 'Wymieniony łańcuch.\nSMS do +48600100200 (symulacja)')
 
     def test_send_rejected_when_order_not_ready(self):
         response = self._send_sms('Rower gotowy.')

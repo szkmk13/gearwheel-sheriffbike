@@ -184,7 +184,11 @@ export default function OrdersPage() {
           rodo_accepted: rodoAccepted
         };
         const createdClient = await createClient(newClientData);
-        finalCustomerId = createdClient.id; 
+        finalCustomerId = createdClient.id;
+        // Klient jest unikalny po numerze - backend oddaje istniejącego zamiast tworzyć duplikat.
+        if (createdClient.existing) {
+          toast(`Klient z numerem ${createdClient.phone} już istnieje - zlecenie przypisano do: ${createdClient.first_name} ${createdClient.last_name}`, { duration: 6000 });
+        }
       }
 
       if (isNewClient || isNewBike) {

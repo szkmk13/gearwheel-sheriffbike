@@ -30,10 +30,14 @@ export default function ClientsPage() {
 
   const mutation = useMutation({
     mutationFn: createClient,
-    onSuccess: () => {
+    onSuccess: (client) => {
       queryClient.invalidateQueries({ queryKey: ['clients'] });
       formRef.current?.reset();
       setIsAddFormOpen(false);
+      if (client.existing) {
+        toast(`Klient z numerem ${client.phone} już istnieje: ${client.first_name} ${client.last_name}`, { duration: 6000 });
+        return;
+      }
       toast.success("Dodano nowego klienta!");
     },
     onError: (error) => {

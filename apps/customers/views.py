@@ -3,6 +3,8 @@ import uuid
 from django.db.models import Prefetch
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework import status
+from rest_framework.fields import BooleanField
 from rest_framework.generics import CreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -15,6 +17,7 @@ from .serializers import (
     CustomerListSerializer, CustomerDetailSerializer, BikeSerializer,
     BikeReadSerializer, BikeDetailSerializer
 )
+from .services import find_existing_customer
 
 
 class CustomerViewSet(ModelViewSet):
@@ -33,6 +36,26 @@ class CustomerViewSet(ModelViewSet):
         if self.action == 'list':
             return CustomerListSerializer
         return CustomerDetailSerializer
+
+    @extend_schema(
+        summary=_('Create a customer, or return the one with this phone number'),
+        description=_(
+            'Customers are unique by phone number. If one already exists under the given '
+            'number (in any notation), it is returned unchanged with status 200 and '
+            '`existing: true` instead of creating a duplicate. A `rodo_accepted: true` in '
+            'the request is still recorded on it.'
+        ),
+        responses={201: CustomerDetailSerializer, 200: CustomerDetailSerializer},
+    )
+    def create(self, request, *args, **kwargs):
+        existing = find_existing_customer(
+            request.data.get('phone'),
+            rodo_accepted=str(request.data.get('rodo_accepted')).lower() in BooleanField.TRUE_VALUES,
+        )
+        if existing:
+            data = self.get_serializer(existing).data
+            return Response({**data, 'existing': True}, status=status.HTTP_200_OK)
+        return super().create(request, *args, **kwargs)
 
 
 @extend_schema(responses=BikeReadSerializer)

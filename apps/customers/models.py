@@ -2,12 +2,15 @@ import uuid
 
 from django.core.exceptions import ValidationError
 from django.db import models
+from phonenumber_field.modelfields import PhoneNumberField
 
 
 class Customer(models.Model):
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    phone = models.CharField(max_length=20)
+    # Klient jest unikalny po numerze; przechowywany w E.164 (`+48504991254`), wiec
+    # `504 991 254` i `+48 504-991-254` to ten sam klient.
+    phone = PhoneNumberField(unique=True)
     email = models.EmailField(blank=True)
     notes = models.TextField(blank=True)
     rodo_accepted = models.BooleanField(

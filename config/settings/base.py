@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'drf_spectacular',
     'django_vite',
+    'phonenumber_field',
     # local
     'apps.customers',
     'apps.orders',
@@ -76,6 +77,10 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'Europe/Warsaw'
+
+# Numery wpisane bez prefiksu kraju (np. `504 991 254`) traktujemy jako polskie.
+PHONENUMBER_DEFAULT_REGION = 'PL'
+
 USE_I18N = True
 USE_TZ = True
 
