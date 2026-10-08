@@ -54,3 +54,8 @@ export const updateBike = async ({ id, bikeData }) => {
 export const lookupBike = async (code) => {
   return get(`/api/customers/bikes/lookup/?code=${encodeURIComponent(code)}`);
 };
+
+// GET /api/customers/lookup/ - Wyszukiwanie klienta po numerze telefonu (dokładne dopasowanie, 404 gdy brak)
+export const lookupClientByPhone = async (phone) => {
+  return get(`/api/customers/lookup/?phone=${encodeURIComponent(phone)}`);
+};

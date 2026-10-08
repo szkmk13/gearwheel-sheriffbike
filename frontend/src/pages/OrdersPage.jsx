@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { fetchOrders, createOrder } from "../api/orders";
-import { fetchClients, fetchClientDetails, createClient, createBike, fetchBikeDetails } from "../api/clients";
+import { fetchClients, fetchClientDetails, createClient, createBike, fetchBikeDetails, lookupClientByPhone } from "../api/clients";
 
 import Button from "../components/Button";
 import SearchInput from "../components/SearchInput";
@@ -39,6 +39,8 @@ export default function OrdersPage() {
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedBikeId, setSelectedBikeId] = useState("");
   const [scannedBike, setScannedBike] = useState(null);
+  // Klient znaleziony po numerze telefonu w formularzu nowego klienta
+  const [foundClient, setFoundClient] = useState(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Stan wyszukiwania i filtrowania
@@ -114,6 +116,35 @@ export default function OrdersPage() {
     toast.success(`Wybrano rower: ${bike.brand} ${bike.model || ''}`);
   };
 
+  // Klient jest unikalny po numerze - jeśli już istnieje, przełączamy formularz na niego,
+  // żeby nie rejestrować drugi raz jego roweru.
+  const handleNewClientPhoneBlur = async (e) => {
+    const phone = e.target.value.trim();
+    if (!phone) return;
+
+    let client;
+    try {
+      client = await lookupClientByPhone(phone);
+    } catch (err) {
+      if (err.status !== 404) console.error("Błąd wyszukiwania klienta po numerze:", err);
+      return;
+    }
+
+    const hasBikes = client.bikes?.length > 0;
+    setFoundClient(client);
+    setSelectedClientId(String(client.id));
+    setSelectedBikeId("");
+    setIsNewClient(false);
+    setIsNewBike(!hasBikes);
+
+    const name = `${client.first_name} ${client.last_name}`;
+    const next = hasBikes ? 'wybierz rower z listy.' : 'nie ma jeszcze rowerów, zarejestruj nowy.';
+    toast(`Klient z numerem ${client.phone} już istnieje: ${name} - ${next}`, { duration: 6000 });
+    if (!client.rodo_accepted) {
+      toast.error(`${name} nie ma w bazie zgody RODO - poproś o jej podpisanie.`, { duration: 8000 });
+    }
+  };
+
   const handleCloseOrderModal = () => {
     formRef.current?.reset();
     setIsAddOrderFormOpen(false);
@@ -122,6 +153,7 @@ export default function OrdersPage() {
     setSelectedClientId("");
     setSelectedBikeId("");
     setScannedBike(null);
+    setFoundClient(null);
   };
 
   const { data: ordersData, isLoading: isOrdersLoading, isError, error } = useQuery({
@@ -139,10 +171,18 @@ export default function OrdersPage() {
     queryKey: ['clients'],
     queryFn: () => fetchClients(),
   });
-  const clientOptions = (clientsData?.results || []).map(client => ({
+  let clientOptions = (clientsData?.results || []).map(client => ({
     value: String(client.id),
     label: `${client.first_name} ${client.last_name}`
   }));
+
+  // Lista klientów jest stronicowana, więc znalezionego po numerze może na niej nie być.
+  if (foundClient && !clientOptions.some(c => c.value === String(foundClient.id))) {
+    clientOptions = [
+      { value: String(foundClient.id), label: `${foundClient.first_name} ${foundClient.last_name}` },
+      ...clientOptions
+    ];
+  }
 
   const { data: selectedClientDetails } = useQuery({
     queryKey: ['client', selectedClientId],
@@ -568,7 +608,7 @@ export default function OrdersPage() {
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       <Input name="fullName" label="Imię i nazwisko" placeholder="np. Jan Kowalski" required={true} />
-                      <Input name="phone" label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} />
+                      <Input name="phone" label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} onBlur={handleNewClientPhoneBlur} />
                       <div className="lg:col-span-2">
                           <Input name="email" label="Adres e-mail" type="email" placeholder="np. jan.kowalski@email.com" />
                       </div>

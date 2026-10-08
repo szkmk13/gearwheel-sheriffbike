@@ -89,6 +89,32 @@ class CustomerPhoneUniquenessTests(APITestCase):
         self.assertIn('phone', response.data)
 
 
+class CustomerLookupTests(APITestCase):
+    """GET /api/customers/lookup/?phone= - the new-order form checks the number on blur."""
+
+    def setUp(self):
+        self.client.force_login(get_user_model().objects.create_user(username='mechanik', is_staff=True))
+        self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='+48500100200')
+        self.bike = Bike.objects.create(customer=self.customer, brand='Trek')
+
+    def _lookup(self, phone):
+        return self.client.get(reverse('customer-lookup'), {'phone': phone})
+
+    def test_finds_customer_with_bikes_in_any_notation(self):
+        for phone in ('500100200', ' 500 100 200 ', '+48 500-100-200'):
+            with self.subTest(phone=phone):
+                response = self._lookup(phone)
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.data['id'], self.customer.pk)
+                self.assertEqual([bike['id'] for bike in response.data['bikes']], [self.bike.pk])
+
+    def test_unknown_or_partial_number_is_not_found(self):
+        for phone in ('600700800', '500100', 'abc', ''):
+            with self.subTest(phone=phone):
+                self.assertEqual(self._lookup(phone).status_code, 404)
+
+
 class MergeCustomersByPhoneMigrationTests(TransactionTestCase):
     """customers.0005 merges customers sharing a number before making the phone unique."""
 

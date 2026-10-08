@@ -4,6 +4,7 @@ from django.db.models import Prefetch
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
+from rest_framework.decorators import action
 from rest_framework.fields import BooleanField
 from rest_framework.generics import CreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.response import Response
@@ -17,7 +18,7 @@ from .serializers import (
     CustomerListSerializer, CustomerDetailSerializer, BikeSerializer,
     BikeReadSerializer, BikeDetailSerializer
 )
-from .services import find_existing_customer
+from .services import find_existing_customer, get_customer_by_phone
 
 
 class CustomerViewSet(ModelViewSet):
@@ -56,6 +57,31 @@ class CustomerViewSet(ModelViewSet):
             data = self.get_serializer(existing).data
             return Response({**data, 'existing': True}, status=status.HTTP_200_OK)
         return super().create(request, *args, **kwargs)
+
+    @extend_schema(
+        summary=_('Look up a customer by phone number'),
+        description=_(
+            'Exact match on the normalized number, so `504 991 254` finds `+48504991254`. '
+            'Used by the new-order form to pick up an existing customer instead of '
+            'registering them (and their bike) again.'
+        ),
+        parameters=[
+            OpenApiParameter(
+                'phone', str, OpenApiParameter.QUERY, required=True,
+                description=_('Phone number in any notation, e.g. `504 991 254`.'),
+            ),
+        ],
+        responses={
+            200: CustomerListSerializer,
+            404: OpenApiResponse(description=_('No customer with this phone number.')),
+        },
+    )
+    @action(detail=False, methods=['get'], url_path='lookup')
+    def lookup(self, request):
+        customer = get_customer_by_phone(request.query_params.get('phone', ''))
+        if not customer:
+            return Response({'detail': 'Nie znaleziono klienta z tym numerem telefonu.'}, status=404)
+        return Response(CustomerListSerializer(customer).data)
 
 
 @extend_schema(responses=BikeReadSerializer)
