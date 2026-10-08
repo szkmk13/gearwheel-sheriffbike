@@ -43,6 +43,11 @@ export const changeOrderStatus = async (id, { status, note }) => {
   return post(`/api/orders/${id}/status/`, { status, note });
 };
 
+// Wysyła klientowi SMS o gotowości do odbioru (treść po ewentualnej edycji)
+export const sendOrderSms = async (id, message) => {
+  return post(`/api/orders/${id}/sms/`, { message });
+};
+
 // Pobiera historię zmian statusu dla zlecenia
 export const fetchOrderStatusHistory = async (id) => {
   return get(`/api/orders/${id}/history/`);

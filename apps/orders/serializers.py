@@ -189,6 +189,33 @@ class ChangeOrderStatusSerializer(serializers.Serializer):
     note = serializers.CharField(required=False, allow_blank=True)
 
 
+class SmsResultSerializer(serializers.Serializer):
+    """Mirrors the dict returned by `sms.send_sms`."""
+    sent = serializers.BooleanField()
+    mocked = serializers.BooleanField(help_text='True while the SMS gateway is a mock (nothing is delivered).')
+    to = serializers.CharField()
+    message = serializers.CharField()
+    error = serializers.CharField(allow_null=True)
+
+
+class SmsPreviewSerializer(serializers.Serializer):
+    to = serializers.CharField()
+    message = serializers.CharField(help_text='Suggested text - staff may edit it before sending.')
+
+
+class ChangeOrderStatusResponseSerializer(RepairOrderDetailSerializer):
+    """Schema only: the full order plus the SMS to review after this change (null if none)."""
+    sms_preview = SmsPreviewSerializer(allow_null=True, read_only=True)
+
+    class Meta(RepairOrderDetailSerializer.Meta):
+        fields = RepairOrderDetailSerializer.Meta.fields + ('sms_preview',)
+
+
+class SendSmsSerializer(serializers.Serializer):
+    # 10 parts of a Polish-character (UCS-2) SMS - a sanity cap, not the billing limit.
+    message = serializers.CharField(max_length=670, trim_whitespace=True)
+
+
 class WeeklyTrendPointSerializer(serializers.Serializer):
     week_start = serializers.DateField()
     orders_completed = serializers.IntegerField()

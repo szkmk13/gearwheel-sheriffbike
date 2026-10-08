@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 
-export default function Modal({ isOpen, onClose, title, children }) {
+export default function Modal({ isOpen, onClose, title, children, maxWidth = "max-w-4xl" }) {
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -23,7 +23,7 @@ export default function Modal({ isOpen, onClose, title, children }) {
         onClick={onClose}
       ></div>
 
-      <div className="relative bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div className={`relative bg-white rounded-xl sm:rounded-2xl shadow-2xl w-full ${maxWidth} max-h-[92vh] flex flex-col overflow-hidden`}>
         
         <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex justify-between items-center bg-white z-10">
           <h2 className="text-lg sm:text-xl font-bold text-gray-900">{title}</h2>

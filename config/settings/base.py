@@ -208,5 +208,11 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
+        # Our own apps, e.g. the mock SMS gateway logs each message it would send.
+        'apps': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
     },
 }

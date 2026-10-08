@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
@@ -6,6 +7,7 @@ import StatusBadge from '../components/StatusBadge';
 import { OrderDetailsSkeleton } from '../components/Skeleton';
 import { isOrderOverdue, formatDate, formatDateTime } from '../utils/dates';
 import PrintIntakeButton from '../print/PrintIntakeButton';
+import SmsPreviewModal from '../components/SmsPreviewModal';
 
 export default function OrderDetailsPage() {
     const { id } = useParams();
@@ -17,12 +19,16 @@ export default function OrderDetailsPage() {
         queryFn: () => fetchOrderDetails(id),
     });
 
+    // Propozycja SMS-a po zmianie na "gotowe do odbioru" - do przejrzenia i wysłania w modalu.
+    const [smsPreview, setSmsPreview] = useState(null);
+
     const statusMutation = useMutation({
         mutationFn: ({ status }) => changeOrderStatus(id, { status }),
-        onSuccess: () => {
+        onSuccess: (updatedOrder) => {
             queryClient.invalidateQueries({ queryKey: ['order', id] });
             queryClient.invalidateQueries({ queryKey: ['orders'] });
-            toast.success("Status zlecenia został zaktualizowany!"); 
+            toast.success("Status zlecenia został zaktualizowany!");
+            if (updatedOrder?.sms_preview) setSmsPreview(updatedOrder.sms_preview);
         },
         onError: (error) => toast.error(`Błąd aktualizacji statusu: ${error.message}`) 
     });
@@ -260,6 +266,8 @@ export default function OrderDetailsPage() {
                     </div>
                 </div>
             </div>
+
+            <SmsPreviewModal orderId={order.id} preview={smsPreview} onClose={() => setSmsPreview(null)} />
         </div>
     );
 }

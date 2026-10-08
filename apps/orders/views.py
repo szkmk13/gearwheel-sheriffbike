@@ -15,8 +15,15 @@ from rest_framework.viewsets import ModelViewSet
 from apps.customers.models import Bike, Customer
 
 from .filters import RepairOrderFilter
-from .models import RepairOrder, RepairOrderItem, StatusHistory
+from .models import RepairOrder, RepairOrderItem
+from .services import (
+    SmsNotAllowed,
+    change_order_status,
+    ready_for_pickup_sms_preview,
+    send_ready_for_pickup_sms,
+)
 from .serializers import (
+    ChangeOrderStatusResponseSerializer,
     ChangeOrderStatusSerializer,
     DashboardSerializer,
     RepairOrderListSerializer,
@@ -24,6 +31,8 @@ from .serializers import (
     RepairOrderDetailSerializer,
     RepairOrderWriteSerializer,
     RepairOrderItemSerializer,
+    SendSmsSerializer,
+    SmsResultSerializer,
     StatusHistorySerializer,
 )
 
@@ -188,11 +197,15 @@ class RepairOrderViewSet(ModelViewSet):
             'Changes the order status and appends an entry to its status history (`old_status`, '
             '`new_status`, `changed_by`, optional `note`). Transitioning to `accepted` sets '
             '`accepted_at`, and to `delivered` sets `delivered_at` (unless already set). '
-            'The request is rejected if the given status is invalid or identical to the current one.'
+            'The request is rejected if the given status is invalid or identical to the current one. '
+            'Nothing is sent to the customer here. The response is the full order plus '
+            '`sms_preview`: when the order became `done` (ready for pickup), the number and the '
+            'suggested text of the pickup SMS for staff to review and send via `POST .../sms/`; '
+            'otherwise `null`.'
         ),
         request=ChangeOrderStatusSerializer,
         responses={
-            200: RepairOrderDetailSerializer,
+            200: ChangeOrderStatusResponseSerializer,
             400: OpenApiResponse(description=_('Invalid status, or the order already has the given status.')),
         },
     )
@@ -209,20 +222,41 @@ class RepairOrderViewSet(ModelViewSet):
         if new_status == order.status:
             return Response({'detail': 'Order is already in this status.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        StatusHistory.objects.create(
-            repair_order=order,
-            old_status=order.status,
-            new_status=new_status,
-            changed_by=request.user,
-            note=note,
-        )
-        order.status = new_status
-        if new_status == 'accepted' and not order.accepted_at:
-            order.accepted_at = timezone.now()
-        if new_status == 'delivered' and not order.delivered_at:
-            order.delivered_at = timezone.now()
-        order.save()
-        return Response(RepairOrderDetailSerializer(order).data)
+        change_order_status(order, new_status, request.user, note)
+        return Response({
+            **RepairOrderDetailSerializer(order).data,
+            'sms_preview': ready_for_pickup_sms_preview(order),
+        })
+
+    @extend_schema(
+        summary=_('Send the ready-for-pickup SMS'),
+        description=_(
+            'Texts the customer that the order can be collected, with the (possibly edited) '
+            '`message`. Only allowed while the order is `done`. For now the gateway is a mock '
+            'that only logs the message (`mocked: true`). On success the SMS is noted on the '
+            'latest `done` entry of the status history.'
+        ),
+        request=SendSmsSerializer,
+        responses={
+            200: SmsResultSerializer,
+            400: OpenApiResponse(description=_(
+                'Empty or too long message, the order is not ready for pickup, or the SMS could '
+                'not be sent (e.g. the customer has no phone number).'
+            )),
+        },
+    )
+    @action(detail=True, methods=['post'], url_path='sms')
+    def send_sms(self, request, pk=None):
+        order = self.get_object()
+        serializer = SendSmsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            result = send_ready_for_pickup_sms(order, serializer.validated_data['message'])
+        except SmsNotAllowed as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        if not result['sent']:
+            return Response({'detail': result['error']}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(SmsResultSerializer(result).data)
 
     @extend_schema(
         summary=_('Repair order status history'),

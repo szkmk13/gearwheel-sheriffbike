@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import connection, transaction
@@ -455,3 +456,88 @@ class StatusHistoryAdminInlineTests(APITestCase):
     def test_history_rows_cannot_be_added(self):
         response = self.client.get(self.url)
         self.assertNotContains(response, 'status_history-empty')
+
+
+class ReadyForPickupSmsTests(APITestCase):
+    """`done` returns an SMS preview; the SMS itself goes out only via the separate endpoint."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username='mechanik', is_staff=True)
+        self.client.force_login(self.user)
+        self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='600100200')
+        self.order = RepairOrder.objects.create(
+            customer=self.customer, bike_tag_number=86, description='Serwis.', status='in_progress',
+            final_cost=Decimal('250.00'),
+        )
+
+    def _change_status(self, new_status, **extra):
+        return self.client.post(
+            reverse('order-change-status', args=[self.order.pk]),
+            {'status': new_status, **extra}, format='json',
+        )
+
+    def _send_sms(self, message):
+        return self.client.post(
+            reverse('order-send-sms', args=[self.order.pk]), {'message': message}, format='json',
+        )
+
+    def test_done_returns_preview_without_sending(self):
+        with self.assertNoLogs('apps.orders.sms', level='INFO'):
+            response = self._change_status('done')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data['sms_preview'], {
+            'to': '600100200',
+            'message': 'Sheriff Bike: Dzień dobry! Państwa sprzęt (zawieszka #86) jest gotowy do odbioru. '
+                       'Do zapłaty: 250 zł. Zapraszamy!',
+        })
+        self.assertEqual(response.data['status'], 'done')
+        entry = self.order.status_history.get(new_status='done')
+        self.assertEqual(entry.note, '')
+
+    def test_preview_falls_back_to_estimated_cost_and_keeps_fractions(self):
+        self.order.final_cost = None
+        self.order.estimated_cost = Decimal('149.50')
+        self.order.save()
+        self.assertIn('Do zapłaty: 149,50 zł.', self._change_status('done').data['sms_preview']['message'])
+
+    def test_preview_has_no_amount_when_cost_unknown(self):
+        self.order.final_cost = None
+        self.order.save()
+        self.assertNotIn('Do zapłaty', self._change_status('done').data['sms_preview']['message'])
+
+    def test_other_statuses_have_no_preview(self):
+        response = self._change_status('waiting_parts')
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(response.data['sms_preview'])
+
+    def test_send_uses_edited_message_and_notes_history(self):
+        self._change_status('done', note='Wymieniony łańcuch.')
+        with self.assertLogs('apps.orders.sms', level='INFO') as logs:
+            response = self._send_sms('Rower gotowy, prosimy o odbiór do piątku.')
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data, {
+            'sent': True, 'mocked': True, 'to': '600100200',
+            'message': 'Rower gotowy, prosimy o odbiór do piątku.', 'error': None,
+        })
+        self.assertIn('prosimy o odbiór do piątku', logs.output[0])
+        entry = self.order.status_history.get(new_status='done')
+        self.assertEqual(entry.note, 'Wymieniony łańcuch.\nSMS do 600100200 (symulacja)')
+
+    def test_send_rejected_when_order_not_ready(self):
+        response = self._send_sms('Rower gotowy.')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('detail', response.data)
+
+    def test_send_rejects_blank_message(self):
+        self._change_status('done')
+        response = self._send_sms('   ')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('message', response.data)
+
+    def test_send_without_phone_fails_and_leaves_history_alone(self):
+        self._change_status('done')
+        Customer.objects.filter(pk=self.customer.pk).update(phone='')
+        response = self._send_sms('Rower gotowy.')
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(response.data['detail'])
+        self.assertEqual(self.order.status_history.get(new_status='done').note, '')
