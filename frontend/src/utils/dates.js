@@ -58,3 +58,56 @@ export function isOrderOverdue(order) {
   if (!order?.estimated_pickup_date || CLOSED_STATUSES.includes(order.status)) return false;
   return order.estimated_pickup_date < todayISODate();
 }
+
+// --- Kalendarz ---------------------------------------------------------------
+// Tydzien zaczyna sie w poniedzialek. Wszystko liczymy na lokalnych datach.
+
+export const MONTH_NAMES = [
+  'Styczeń', 'Luty', 'Marzec', 'Kwiecień', 'Maj', 'Czerwiec',
+  'Lipiec', 'Sierpień', 'Wrzesień', 'Październik', 'Listopad', 'Grudzień',
+];
+// Dopelniacz do dat typu "8 października 2026".
+export const MONTH_NAMES_GENITIVE = [
+  'stycznia', 'lutego', 'marca', 'kwietnia', 'maja', 'czerwca',
+  'lipca', 'sierpnia', 'września', 'października', 'listopada', 'grudnia',
+];
+export const WEEKDAY_SHORT = ['Pon', 'Wt', 'Śr', 'Czw', 'Pt', 'Sob', 'Nd'];
+export const WEEKDAY_NAMES = ['Poniedziałek', 'Wtorek', 'Środa', 'Czwartek', 'Piątek', 'Sobota', 'Niedziela'];
+
+// YYYY-MM-DD -> Date (lokalna polnoc) albo null, gdy string nie jest data.
+export function parseISODate(value) {
+  const match = typeof value === 'string' && value.match(ISO_DATE_ONLY);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  return toLocalISODate(date) === value ? date : null;
+}
+
+export function addDays(date, days) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
+}
+
+export function addMonths(date, months) {
+  // Dzien przycinamy do dlugosci miesiaca: 31 stycznia + 1 miesiac = 28/29 lutego, nie 3 marca.
+  const lastDay = new Date(date.getFullYear(), date.getMonth() + months + 1, 0).getDate();
+  return new Date(date.getFullYear(), date.getMonth() + months, Math.min(date.getDate(), lastDay));
+}
+
+// 0 = poniedzialek ... 6 = niedziela
+export function weekdayIndex(date) {
+  return (date.getDay() + 6) % 7;
+}
+
+export function startOfWeek(date) {
+  return addDays(date, -weekdayIndex(date));
+}
+
+// 42 dni (6 pelnych tygodni) siatki miesiaca, od poniedzialku przed 1. dniem miesiaca.
+export function monthGridDays(date) {
+  const first = startOfWeek(new Date(date.getFullYear(), date.getMonth(), 1));
+  return Array.from({ length: 42 }, (_, i) => addDays(first, i));
+}
+
+export function weekDays(date) {
+  const first = startOfWeek(date);
+  return Array.from({ length: 7 }, (_, i) => addDays(first, i));
+}

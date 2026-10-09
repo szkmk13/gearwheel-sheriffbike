@@ -5,6 +5,7 @@ from django.db.models import Case, Count, F, IntegerField, Prefetch, Sum, When
 from django.db.models.functions import Coalesce, TruncWeek
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import status
 from rest_framework.decorators import action
@@ -23,6 +24,7 @@ from .services import (
     send_ready_for_pickup_sms,
 )
 from .serializers import (
+    CalendarRangeSerializer,
     ChangeOrderStatusResponseSerializer,
     ChangeOrderStatusSerializer,
     DashboardSerializer,
@@ -227,6 +229,32 @@ class RepairOrderViewSet(ModelViewSet):
             **RepairOrderDetailSerializer(order).data,
             'sms_preview': ready_for_pickup_sms_preview(order),
         })
+
+    @extend_schema(
+        summary=_('Repair orders by pickup date (calendar)'),
+        description=_(
+            'Orders whose `estimated_pickup_date` falls between `start` and `end` (both '
+            'inclusive, at most 42 days - the six weeks of a month view), sorted by that date. '
+            'Not paginated, so a busy month is never cut off. Orders without a pickup date are '
+            'left out. Accepts the same `status`/`priority`/`category` filters as the list.'
+        ),
+        parameters=[
+            OpenApiParameter('start', OpenApiTypes.DATE, OpenApiParameter.QUERY, required=True),
+            OpenApiParameter('end', OpenApiTypes.DATE, OpenApiParameter.QUERY, required=True),
+        ],
+        responses={
+            200: RepairOrderListSerializer(many=True),
+            400: OpenApiResponse(description=_('Missing or invalid dates, or a range longer than 42 days.')),
+        },
+    )
+    @action(detail=False, methods=['get'], url_path='calendar')
+    def calendar(self, request):
+        date_range = CalendarRangeSerializer(data=request.query_params)
+        date_range.is_valid(raise_exception=True)
+        orders = self.filter_queryset(self.get_queryset()).filter(
+            estimated_pickup_date__range=(date_range.validated_data['start'], date_range.validated_data['end']),
+        ).order_by('estimated_pickup_date', 'status_order', 'bike_tag_number')
+        return Response(RepairOrderListSerializer(orders, many=True).data)
 
     @extend_schema(
         summary=_('Send the ready-for-pickup SMS'),

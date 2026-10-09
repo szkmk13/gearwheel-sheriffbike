@@ -1,4 +1,5 @@
-const statusMap = {
+// Eksportowane, żeby kalendarz kolorował zlecenia tak samo jak odznaki statusu.
+export const statusMap = {
     accepted: { label: 'Przyjęte', className: 'bg-blue-100 text-blue-700' },
     estimating: { label: 'Wycena', className: 'bg-yellow-100 text-yellow-800' },
     waiting_parts: { label: 'Czeka na części', className: 'bg-purple-100 text-purple-700' },

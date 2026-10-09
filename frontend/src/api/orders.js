@@ -18,6 +18,13 @@ export const fetchOrders = async (filters = {}) => {
   return fetcher(url);
 };
 
+// GET /api/orders/calendar/ - Zlecenia z datą odbioru w zakresie [start, end] (bez paginacji, maks. 42 dni)
+export const fetchOrdersCalendar = async ({ start, end, status }) => {
+  const params = new URLSearchParams({ start, end });
+  if (status) params.append('status', status);
+  return fetcher(`/api/orders/calendar/?${params.toString()}`);
+};
+
 // Tworzy nowe zlecenie naprawy
 export const createOrder = async (newOrderData) => {
   return post('/api/orders/', newOrderData);

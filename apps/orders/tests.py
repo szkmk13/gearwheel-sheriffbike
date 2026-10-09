@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -541,3 +541,66 @@ class ReadyForPickupSmsTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertTrue(response.data['detail'])
         self.assertEqual(self.order.status_history.get(new_status='done').note, '')
+
+
+class OrderCalendarTests(APITestCase):
+    """GET /api/orders/calendar/ - orders by pickup date for the calendar view."""
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_user(username='mechanik', is_staff=True))
+        self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
+        self.bike = Bike.objects.create(customer=self.customer, brand='Trek')
+
+    def _order(self, pickup, tag=1, status='accepted'):
+        order = RepairOrder.objects.create(
+            customer=self.customer, bike_tag_number=tag, description='Serwis.',
+            estimated_pickup_date=pickup, status=status,
+        )
+        order.bikes.add(self.bike)
+        return order
+
+    def _calendar(self, **params):
+        return self.client.get(reverse('order-calendar'), params)
+
+    def test_returns_orders_in_range_inclusive_sorted_by_pickup_date(self):
+        last_day = self._order(date(2026, 10, 31), tag=3)
+        first_day = self._order(date(2026, 10, 1), tag=2)
+        self._order(date(2026, 9, 30))
+        self._order(date(2026, 11, 1))
+        self._order(None)
+
+        response = self._calendar(start='2026-10-01', end='2026-10-31')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([o['id'] for o in response.data], [first_day.pk, last_day.pk])
+        self.assertEqual(response.data[0]['customer_name'], 'Anna Nowak')
+
+    def test_is_not_paginated(self):
+        for tag in range(60):
+            self._order(date(2026, 10, 15), tag=tag)
+
+        response = self._calendar(start='2026-10-01', end='2026-10-31')
+
+        self.assertEqual(len(response.data), 60)
+
+    def test_status_filter_applies(self):
+        open_order = self._order(date(2026, 10, 15), status='in_progress')
+        self._order(date(2026, 10, 15), status='delivered')
+
+        response = self._calendar(start='2026-10-01', end='2026-10-31', status='accepted,in_progress')
+
+        self.assertEqual([o['id'] for o in response.data], [open_order.pk])
+
+    def test_invalid_range_is_rejected(self):
+        for params in (
+            {},
+            {'start': '2026-10-01'},
+            {'start': 'jutro', 'end': '2026-10-31'},
+            {'start': '2026-10-31', 'end': '2026-10-01'},
+            {'start': '2026-10-01', 'end': '2026-11-12'},
+        ):
+            with self.subTest(params=params):
+                self.assertEqual(self._calendar(**params).status_code, 400)
+
+    def test_six_week_month_grid_is_allowed(self):
+        self.assertEqual(self._calendar(start='2026-09-28', end='2026-11-08').status_code, 200)

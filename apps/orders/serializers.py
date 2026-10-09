@@ -216,6 +216,22 @@ class SendSmsSerializer(serializers.Serializer):
     message = serializers.CharField(max_length=670, trim_whitespace=True)
 
 
+class CalendarRangeSerializer(serializers.Serializer):
+    # A month view shows 6 full weeks, so 42 days is the most the calendar ever asks for.
+    MAX_DAYS = 42
+
+    start = serializers.DateField()
+    end = serializers.DateField()
+
+    def validate(self, attrs):
+        days = (attrs['end'] - attrs['start']).days + 1
+        if days < 1:
+            raise serializers.ValidationError({'end': 'Koniec zakresu nie moze byc przed poczatkiem.'})
+        if days > self.MAX_DAYS:
+            raise serializers.ValidationError({'end': f'Zakres moze obejmowac najwyzej {self.MAX_DAYS} dni.'})
+        return attrs
+
+
 class WeeklyTrendPointSerializer(serializers.Serializer):
     week_start = serializers.DateField()
     orders_completed = serializers.IntegerField()
