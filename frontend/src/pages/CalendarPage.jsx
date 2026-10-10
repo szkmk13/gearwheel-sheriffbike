@@ -4,13 +4,18 @@ import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { fetchOrdersCalendar } from "../api/orders";
 
-import StatusBadge, { statusMap } from "../components/StatusBadge";
+import StatusBadge from "../components/StatusBadge";
 import StickyHeader from "../components/StickyHeader";
 import { Skeleton } from "../components/Skeleton";
+import OrderChip from "../components/calendar/OrderChip";
+import DayColumns from "../components/calendar/DayColumns";
+import {
+  OPEN_STATUSES, WORKSHOP_DAY_STYLE, calendarQueryKey, groupByPickupDate,
+} from "../components/calendar/calendarData";
 import {
   MONTH_NAMES, MONTH_NAMES_GENITIVE, WEEKDAY_SHORT, WEEKDAY_NAMES,
   addDays, addMonths, isOrderOverdue, monthGridDays, parseISODate,
-  toLocalISODate, todayISODate, weekDays, weekdayIndex,
+  toLocalISODate, todayISODate, weekDays, weekdayIndex, workshopDayKind,
 } from "../utils/dates";
 
 const VIEWS = [
@@ -18,9 +23,6 @@ const VIEWS = [
   { value: 'week', label: 'Tydzień' },
   { value: 'day', label: 'Dzień' },
 ];
-
-// Domyślnie bez `delivered` i `cancelled` - to terminy, które już nie są aktualne.
-const OPEN_STATUSES = ['accepted', 'estimating', 'waiting_parts', 'in_progress', 'done'];
 
 // Ile zleceń mieści się w komórce miesiąca, zanim zwiniemy resztę w "+N więcej".
 const MAX_CHIPS_IN_MONTH_CELL = 3;
@@ -49,25 +51,6 @@ function rangeTitle(view, date, days) {
   if (first.getMonth() === last.getMonth()) return `${first.getDate()} - ${lastPart}`;
   const firstYear = first.getFullYear() === last.getFullYear() ? '' : ` ${first.getFullYear()}`;
   return `${first.getDate()} ${MONTH_NAMES_GENITIVE[first.getMonth()]}${firstYear} - ${lastPart}`;
-}
-
-function OrderChip({ order }) {
-  const overdue = isOrderOverdue(order);
-  const colors = statusMap[order.status]?.className ?? 'bg-gray-100 text-gray-700';
-  const label = `#${order.bike_tag_number} ${order.customer_name}`;
-
-  return (
-    <Link
-      to={`/panel/orders/${order.id}`}
-      title={`${label} - ${order.bike_label}${overdue ? ' (po terminie)' : ''}`}
-      className={`block truncate rounded px-1.5 py-0.5 text-xs font-medium hover:brightness-95 transition ${colors} ${
-        overdue ? 'border-l-[3px] border-red-500' : ''
-      }`}
-    >
-      {order.priority === 'urgent' && <span className="text-red-600 font-bold">! </span>}
-      {label}
-    </Link>
-  );
 }
 
 function OrderCard({ order }) {
@@ -128,8 +111,14 @@ function MonthView({ date, days, ordersByDay, isLoading, todayISO, onOpenDay }) 
     <>
       <div className="bg-white border border-[var(--color-line)] rounded-xl overflow-hidden shadow-sm">
         <div className="grid grid-cols-7 border-b border-[var(--color-line)] bg-[var(--color-paper)]">
-          {WEEKDAY_SHORT.map((name) => (
-            <div key={name} className="py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {/* Pierwszy tydzien siatki zaczyna sie w poniedzialek, wiec days[i] to i-ty dzien tygodnia. */}
+          {WEEKDAY_SHORT.map((name, i) => (
+            <div
+              key={name}
+              className={`py-2 text-center text-xs font-semibold uppercase tracking-wide text-gray-500 ${
+                WORKSHOP_DAY_STYLE[workshopDayKind(days[i])]?.cell ?? ''
+              }`}
+            >
               {name}
             </div>
           ))}
@@ -143,6 +132,8 @@ function MonthView({ date, days, ordersByDay, isLoading, todayISO, onOpenDay }) 
             const isToday = iso === todayISO;
             const isActive = iso === activeISO;
             const hidden = orders.length - MAX_CHIPS_IN_MONTH_CELL;
+            // Sobota/niedziela trzymaja swoj kolor tez poza miesiacem - tam wyroznia je wyblakly numer.
+            const background = WORKSHOP_DAY_STYLE[workshopDayKind(day)]?.cell ?? (inMonth ? '' : 'bg-gray-50/70');
 
             return (
               <div
@@ -150,8 +141,8 @@ function MonthView({ date, days, ordersByDay, isLoading, todayISO, onOpenDay }) 
                 onClick={() => setSelectedISO(iso)}
                 className={`min-h-[3.75rem] md:min-h-[7.5rem] p-1 md:p-1.5 border-[var(--color-line)] ${
                   index % 7 !== 6 ? 'border-r' : ''
-                } ${index < 35 ? 'border-b' : ''} ${inMonth ? '' : 'bg-gray-50/70'} ${
-                  isActive ? 'max-md:bg-[var(--color-accent)]/5' : ''
+                } ${index < 35 ? 'border-b' : ''} ${background} ${
+                  isActive ? 'max-md:ring-2 max-md:ring-inset max-md:ring-[var(--color-accent)]/40' : ''
                 } cursor-pointer md:cursor-default`}
               >
                 <div className="flex justify-center md:justify-start mb-1">
@@ -218,58 +209,6 @@ function MonthView({ date, days, ordersByDay, isLoading, todayISO, onOpenDay }) 
   );
 }
 
-function WeekView({ days, ordersByDay, isLoading, todayISO, onOpenDay }) {
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-7 gap-3 md:gap-0 md:bg-white md:border md:border-[var(--color-line)] md:rounded-xl md:overflow-hidden md:shadow-sm">
-      {days.map((day, index) => {
-        const iso = toLocalISODate(day);
-        const orders = ordersByDay[iso] ?? [];
-        const isToday = iso === todayISO;
-
-        return (
-          <div
-            key={iso}
-            className={`bg-white md:bg-transparent border border-[var(--color-line)] rounded-xl md:rounded-none md:border-0 md:min-h-[24rem] ${
-              index < 6 ? 'md:border-r' : ''
-            }`}
-          >
-            <button
-              type="button"
-              onClick={() => onOpenDay(day)}
-              className="w-full flex md:flex-col items-center gap-2 md:gap-1 px-3 py-2 md:py-3 border-b border-[var(--color-line)] hover:bg-gray-50 cursor-pointer transition-colors"
-              title="Pokaż dzień"
-            >
-              <span className={`text-xs font-semibold uppercase tracking-wide ${isToday ? 'text-[var(--color-accent)]' : 'text-gray-500'}`}>
-                {WEEKDAY_SHORT[index]}
-              </span>
-              <span
-                className={`inline-flex items-center justify-center w-8 h-8 rounded-full text-base font-semibold ${
-                  isToday ? 'bg-[var(--color-accent)] text-white' : 'text-[var(--color-ink)]'
-                }`}
-              >
-                {day.getDate()}
-              </span>
-              {orders.length > 0 && (
-                <span className="md:hidden ml-auto text-xs text-gray-500">{orders.length} odb.</span>
-              )}
-            </button>
-
-            <div className="flex flex-col gap-1 p-2">
-              {isLoading ? (
-                <Skeleton className="h-5 w-full" />
-              ) : orders.length === 0 ? (
-                <p className="md:hidden py-1 text-xs text-gray-400">Brak odbiorów</p>
-              ) : (
-                orders.map((order) => <OrderChip key={order.id} order={order} />)
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 export default function CalendarPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [showClosed, setShowClosed] = useState(false);
@@ -279,6 +218,8 @@ export default function CalendarPage() {
   const view = VIEWS.some((v) => v.value === searchParams.get('view')) ? searchParams.get('view') : 'month';
   const dayISO = parseISODate(searchParams.get('date')) ? searchParams.get('date') : todayISO;
   const date = useMemo(() => parseISODate(dayISO), [dayISO]);
+  // Sobota (krócej) / niedziela (nieczynne) - opis przy tytule widoku dnia.
+  const dayStyle = WORKSHOP_DAY_STYLE[workshopDayKind(date)];
 
   const days = useMemo(() => {
     if (view === 'month') return monthGridDays(date);
@@ -290,19 +231,13 @@ export default function CalendarPage() {
   const end = toLocalISODate(days[days.length - 1]);
 
   const { data: orders = [], isLoading, isFetching, isError, error } = useQuery({
-    queryKey: ['orders-calendar', start, end, showClosed],
+    queryKey: calendarQueryKey(start, end, showClosed),
     queryFn: () => fetchOrdersCalendar({ start, end, status: showClosed ? undefined : OPEN_STATUSES.join(',') }),
     // Przy przełączaniu okresu zostawiamy poprzednie dane, zamiast migać pustą siatką.
     placeholderData: keepPreviousData,
   });
 
-  const ordersByDay = useMemo(() => {
-    const grouped = {};
-    for (const order of orders) {
-      (grouped[order.estimated_pickup_date] ??= []).push(order);
-    }
-    return grouped;
-  }, [orders]);
+  const ordersByDay = useMemo(() => groupByPickupDate(orders), [orders]);
 
   const goTo = (nextView, nextDate) => {
     setSearchParams({ view: nextView, date: toLocalISODate(nextDate) }, { replace: true });
@@ -350,6 +285,11 @@ export default function CalendarPage() {
               <h2 className="ml-1 text-base sm:text-lg font-semibold text-[var(--color-ink)]">
                 {rangeTitle(view, date, days)}
               </h2>
+              {view === 'day' && dayStyle && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${dayStyle.cell} ${dayStyle.badgeClass}`}>
+                  {dayStyle.note}
+                </span>
+              )}
               {isFetching && !isLoading && (
                 <span className="ml-1 text-xs text-gray-400">Ładowanie...</span>
               )}
@@ -404,7 +344,14 @@ export default function CalendarPage() {
         />
       )}
       {view === 'week' && (
-        <WeekView days={days} ordersByDay={ordersByDay} isLoading={isLoading} todayISO={todayISO} onOpenDay={openDay} />
+        <DayColumns
+          days={days}
+          ordersByDay={ordersByDay}
+          isLoading={isLoading}
+          todayISO={todayISO}
+          onOpenDay={openDay}
+          columnClassName="md:min-h-[24rem]"
+        />
       )}
       {view === 'day' && (
         <div className="max-w-3xl">

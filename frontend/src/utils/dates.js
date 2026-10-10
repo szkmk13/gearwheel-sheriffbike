@@ -47,9 +47,20 @@ export function todayISODate() {
   return toLocalISODate(new Date());
 }
 
+// Godziny pracy serwisu wg dnia tygodnia (indeks z weekdayIndex: 0 = poniedzialek).
+// 'short' - czynne krocej, 'closed' - nieczynne. Pozostale dni: zwykly dzien pracy.
+const WORKSHOP_DAY_KIND = { 5: 'short', 6: 'closed' };
+
+// 'short' | 'closed' | null
+export function workshopDayKind(date) {
+  return WORKSHOP_DAY_KIND[weekdayIndex(date)] ?? null;
+}
+
+// Dzis + DEFAULT_PICKUP_DAYS, a gdy wypada w dzien zamkniety - pierwszy kolejny dzien pracy.
 export function defaultPickupDate() {
-  const date = new Date();
-  date.setDate(date.getDate() + DEFAULT_PICKUP_DAYS);
+  const today = new Date();
+  let date = new Date(today.getFullYear(), today.getMonth(), today.getDate() + DEFAULT_PICKUP_DAYS);
+  while (workshopDayKind(date) === 'closed') date = addDays(date, 1);
   return toLocalISODate(date);
 }
 

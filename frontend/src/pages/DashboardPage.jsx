@@ -1,12 +1,36 @@
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { useNavigate } from 'react-router-dom';
-import { fetchOrders, fetchDashboardStats } from '../api/orders';
+import { Link, useNavigate } from 'react-router-dom';
+import { fetchOrders, fetchDashboardStats, fetchOrdersCalendar } from '../api/orders';
 import StickyHeader from '../components/StickyHeader';
 import StatusBadge from '../components/StatusBadge';
 import { DashboardSkeleton } from '../components/Skeleton';
+import DayColumns from '../components/calendar/DayColumns';
+import { OPEN_STATUSES, calendarQueryKey, groupByPickupDate } from '../components/calendar/calendarData';
+import { addDays, parseISODate, toLocalISODate, todayISODate } from '../utils/dates';
+
+// Pasek odbiorow: dzis w srodku, po 3 dni wstecz (zalegle) i do przodu.
+const PICKUP_DAYS_AROUND_TODAY = 3;
 
 export default function DashboardPage() {
     const navigate = useNavigate();
+
+    const todayISO = todayISODate();
+    const pickupDays = useMemo(() => {
+        const today = parseISODate(todayISO);
+        return Array.from(
+            { length: 2 * PICKUP_DAYS_AROUND_TODAY + 1 },
+            (_, i) => addDays(today, i - PICKUP_DAYS_AROUND_TODAY),
+        );
+    }, [todayISO]);
+    const pickupStart = toLocalISODate(pickupDays[0]);
+    const pickupEnd = toLocalISODate(pickupDays[pickupDays.length - 1]);
+
+    const { data: pickupOrders = [], isLoading: isPickupsLoading, isError: isPickupsError } = useQuery({
+        queryKey: calendarQueryKey(pickupStart, pickupEnd),
+        queryFn: () => fetchOrdersCalendar({ start: pickupStart, end: pickupEnd, status: OPEN_STATUSES.join(',') }),
+    });
+    const pickupsByDay = useMemo(() => groupByPickupDate(pickupOrders), [pickupOrders]);
 
     const { data: stats, isLoading: isStatsLoading } = useQuery({
         queryKey: ['dashboardStats'],
@@ -62,6 +86,35 @@ export default function DashboardPage() {
                     </p>
                     <span className="text-xs text-[var(--color-ink-3)] mt-1 block">Suma zrealizowanych kosztów</span>
                 </div>
+            </div>
+
+            {/* Najbliższe odbiory: dziś +/- 3 dni */}
+            <div className="mb-6 sm:mb-8">
+                <div className="flex justify-between items-center mb-3 sm:mb-4">
+                    <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)]">Odbiory: najbliższe dni</h3>
+                    <Link
+                        to="/panel/calendar?view=week"
+                        className="text-xs sm:text-sm font-medium text-[var(--color-accent)] hover:underline"
+                    >
+                        Otwórz kalendarz →
+                    </Link>
+                </div>
+                {isPickupsError ? (
+                    <p className="p-4 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">
+                        Nie udało się pobrać odbiorów.
+                    </p>
+                ) : (
+                    // Bez dopisku "krócej" przy sobocie - to wiadomo na co dzień, zostaje sam kolor.
+                    <DayColumns
+                        hiddenBadges={['short']}
+                        days={pickupDays}
+                        ordersByDay={pickupsByDay}
+                        isLoading={isPickupsLoading}
+                        todayISO={todayISO}
+                        onOpenDay={(day) => navigate(`/panel/calendar?view=day&date=${toLocalISODate(day)}`)}
+                        columnClassName="md:min-h-[11rem]"
+                    />
+                )}
             </div>
 
             {/* Ostatnie aktywne zlecenia */}
