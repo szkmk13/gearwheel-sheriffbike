@@ -8,7 +8,7 @@ const STEP_PT = 0.5;
 // zmniejszamy font do 9 pt, a dalej obcinamy z dopiskiem - dokument nie moze przejsc
 // na 2. strone, bo odcinek klienta musi zostac na dole.
 // `fitKey` wymusza ponowne dopasowanie, np. po doczytaniu fontu (inna szerokosc znakow).
-export default function ServicesBlock({ services, notes, fitKey }) {
+export default function ServicesBlock({ services, notes, estimatedCost, fitKey }) {
     const boxRef = useRef(null);
     const [fontPt, setFontPt] = useState(MAX_FONT_PT);
     const [truncated, setTruncated] = useState(false);
@@ -46,6 +46,11 @@ export default function ServicesBlock({ services, notes, fitKey }) {
                 )}
                 {notes && <p className="services-notes">{notes}</p>}
                 {truncated && <div className="services-more">…ciąg dalszy w systemie</div>}
+            </div>
+            {/* Poza dopasowywanym pudelkiem, zeby kwota nigdy nie zostala obcieta. */}
+            <div className="services-cost">
+                <span>Szacowany koszt naprawy:</span>
+                <span className="services-cost-value">{estimatedCost}</span>
             </div>
         </>
     );

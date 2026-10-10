@@ -22,6 +22,7 @@ export default function CustomerStub({ data }) {
                 <StubRow label="Planowany termin odbioru">
                     {data.plannedPickupAt && formatDate(data.plannedPickupAt)}
                 </StubRow>
+                <StubRow label="Szacowany koszt naprawy" strong>{data.estimatedCost}</StubRow>
             </div>
         </div>
     );

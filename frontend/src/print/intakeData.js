@@ -9,6 +9,18 @@ export function formatPhone(phone) {
     return `+48 ${local.slice(0, 3)} ${local.slice(3, 6)} ${local.slice(6)}`;
 }
 
+// "250.00" -> "250 zł", "250.5" -> "250,50 zł". Brak kwoty -> "" (pole zostaje do dopisania).
+export function formatCost(value) {
+    if (value === null || value === undefined || value === "") return "";
+    const amount = Number(value);
+    if (Number.isNaN(amount)) return "";
+    const fractionDigits = Number.isInteger(amount) ? 0 : 2;
+    return `${amount.toLocaleString("pl-PL", {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+    })} zł`;
+}
+
 export function toIntakeData(order) {
     const customer = order.customer || {};
     return {
@@ -28,5 +40,6 @@ export function toIntakeData(order) {
             price: item.unit_price != null ? Number(item.unit_price) * Number(item.quantity) : null,
         })),
         notes: order.description,
+        estimatedCost: formatCost(order.estimated_cost),
     };
 }

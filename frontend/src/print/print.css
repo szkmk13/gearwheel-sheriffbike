@@ -144,10 +144,29 @@
   color: #444;
 }
 
+/* Szacowany koszt pod zakresem uslug - staly wiersz, nie bierze udzialu w dopasowaniu fontu. */
+.services-cost {
+  flex: none;
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  margin-top: 3mm;
+  font-size: 11pt;
+  font-weight: 600;
+}
+
+.services-cost-value {
+  min-width: 35mm;
+  font-weight: 700;
+  /* Linia do dopisania dlugopisem, gdy brak wyceny. */
+  border-bottom: 0.5pt dotted #999;
+}
+
 /* Odcinek dla klienta - linie ciecia na cala szerokosc kartki. */
 .stub {
   flex: none;
-  height: 45mm;
+  /* 50 mm: trzy wiersze danych (z szacowanym kosztem) nad dolnym marginesem 8 mm. */
+  height: 50mm;
   margin: 4mm -22mm 0;
   /* Dol 8 mm: tresc odcinka poza niedrukowalnym pasem drukarki (~4-5 mm od krawedzi). */
   padding: 4mm 22mm 8mm;

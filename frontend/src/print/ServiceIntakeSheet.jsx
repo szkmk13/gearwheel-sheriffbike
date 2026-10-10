@@ -12,12 +12,18 @@ import "./print.css";
 //   bikes: [{ model, serialNumber }],      // zlecenie moze obejmowac kilka sztuk sprzetu
 //   services: [{ name, price }],
 //   notes,
+//   estimatedCost,                         // sformatowana kwota ("250 zł") albo ""
 // }
 export default function ServiceIntakeSheet({ data, fitKey }) {
     return (
         <div className="sheet">
             <IntakeHeader data={data} />
-            <ServicesBlock services={data.services} notes={data.notes} fitKey={fitKey} />
+            <ServicesBlock
+                services={data.services}
+                notes={data.notes}
+                estimatedCost={data.estimatedCost}
+                fitKey={fitKey}
+            />
             <CustomerStub data={data} />
         </div>
     );
