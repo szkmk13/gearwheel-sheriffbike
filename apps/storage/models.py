@@ -184,6 +184,7 @@ class StorageEvent(models.Model):
     EVENT_EXTEND = 'extend'
     EVENT_PAYMENT = 'payment'
     EVENT_CANCEL = 'cancel'
+    EVENT_UPDATE = 'update'
     EVENT_CHOICES = [
         (EVENT_RESERVE, 'Rezerwacja'),
         (EVENT_CHECK_IN, 'Przyjecie'),
@@ -191,9 +192,12 @@ class StorageEvent(models.Model):
         (EVENT_EXTEND, 'Przedluzenie'),
         (EVENT_PAYMENT, 'Wplata'),
         (EVENT_CANCEL, 'Anulowanie'),
+        (EVENT_UPDATE, 'Edycja'),
     ]
 
-    booking = models.ForeignKey(StorageBooking, on_delete=models.CASCADE, related_name='events')
+    # PROTECT: rezerwacji z historia nie usuwamy (od tego jest anulowanie), wiec log
+    # nie moze zniknac razem z nia.
+    booking = models.ForeignKey(StorageBooking, on_delete=models.PROTECT, related_name='events')
     event_type = models.CharField(max_length=20, choices=EVENT_CHOICES)
     performed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
     note = models.TextField(blank=True)

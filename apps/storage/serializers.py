@@ -77,6 +77,14 @@ class StorageBookingWriteSerializer(serializers.ModelSerializer):
             'price': {'required': False},
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Przy edycji zlecenie i sprzet sa stale - przepiecie rezerwacji (z wplatami)
+        # na inne zlecenie zmienialoby jej wlasciciela.
+        if self.instance is not None:
+            for name in ('repair_order', 'bike'):
+                self.fields[name].read_only = True
+
     def validate(self, attrs):
         instance = self.instance
         repair_order = attrs.get('repair_order') or (instance and instance.repair_order)

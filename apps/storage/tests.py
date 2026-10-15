@@ -278,3 +278,68 @@ class StorageApiTests(StorageTestCase):
         self.assertEqual(body['stored_now'], 1)
         self.assertEqual(body['unpaid_count'], 1)
         self.assertEqual(Decimal(body['outstanding_amount']), Decimal('550.00'))
+
+
+class StorageBookingEditTests(StorageTestCase):
+    """Edycja przez API idzie przez serwis, a rezerwacji nie da sie usunac."""
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.user)
+        self.booking = self.make_booking(price=Decimal('550.00'))
+        self.url = f'/api/storage/bookings/{self.booking.pk}/'
+
+    def patch(self, data):
+        return self.client.patch(self.url, data, content_type='application/json')
+
+    def test_edit_is_logged_with_old_and_new_values(self):
+        response = self.patch({'price': '600.00', 'end_date': '2027-04-15'})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()['price'], '600.00')
+
+        event = self.booking.events.get(event_type=StorageEvent.EVENT_UPDATE)
+        self.assertEqual(event.performed_by, self.user)
+        self.assertIn('550.00 -> 600.00', event.note)
+        self.assertIn('2027-03-31 -> 2027-04-15', event.note)
+
+    def test_unchanged_edit_writes_no_event(self):
+        response = self.patch({'price': '550.00'})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertFalse(self.booking.events.filter(event_type=StorageEvent.EVENT_UPDATE).exists())
+
+    def test_price_below_paid_amount_is_400(self):
+        services.register_payment(self.booking, amount=Decimal('300.00'), user=self.user)
+        response = self.patch({'price': '100.00'})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('price', response.json())
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.price, Decimal('550.00'))
+
+    def test_overlapping_edit_is_400(self):
+        self.make_booking(start='2027-04-01', end='2027-04-30')
+        self.assertEqual(self.patch({'end_date': '2027-04-15'}).status_code, 400)
+
+    def test_finished_booking_cannot_be_edited(self):
+        services.check_in(self.booking, user=self.user)
+        services.check_out(self.booking, user=self.user)
+        response = self.patch({'price': '900.00', 'end_date': '2027-06-30'})
+        self.assertEqual(response.status_code, 400)
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.price, Decimal('550.00'))
+        self.assertEqual(self.booking.end_date, date(2027, 3, 31))
+
+    def test_order_and_equipment_are_fixed_after_creation(self):
+        other = Customer.objects.create(first_name='Jan', last_name='Kowal', phone='600700800')
+        other_bike = Bike.objects.create(customer=other, brand='Kross')
+        other_order = RepairOrder.objects.create(customer=other, bike_tag_number=7, description='x')
+        other_order.bikes.set([other_bike])
+
+        self.patch({'repair_order': other_order.pk, 'bike': other_bike.pk})
+        self.booking.refresh_from_db()
+        self.assertEqual(self.booking.repair_order, self.order)
+        self.assertEqual(self.booking.bike, self.bike)
+
+    def test_delete_is_not_allowed(self):
+        self.assertEqual(self.client.delete(self.url).status_code, 405)
+        self.assertTrue(StorageBooking.objects.filter(pk=self.booking.pk).exists())
+        self.assertTrue(self.booking.events.exists())

@@ -9,12 +9,25 @@ from collections import defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import F, Q, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from .models import StorageBooking, StorageEvent
+
+# Pola, ktore wolno poprawic w aktywnej rezerwacji. Zlecenie i sprzet sa ustalane przy
+# tworzeniu - przepiecie oplaconej rezerwacji na inne zlecenie zmienialoby wlasciciela.
+EDITABLE_FIELDS = ('start_date', 'end_date', 'price', 'check_in_notes', 'check_out_notes')
+
+
+def _full_clean(booking):
+    """`full_clean()` z bledem DRF - walidacja modelu ma konczyc sie 400, nie 500."""
+    try:
+        booking.full_clean(exclude=['created_by'])
+    except DjangoValidationError as exc:
+        raise ValidationError(exc.message_dict)
 
 
 def _log(booking, event_type, user, note=''):
@@ -51,9 +64,45 @@ def create_booking(*, user=None, **fields):
     notes = fields.get('check_in_notes', '')
 
     with transaction.atomic():
-        booking.full_clean(exclude=['created_by'])
+        _full_clean(booking)
         booking.save()
         _log(booking, StorageEvent.EVENT_RESERVE, user, notes)
+    return booking
+
+
+@transaction.atomic
+def update_booking(booking, *, user=None, **fields):
+    """Poprawia dane aktywnej rezerwacji i zapisuje w logu, co sie zmienilo.
+
+    Jedyna droga edycji - PATCH/PUT z API tez tu trafia - zeby zmiana ceny czy terminu
+    nie mogla przejsc bez sladu. Odebranych i anulowanych pobytow nie edytujemy.
+    """
+    booking = StorageBooking.objects.select_for_update().get(pk=booking.pk)
+    if booking.status not in StorageBooking.ACTIVE_STATUSES:
+        raise ValidationError(
+            {'status': 'Edytowac mozna tylko rezerwacje aktywna (zarezerwowana albo w magazynie).'}
+        )
+
+    changes = []
+    for name in EDITABLE_FIELDS:
+        if name in fields and fields[name] != getattr(booking, name):
+            changes.append((name, getattr(booking, name), fields[name]))
+            setattr(booking, name, fields[name])
+    if not changes:
+        return booking
+
+    if booking.price < booking.paid_amount:
+        raise ValidationError(
+            {'price': f'Cena nie moze byc nizsza niz juz wplacona kwota ({booking.paid_amount} zl).'}
+        )
+    _full_clean(booking)
+    booking.save(update_fields=[name for name, _, _ in changes] + ['updated_at'])
+
+    note = '; '.join(
+        f'{StorageBooking._meta.get_field(name).verbose_name}: {old} -> {new}'
+        for name, old, new in changes
+    )
+    _log(booking, StorageEvent.EVENT_UPDATE, user, note)
     return booking
 
 
@@ -108,7 +157,7 @@ def extend(booking, *, end_date, user=None, note=''):
 
     previous = booking.end_date
     booking.end_date = end_date
-    booking.full_clean(exclude=['created_by'])
+    _full_clean(booking)
     booking.save(update_fields=['end_date', 'updated_at'])
     _log(
         booking, StorageEvent.EVENT_EXTEND, user,

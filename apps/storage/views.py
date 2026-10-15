@@ -88,11 +88,20 @@ DEFAULT_OCCUPANCY_DAYS = 365
             'cannot have two overlapping active stays.'
         ),
     ),
-    update=extend_schema(summary=_('Edit a storage booking')),
+    update=extend_schema(
+        summary=_('Edit a storage booking'),
+        description=_(
+            'Only active (`reserved` / `stored`) bookings can be edited, and only their dates, '
+            '`price` and notes - `repair_order` and `bike` are fixed once the booking exists. '
+            'The price cannot drop below `paid_amount`. Every change is written to the event '
+            'log as an `update` event listing the old and new values.'
+        ),
+    ),
     partial_update=extend_schema(summary=_('Edit a storage booking')),
-    destroy=extend_schema(summary=_('Delete a storage booking')),
 )
 class StorageBookingViewSet(ModelViewSet):
+    # Bez DELETE: rezerwacje sie anuluje (`cancel`), zeby log zdarzen zostal.
+    http_method_names = ['get', 'post', 'put', 'patch', 'head', 'options']
     queryset = (
         StorageBooking.objects
         .select_related('bike', 'repair_order', 'repair_order__customer')
@@ -135,6 +144,12 @@ class StorageBookingViewSet(ModelViewSet):
         # przechodzily dokladnie te sama walidacje i zostawialy zdarzenie `reserve`.
         serializer.instance = services.create_booking(
             user=self.request.user, **serializer.validated_data
+        )
+
+    def perform_update(self, serializer):
+        # Edycja tez przez serwis - pelna walidacja i zdarzenie `update` w logu.
+        serializer.instance = services.update_booking(
+            serializer.instance, user=self.request.user, **serializer.validated_data
         )
 
     def _run(self, request, handler, **kwargs):

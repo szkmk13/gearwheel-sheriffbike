@@ -25,6 +25,10 @@ class StorageBookingAdmin(admin.ModelAdmin):
     readonly_fields = ('checked_in_at', 'checked_out_at', 'paid_at', 'created_at', 'updated_at')
     inlines = [StorageEventInline]
 
+    def has_delete_permission(self, request, obj=None):
+        # Rezerwacje sie anuluje, nie usuwa - razem z nia zniknalby log zdarzen.
+        return False
+
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
             'bike', 'repair_order', 'repair_order__customer',
