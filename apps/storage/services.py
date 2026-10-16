@@ -15,6 +15,8 @@ from django.db.models import F, Q, Sum
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from apps.orders.models import RepairOrder
+
 from .models import StorageBooking, StorageEvent
 
 # Pola, ktore wolno poprawic w aktywnej rezerwacji. Zlecenie i sprzet sa ustalane przy
@@ -70,6 +72,62 @@ def create_booking(*, user=None, **fields):
     return booking
 
 
+def intake(*, customer, bikes, bike_tag_number, end_date, start_date=None, price=None,
+           description='', notes='', user=None):
+    """Przyjecie sprzetu na przechowanie - zlecenie i pobyty powstaja w jednym kroku.
+
+    Serwis nie przyjmuje rezerwacji z wyprzedzeniem: zlecenie (z naklejka przypieta na
+    sprzet) zaklada sie dopiero, gdy klient fizycznie przynosi sprzet. Jedno zlecenie
+    obejmuje wszystkie przyniesione sztuki pod jedna naklejka, a kazda sztuka dostaje
+    wlasny pobyt od razu w statusie `stored`. Wszystko albo nic - kolizja terminu
+    jednej sztuki cofa cale przyjecie.
+    """
+    start_date = start_date or timezone.localdate()
+    bikes = list(bikes)
+    if not bikes:
+        raise ValidationError({'bikes': 'Wybierz co najmniej jedna sztuke sprzetu.'})
+    if len(bikes) != len({bike.pk for bike in bikes}):
+        raise ValidationError({'bikes': 'Ta sama sztuka sprzetu zostala wybrana dwa razy.'})
+    foreign = [str(bike) for bike in bikes if bike.customer_id != customer.pk]
+    if foreign:
+        raise ValidationError({'bikes': f'Sprzet nie nalezy do tego klienta: {", ".join(foreign)}.'})
+    if end_date < start_date:
+        raise ValidationError(
+            {'end_date': 'Data konca pobytu nie moze byc wczesniejsza niz data poczatku.'}
+        )
+
+    now = timezone.now()
+    with transaction.atomic():
+        order = RepairOrder.objects.create(
+            customer=customer,
+            bike_tag_number=bike_tag_number,
+            description=description or 'Przechowanie zimowe',
+            estimated_pickup_date=end_date,
+        )
+        order.bikes.set(bikes)
+
+        bookings = []
+        for bike in bikes:
+            booking = StorageBooking(
+                repair_order=order, bike=bike, start_date=start_date, end_date=end_date,
+                status=StorageBooking.STATUS_STORED, checked_in_at=now, check_in_notes=notes,
+                created_by=user if user and user.is_authenticated else None,
+            )
+            if price is not None:
+                booking.price = price
+            # Kolizje sprawdzamy tu, a nie dopiero w `full_clean`, zeby komunikat wskazal
+            # sztuke - przy kilku naraz samo "zachodzacy termin" nie mowi, o ktora chodzi.
+            if booking.overlapping().exists():
+                raise ValidationError(
+                    {'bikes': f'{bike} ma juz przechowanie w zachodzacym terminie.'}
+                )
+            _full_clean(booking)
+            booking.save()
+            _log(booking, StorageEvent.EVENT_CHECK_IN, user, notes)
+            bookings.append(booking)
+    return order, bookings
+
+
 @transaction.atomic
 def update_booking(booking, *, user=None, **fields):
     """Poprawia dane aktywnej rezerwacji i zapisuje w logu, co sie zmienilo.
@@ -80,7 +138,7 @@ def update_booking(booking, *, user=None, **fields):
     booking = StorageBooking.objects.select_for_update().get(pk=booking.pk)
     if booking.status not in StorageBooking.ACTIVE_STATUSES:
         raise ValidationError(
-            {'status': 'Edytowac mozna tylko rezerwacje aktywna (zarezerwowana albo w magazynie).'}
+            {'status': 'Edytowac mozna tylko rezerwacje aktywna (zarezerwowana albo na przechowaniu).'}
         )
 
     changes = []
@@ -130,7 +188,7 @@ def check_out(booking, *, user=None, notes=''):
     rozliczana osobno - ale `balance_due` zostaje widoczne na rezerwacji."""
     if booking.status != StorageBooking.STATUS_STORED:
         raise ValidationError(
-            {'status': f'Wydac mozna tylko sprzet w magazynie (obecny status: '
+            {'status': f'Wydac mozna tylko sprzet na przechowaniu (obecny status: '
                        f'{booking.get_status_display()}).'}
         )
 
@@ -150,7 +208,7 @@ def extend(booking, *, end_date, user=None, note=''):
     if booking.status not in StorageBooking.ACTIVE_STATUSES:
         raise ValidationError(
             {'status': 'Zmienic termin mozna tylko rezerwacji aktywnej (zarezerwowana '
-                       'albo w magazynie).'}
+                       'albo na przechowaniu).'}
         )
     if end_date == booking.end_date:
         raise ValidationError({'end_date': 'Podana data konca pobytu jest juz ustawiona.'})

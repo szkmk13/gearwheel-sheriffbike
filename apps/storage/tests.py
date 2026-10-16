@@ -343,3 +343,89 @@ class StorageBookingEditTests(StorageTestCase):
         self.assertEqual(self.client.delete(self.url).status_code, 405)
         self.assertTrue(StorageBooking.objects.filter(pk=self.booking.pk).exists())
         self.assertTrue(self.booking.events.exists())
+
+
+class StorageIntakeTests(StorageTestCase):
+    """Przyjecie sprzetu: zlecenie powstaje razem z pobytami, nie wczesniej."""
+
+    url = '/api/storage/intake/'
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.user)
+
+    def post(self, **overrides):
+        data = {
+            'customer': self.customer.pk,
+            'bikes': [self.bike.pk, self.skis.pk],
+            'bike_tag_number': 77,
+            'start_date': '2026-11-01',
+            'end_date': '2027-03-31',
+            **overrides,
+        }
+        data = {key: value for key, value in data.items() if value is not None}
+        return self.client.post(self.url, data, content_type='application/json')
+
+    def test_creates_one_order_and_a_stored_stay_per_piece(self):
+        response = self.post(price='400.00', notes='Rysa na ramie')
+        self.assertEqual(response.status_code, 201, response.content)
+        body = response.json()
+
+        order = RepairOrder.objects.get(pk=body['repair_order'])
+        self.assertEqual(order.customer, self.customer)
+        self.assertEqual(order.bike_tag_number, 77)
+        self.assertEqual(order.estimated_pickup_date, date(2027, 3, 31))
+        self.assertEqual(set(order.bikes.all()), {self.bike, self.skis})
+
+        bookings = StorageBooking.objects.filter(repair_order=order)
+        self.assertEqual(bookings.count(), 2)
+        for booking in bookings:
+            self.assertEqual(booking.status, StorageBooking.STATUS_STORED)
+            self.assertIsNotNone(booking.checked_in_at)
+            self.assertEqual(booking.price, Decimal('400.00'))
+            self.assertEqual(booking.check_in_notes, 'Rysa na ramie')
+            self.assertEqual(
+                list(booking.events.values_list('event_type', flat=True)),
+                [StorageEvent.EVENT_CHECK_IN],
+            )
+        self.assertEqual({b['tag'] for b in body['bookings']}, {77})
+
+    def test_defaults_start_date_to_today_and_price_to_setting(self):
+        # `None` usuwa pole z payloadu - sprawdzamy wartosci domyslne.
+        with self.settings(STORAGE_DEFAULT_PRICE='550.00'):
+            response = self.post(start_date=None, bikes=[self.bike.pk], end_date='2099-03-31')
+        self.assertEqual(response.status_code, 201, response.content)
+        booking = StorageBooking.objects.get(bike=self.bike)
+        self.assertEqual(booking.start_date, date.today())
+        self.assertEqual(booking.price, Decimal('550.00'))
+
+    def test_overlap_of_one_piece_rolls_back_everything(self):
+        self.make_booking(bike=self.skis, start='2027-01-01', end='2027-02-28')
+        orders_before = RepairOrder.objects.count()
+
+        response = self.post()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('bikes', response.json())
+        self.assertEqual(RepairOrder.objects.count(), orders_before)
+        self.assertFalse(StorageBooking.objects.filter(bike=self.bike).exists())
+
+    def test_equipment_of_another_customer_is_rejected(self):
+        other = Customer.objects.create(first_name='Jan', last_name='Kowal', phone='600700800')
+        other_bike = Bike.objects.create(customer=other, brand='Kross')
+        orders_before = RepairOrder.objects.count()
+
+        response = self.post(bikes=[self.bike.pk, other_bike.pk])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('bikes', response.json())
+        self.assertEqual(RepairOrder.objects.count(), orders_before)
+
+    def test_requires_at_least_one_piece_and_valid_dates(self):
+        self.assertEqual(self.post(bikes=[]).status_code, 400)
+        response = self.post(start_date='2027-04-01', end_date='2027-03-31')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('end_date', response.json())
+        self.assertFalse(StorageBooking.objects.exists())
+
+    def test_requires_authentication(self):
+        self.client.logout()
+        self.assertEqual(self.post().status_code, 401)

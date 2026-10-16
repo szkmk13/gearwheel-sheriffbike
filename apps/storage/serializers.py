@@ -3,7 +3,7 @@ from decimal import Decimal
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
-from apps.customers.models import Bike
+from apps.customers.models import Bike, Customer
 from apps.customers.serializers import BikeNestedSerializer, CustomerBasicSerializer
 from apps.orders.models import RepairOrder
 
@@ -113,6 +113,31 @@ class StorageBookingWriteSerializer(serializers.ModelSerializer):
 
     def to_representation(self, instance):
         return StorageBookingDetailSerializer(instance, context=self.context).data
+
+
+class IntakeSerializer(serializers.Serializer):
+    """Przyjecie sprzetu: zlecenie i pobyty powstaja razem (patrz `services.intake`)."""
+
+    customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
+    bikes = serializers.PrimaryKeyRelatedField(
+        queryset=Bike.objects.all(), many=True, allow_empty=False,
+    )
+    bike_tag_number = serializers.IntegerField(min_value=0)
+    start_date = serializers.DateField(
+        required=False, help_text='Domyslnie dzisiaj - dzien, w ktorym sprzet trafia do serwisu.',
+    )
+    end_date = serializers.DateField()
+    price = serializers.DecimalField(
+        max_digits=8, decimal_places=2, min_value=Decimal('0.00'), required=False,
+        help_text='Cena za jedna sztuke. Domyslnie STORAGE_DEFAULT_PRICE.',
+    )
+    description = serializers.CharField(required=False, allow_blank=True)
+    notes = serializers.CharField(required=False, allow_blank=True)
+
+
+class IntakeResultSerializer(serializers.Serializer):
+    repair_order = serializers.IntegerField()
+    bookings = StorageBookingListSerializer(many=True)
 
 
 class CheckInSerializer(serializers.Serializer):

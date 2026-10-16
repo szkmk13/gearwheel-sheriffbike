@@ -28,7 +28,11 @@ export default function QRScannerModal({
   isOpen, 
   onClose, 
   initialAction = 'details', 
-  onBikeScanned = null 
+  onBikeScanned = null,
+  // Własny kontekst (np. przechowalnia): podpis zamiast domyślnego, bez przełącznika celu
+  // i bez linku do pełnego ekranu, który prowadzi do przepływu zleceń.
+  hint = null,
+  hideActionSwitch = false,
 }) {
   const navigate = useNavigate();
 
@@ -291,7 +295,7 @@ export default function QRScannerModal({
             <div>
               <h2 className="text-base sm:text-lg font-bold text-gray-900">Skaner SheriffBike QR</h2>
               <p className="text-xs text-gray-500">
-                {scanAction === 'new_order' ? 'Zeskanuj rower, by natychmiast utworzyć zlecenie' : 'Skieruj aparat na etykietę roweru'}
+                {hint || (scanAction === 'new_order' ? 'Zeskanuj rower, by natychmiast utworzyć zlecenie' : 'Skieruj aparat na etykietę roweru')}
               </p>
             </div>
           </div>
@@ -311,7 +315,7 @@ export default function QRScannerModal({
         </div>
 
         {/* Przełącznik akcji po zeskanowaniu */}
-        <div className="px-4 sm:px-5 py-2.5 bg-gray-100/70 border-b border-gray-200/70 flex items-center justify-between gap-2">
+        {!hideActionSwitch && <div className="px-4 sm:px-5 py-2.5 bg-gray-100/70 border-b border-gray-200/70 flex items-center justify-between gap-2">
           <span className="text-xs font-medium text-gray-600 shrink-0">Cel skanowania:</span>
           <div className="inline-flex p-0.5 bg-gray-200/80 rounded-lg text-xs font-semibold">
             <button
@@ -344,7 +348,7 @@ export default function QRScannerModal({
               <span>Nowe zlecenie</span>
             </button>
           </div>
-        </div>
+        </div>}
 
         {/* Widok aparatu na żywo */}
         <div className="p-4 sm:p-5 space-y-3">
@@ -409,17 +413,19 @@ export default function QRScannerModal({
 
         {/* Stopka z informacją */}
         <div className="px-5 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-          <button
-            type="button"
-            onClick={() => {
-              stopCamera();
-              onClose();
-              navigate(`/panel/scan?action=${scanAction}`);
-            }}
-            className="text-[var(--color-accent)] hover:underline font-medium cursor-pointer"
-          >
-            Otwórz na pełnym ekranie ↗
-          </button>
+          {hideActionSwitch ? <span /> : (
+            <button
+              type="button"
+              onClick={() => {
+                stopCamera();
+                onClose();
+                navigate(`/panel/scan?action=${scanAction}`);
+              }}
+              className="text-[var(--color-accent)] hover:underline font-medium cursor-pointer"
+            >
+              Otwórz na pełnym ekranie ↗
+            </button>
+          )}
           <button
             onClick={() => {
               stopCamera();

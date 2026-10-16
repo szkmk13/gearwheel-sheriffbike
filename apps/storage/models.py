@@ -37,7 +37,7 @@ class StorageBooking(models.Model):
     STATUS_CANCELLED = 'cancelled'
     STATUS_CHOICES = [
         (STATUS_RESERVED, 'Zarezerwowane'),
-        (STATUS_STORED, 'W magazynie'),
+        (STATUS_STORED, 'Na przechowaniu'),
         (STATUS_PICKED_UP, 'Odebrane'),
         (STATUS_CANCELLED, 'Anulowane'),
     ]

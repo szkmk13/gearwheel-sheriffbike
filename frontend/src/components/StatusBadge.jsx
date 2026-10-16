@@ -7,6 +7,10 @@ export const statusMap = {
     done: { label: 'Gotowe', className: 'bg-green-100 text-green-700' },
     delivered: { label: 'Odebrane', className: 'bg-gray-100 text-gray-500' },
     cancelled: { label: 'Anulowane', className: 'bg-red-100 text-red-700' },
+    // Przechowalnia (StorageBooking.status)
+    reserved: { label: 'Zarezerwowane', className: 'bg-yellow-100 text-yellow-800' },
+    stored: { label: 'Na przechowaniu', className: 'bg-blue-100 text-blue-700' },
+    picked_up: { label: 'Odebrane', className: 'bg-gray-100 text-gray-500' },
     OK: { label: 'OK', className: 'bg-green-100 text-green-700' },
     'Niski stan': { label: 'Niski stan', className: 'bg-orange-100 text-orange-700' }
 };

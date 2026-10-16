@@ -44,7 +44,7 @@ class StorageBookingFilter(filters.FilterSet):
     overdue = filters.BooleanFilter(
         method='filter_overdue',
         label='Przeterminowane',
-        help_text='Sprzet wciaz w magazynie, mimo ze termin odbioru minal.',
+        help_text='Sprzet wciaz na przechowaniu, mimo ze termin odbioru minal.',
     )
     unpaid = filters.BooleanFilter(
         method='filter_unpaid',

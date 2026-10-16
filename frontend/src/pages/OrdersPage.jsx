@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 import { fetchOrders, createOrder } from "../api/orders";
-import { fetchClients, fetchClientDetails, createClient, createBike, fetchBikeDetails, lookupClientByPhone } from "../api/clients";
+import { fetchClientDetails, createClient, createBike, fetchBikeDetails, lookupClientByPhone } from "../api/clients";
 
 import Button from "../components/Button";
 import SearchInput from "../components/SearchInput";
@@ -13,6 +13,7 @@ import Modal from "../components/Modal";
 import Input from "../components/Input";
 import DateInput from "../components/DateInput";
 import Select from "../components/Select";
+import ClientSearchSelect from "../components/ClientSearchSelect";
 import QRScannerModal from "../components/QRScannerModal";
 import { TableRowsSkeleton, MobileOrderCardsSkeleton } from "../components/Skeleton";
 import { todayISODate, defaultPickupDate, isOrderOverdue, formatDate } from "../utils/dates";
@@ -39,8 +40,11 @@ export default function OrdersPage() {
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedBikeId, setSelectedBikeId] = useState("");
   const [scannedBike, setScannedBike] = useState(null);
-  // Klient znaleziony po numerze telefonu w formularzu nowego klienta
+  // Klient wybrany z wyszukiwarki albo znaleziony po numerze w formularzu nowego klienta -
+  // pokazywany od razu, zanim dociągną się jego szczegóły (rowery).
   const [foundClient, setFoundClient] = useState(null);
+  // Tekst wpisany w wyszukiwarkę przed kliknięciem "+ Nowy klient" trafia do formularza nowego.
+  const [newClientPrefill, setNewClientPrefill] = useState({ fullName: '', phone: '' });
   const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   // Stan wyszukiwania i filtrowania
@@ -154,6 +158,7 @@ export default function OrdersPage() {
     setSelectedBikeId("");
     setScannedBike(null);
     setFoundClient(null);
+    setNewClientPrefill({ fullName: '', phone: '' });
   };
 
   const { data: ordersData, isLoading: isOrdersLoading, isError, error } = useQuery({
@@ -167,28 +172,32 @@ export default function OrdersPage() {
   });
   const ordersList = ordersData?.results || [];
 
-  const { data: clientsData } = useQuery({
-    queryKey: ['clients'],
-    queryFn: () => fetchClients(),
-  });
-  let clientOptions = (clientsData?.results || []).map(client => ({
-    value: String(client.id),
-    label: `${client.first_name} ${client.last_name}`
-  }));
-
-  // Lista klientów jest stronicowana, więc znalezionego po numerze może na niej nie być.
-  if (foundClient && !clientOptions.some(c => c.value === String(foundClient.id))) {
-    clientOptions = [
-      { value: String(foundClient.id), label: `${foundClient.first_name} ${foundClient.last_name}` },
-      ...clientOptions
-    ];
-  }
-
   const { data: selectedClientDetails } = useQuery({
     queryKey: ['client', selectedClientId],
     queryFn: () => fetchClientDetails(selectedClientId),
     enabled: !!selectedClientId && !isNewClient,
   });
+
+  const selectedClient = selectedClientDetails
+    ?? (foundClient && String(foundClient.id) === String(selectedClientId) ? foundClient : null);
+
+  const handleClientPicked = (client) => {
+    setFoundClient(client);
+    setSelectedClientId(client ? String(client.id) : "");
+    setSelectedBikeId("");
+    setScannedBike(null);
+    if (client && !client.rodo_accepted) {
+      toast.error(`${client.first_name} ${client.last_name} nie ma w bazie zgody RODO - poproś o jej podpisanie.`, { duration: 8000 });
+    }
+  };
+
+  const handleCreateNewClient = (prefill) => {
+    setNewClientPrefill({ fullName: '', phone: '', ...prefill });
+    setIsNewClient(true);
+    setIsNewBike(true);
+    setSelectedClientId("");
+    setSelectedBikeId("");
+  };
 
   let bikeOptions = (selectedClientDetails?.bikes || []).map(bike => ({
     value: String(bike.id),
@@ -593,22 +602,18 @@ export default function OrdersPage() {
                 </div>
 
                 {!isNewClient ? (
-                    <Select
-                      name="customer" 
-                      label="Klient z bazy" 
-                      options={clientOptions} 
-                      placeholder="Wybierz klienta..."
-                      value={selectedClientId}
-                      required={!isNewClient} 
-                      onChange={(e) => {
-                        setSelectedClientId(e.target.value);
-                        setSelectedBikeId("");
-                      }}
+                    <ClientSearchSelect
+                      name="customer"
+                      label="Klient z bazy"
+                      required
+                      value={selectedClient}
+                      onChange={handleClientPicked}
+                      onCreateNew={handleCreateNewClient}
                     />
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      <Input name="fullName" label="Imię i nazwisko" placeholder="np. Jan Kowalski" required={true} />
-                      <Input name="phone" label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} onBlur={handleNewClientPhoneBlur} />
+                      <Input name="fullName" label="Imię i nazwisko" placeholder="np. Jan Kowalski" required={true} defaultValue={newClientPrefill.fullName} />
+                      <Input name="phone" label="Numer telefonu" type="tel" placeholder="np. +48 222 222 222" required={true} defaultValue={newClientPrefill.phone} onBlur={handleNewClientPhoneBlur} />
                       <div className="lg:col-span-2">
                           <Input name="email" label="Adres e-mail" type="email" placeholder="np. jan.kowalski@email.com" />
                       </div>

@@ -4,6 +4,7 @@ from django.db.models import Prefetch
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
+from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
@@ -20,6 +21,8 @@ from .serializers import (
     CheckInSerializer,
     CheckOutSerializer,
     ExtendSerializer,
+    IntakeResultSerializer,
+    IntakeSerializer,
     OccupancySerializer,
     PaymentSerializer,
     StorageBookingDetailSerializer,
@@ -280,3 +283,27 @@ class OccupancyView(APIView):
 class StorageDashboardView(APIView):
     def get(self, request):
         return Response(StorageDashboardSerializer(services.dashboard()).data)
+
+
+@extend_schema(
+    summary=_('Take equipment into storage'),
+    description=_(
+        'The shop takes no advance reservations: the repair order is created only when the '
+        'customer brings the equipment in. This creates, in one transaction, a repair order '
+        'for all the listed equipment under one claim tag and one stay per piece, already '
+        '`stored`. All the equipment must belong to `customer`. `start_date` defaults to '
+        'today and `price` (per piece) to `STORAGE_DEFAULT_PRICE`. If any piece already has '
+        'an overlapping stay, nothing is created.'
+    ),
+    request=IntakeSerializer,
+    responses={201: IntakeResultSerializer},
+)
+class StorageIntakeView(APIView):
+    def post(self, request):
+        payload = IntakeSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        order, bookings = services.intake(user=request.user, **payload.validated_data)
+        return Response(
+            IntakeResultSerializer({'repair_order': order.pk, 'bookings': bookings}).data,
+            status=status.HTTP_201_CREATED,
+        )
