@@ -303,7 +303,7 @@ export default function CalendarPage() {
                   onChange={(e) => setShowClosed(e.target.checked)}
                   className="w-4 h-4 rounded border-[var(--color-line)] text-[var(--color-accent)] focus:ring-[var(--color-accent)] cursor-pointer"
                 />
-                Pokaż odebrane i anulowane
+                Pokaż wszystkie
               </label>
 
               <div className="inline-flex rounded-md border border-[var(--color-line)] bg-[var(--color-paper-2)] p-0.5 shadow-xs">

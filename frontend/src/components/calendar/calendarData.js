@@ -1,7 +1,7 @@
 // Wspolne dla kalendarza (/panel/calendar) i paska najblizszych odbiorow na dashboardzie.
 
-// Domyslnie bez `delivered` i `cancelled` - to terminy, ktore juz nie sa aktualne.
-export const OPEN_STATUSES = ['accepted', 'estimating', 'waiting_parts', 'in_progress', 'done'];
+// Domyslnie bez `done`, `delivered` i `cancelled` - przy tych zleceniach nie ma juz nic do zrobienia.
+export const OPEN_STATUSES = ['accepted', 'estimating', 'waiting_parts', 'in_progress'];
 
 // Klucz zaczyna sie od 'orders', wiec kazde invalidateQueries(['orders']) po zmianie
 // zlecenia odswieza tez kalendarz i dashboard.
