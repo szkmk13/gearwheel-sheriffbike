@@ -636,6 +636,16 @@ class OrderItemsTests(APITestCase):
         )
         self.assertEqual(self.final_cost(), Decimal('40.00'))
 
+    def test_editing_description_keeps_items_and_final_cost(self):
+        self.add(part=self.tube.pk, quantity='2')
+        response = self.client.patch(
+            f'/api/orders/{self.order.pk}/', {'description': 'Serwis + wymiana dętki'}, format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.json()['description'], 'Serwis + wymiana dętki')
+        self.assertEqual(self.order.items.count(), 1)
+        self.assertEqual(self.final_cost(), Decimal('40.00'))
+
     def test_same_catalogue_entry_adds_to_quantity(self):
         self.assertEqual(self.add(part=self.tube.pk).status_code, 201)
         response = self.add(part=self.tube.pk, quantity='2')

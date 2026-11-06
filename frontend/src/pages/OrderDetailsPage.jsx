@@ -1,14 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { fetchOrderDetails, changeOrderStatus } from '../api/orders';
+import { fetchOrderDetails, changeOrderStatus, updateOrder } from '../api/orders';
 import StatusBadge from '../components/StatusBadge';
 import { OrderDetailsSkeleton } from '../components/Skeleton';
 import { isOrderOverdue, formatDate, formatDateTime } from '../utils/dates';
 import PrintIntakeButton from '../print/PrintIntakeButton';
 import SmsPreviewModal from '../components/SmsPreviewModal';
-import OrderItemsSection, { ITEM_KINDS } from '../components/orders/OrderItemsSection';
+import OrderItemsSection, { ITEM_KINDS, ITEMS_LOCKED_STATUSES } from '../components/orders/OrderItemsSection';
 import { formatMoney } from '../utils/money';
 
 export default function OrderDetailsPage() {
@@ -186,12 +186,7 @@ export default function OrderDetailsPage() {
                         </div>
                     </div>
 
-                    <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6">
-                        <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)] mb-3">Opis usterki / Wymagane prace</h3>
-                        <div className="p-3.5 sm:p-4 bg-[var(--color-paper)] rounded-lg border border-[var(--color-line)] text-sm sm:text-base text-[var(--color-ink-2)] whitespace-pre-wrap">
-                            {order.description}
-                        </div>
-                    </div>
+                    <OrderDescriptionCard order={order} />
 
                     {/* Historia zmian statusu */}
                     <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6">
@@ -271,6 +266,102 @@ export default function OrderDetailsPage() {
             </div>
 
             <SmsPreviewModal orderId={order.id} preview={smsPreview} onClose={() => setSmsPreview(null)} />
+        </div>
+    );
+}
+
+// Opis usterki / zakres prac - do poprawienia po przyjęciu, dopóki zlecenie nie jest wydane ani anulowane
+// (te same statusy, przy których blokują się pozycje zlecenia).
+function OrderDescriptionCard({ order }) {
+    const queryClient = useQueryClient();
+    const [isEditing, setIsEditing] = useState(false);
+    const [draft, setDraft] = useState(order.description);
+    const textareaRef = useRef(null);
+    const locked = ITEMS_LOCKED_STATUSES.includes(order.status);
+
+    // Kursor na końcu opisu, nie na początku jak przy samym autoFocus - zwykle dopisuje się na końcu.
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (!isEditing || !textarea) return;
+        const end = textarea.value.length;
+        textarea.focus();
+        textarea.setSelectionRange(end, end);
+        textarea.scrollTop = textarea.scrollHeight;
+    }, [isEditing]);
+
+    const mutation = useMutation({
+        mutationFn: (description) => updateOrder({ id: order.id, orderData: { description } }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['order', String(order.id)] });
+            queryClient.invalidateQueries({ queryKey: ['orders'] });
+            setIsEditing(false);
+            toast.success('Opis zlecenia został zaktualizowany!');
+        },
+        // Wpisany tekst zostaje w polu, żeby można było poprawić i spróbować jeszcze raz.
+        onError: (error) => toast.error(`Błąd zapisu opisu: ${error.message}`),
+    });
+
+    const startEditing = () => {
+        setDraft(order.description);
+        setIsEditing(true);
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        mutation.mutate(draft.trim());
+    };
+
+    return (
+        <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6">
+            <div className="flex items-center justify-between gap-3 mb-3">
+                <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)]">Opis usterki / Wymagane prace</h3>
+                {!locked && !isEditing && (
+                    <button
+                        type="button"
+                        onClick={startEditing}
+                        className="text-xs font-medium text-[var(--color-accent)] hover:underline cursor-pointer"
+                    >
+                        Edytuj
+                    </button>
+                )}
+            </div>
+
+            {isEditing ? (
+                <form onSubmit={handleSubmit}>
+                    <textarea
+                        ref={textareaRef}
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        rows={5}
+                        disabled={mutation.isPending}
+                        placeholder="Dokładny opis tego, co należy wykonać..."
+                        className="w-full p-3.5 sm:p-4 bg-[var(--color-paper)] rounded-lg border border-[var(--color-line)] text-sm sm:text-base text-[var(--color-ink)]
+                                   focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] resize-y"
+                    />
+                    <div className="flex justify-end gap-2 mt-3">
+                        <button
+                            type="button"
+                            onClick={() => setIsEditing(false)}
+                            disabled={mutation.isPending}
+                            className="px-4 py-2 text-sm font-medium text-[var(--color-ink-2)] hover:bg-[var(--color-paper)] rounded-md transition-colors cursor-pointer"
+                        >
+                            Anuluj
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={mutation.isPending || !draft.trim()}
+                            className="px-4 py-2 text-sm font-medium text-white bg-[var(--color-accent)] hover:bg-[var(--color-accent-deep)] rounded-md transition-colors cursor-pointer
+                                       disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            {mutation.isPending ? 'Zapisywanie...' : 'Zapisz'}
+                        </button>
+                    </div>
+                </form>
+            ) : (
+                <div className="p-3.5 sm:p-4 bg-[var(--color-paper)] rounded-lg border border-[var(--color-line)] text-sm sm:text-base text-[var(--color-ink-2)] whitespace-pre-wrap">
+                    {order.description}
+                </div>
+            )}
         </div>
     );
 }
