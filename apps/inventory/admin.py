@@ -16,9 +16,12 @@ class SupplierAdmin(admin.ModelAdmin):
 
 @admin.register(Part)
 class PartAdmin(admin.ModelAdmin):
-    list_display = ('name', 'sku', 'stock_quantity', 'low_stock_threshold', 'sell_price', 'category', 'supplier')
-    list_filter = ('category', 'supplier')
+    list_display = ('name', 'kind', 'sku', 'unit', 'sell_price', 'is_active', 'category', 'supplier')
+    list_filter = ('kind', 'is_active', 'category', 'supplier')
+    list_editable = ('sell_price', 'is_active')
     search_fields = ('name', 'sku', 'barcode')
+    # Stany magazynowe nie są na razie prowadzone (wszystko "bez limitu") - ukryte, żeby nie myliły.
+    exclude = ('stock_quantity', 'low_stock_threshold')
 
 
 @admin.register(Invoice)

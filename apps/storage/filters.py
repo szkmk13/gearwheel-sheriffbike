@@ -1,4 +1,3 @@
-from django.db.models import F
 from django.utils import timezone
 from django_filters import rest_framework as filters
 
@@ -46,16 +45,11 @@ class StorageBookingFilter(filters.FilterSet):
         label='Przeterminowane',
         help_text='Sprzet wciaz na przechowaniu, mimo ze termin odbioru minal.',
     )
-    unpaid = filters.BooleanFilter(
-        method='filter_unpaid',
-        label='Nieoplacone',
-        help_text='Rezerwacje z niezerowa kwota do zaplaty (anulowane pomijamy).',
-    )
 
     class Meta:
         model = StorageBooking
         fields = ['status', 'category', 'customer', 'bike', 'repair_order',
-                  'start_after', 'end_before', 'active_on', 'overdue', 'unpaid']
+                  'start_after', 'end_before', 'active_on', 'overdue']
 
     def filter_active_on(self, queryset, name, value):
         return queryset.filter(
@@ -67,9 +61,3 @@ class StorageBookingFilter(filters.FilterSet):
     def filter_overdue(self, queryset, name, value):
         condition = {'status': StorageBooking.STATUS_STORED, 'end_date__lt': timezone.localdate()}
         return queryset.filter(**condition) if value else queryset.exclude(**condition)
-
-    def filter_unpaid(self, queryset, name, value):
-        settled = queryset.exclude(status=StorageBooking.STATUS_CANCELLED)
-        if value:
-            return settled.filter(paid_amount__lt=F('price'))
-        return settled.filter(paid_amount__gte=F('price'))

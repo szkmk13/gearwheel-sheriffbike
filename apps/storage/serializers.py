@@ -30,8 +30,6 @@ class StorageBookingListSerializer(serializers.ModelSerializer):
     category = serializers.CharField(source='bike.category', read_only=True)
     tag = serializers.IntegerField(source='repair_order.bike_tag_number', read_only=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
-    balance_due = serializers.DecimalField(max_digits=8, decimal_places=2, read_only=True)
-    is_paid = serializers.BooleanField(read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
 
     class Meta:
@@ -39,7 +37,7 @@ class StorageBookingListSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'repair_order', 'tag', 'customer', 'customer_name', 'bike', 'bike_label',
             'category', 'start_date', 'end_date', 'status', 'status_display',
-            'price', 'paid_amount', 'balance_due', 'is_paid', 'is_overdue',
+            'is_overdue',
             'checked_in_at', 'checked_out_at', 'created_at',
         )
 
@@ -55,7 +53,7 @@ class StorageBookingDetailSerializer(StorageBookingListSerializer):
 
     class Meta(StorageBookingListSerializer.Meta):
         fields = StorageBookingListSerializer.Meta.fields + (
-            'paid_at', 'check_in_notes', 'check_out_notes', 'created_by', 'updated_at', 'events',
+            'check_in_notes', 'check_out_notes', 'created_by', 'updated_at', 'events',
         )
 
 
@@ -68,19 +66,18 @@ class StorageBookingWriteSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StorageBooking
-        fields = ('repair_order', 'bike', 'start_date', 'end_date', 'price',
+        fields = ('repair_order', 'bike', 'start_date', 'end_date',
                   'check_in_notes', 'check_out_notes', 'status')
         extra_kwargs = {
             # Status zmieniaja wylacznie akcje (check-in/check-out/cancel), zeby kazde
             # przejscie zostawilo slad w StorageEvent.
             'status': {'read_only': True},
-            'price': {'required': False},
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # Przy edycji zlecenie i sprzet sa stale - przepiecie rezerwacji (z wplatami)
-        # na inne zlecenie zmienialoby jej wlasciciela.
+        # Przy edycji zlecenie i sprzet sa stale - przepiecie rezerwacji na inne
+        # zlecenie zmienialoby jej wlasciciela.
         if self.instance is not None:
             for name in ('repair_order', 'bike'):
                 self.fields[name].read_only = True
@@ -129,7 +126,7 @@ class IntakeSerializer(serializers.Serializer):
     end_date = serializers.DateField()
     price = serializers.DecimalField(
         max_digits=8, decimal_places=2, min_value=Decimal('0.00'), required=False,
-        help_text='Cena za jedna sztuke. Domyslnie STORAGE_DEFAULT_PRICE.',
+        help_text='Cena za sztuke na pozycji "Przechowanie zimowe". Domyslnie z katalogu.',
     )
     description = serializers.CharField(required=False, allow_blank=True)
     notes = serializers.CharField(required=False, allow_blank=True)
@@ -157,11 +154,6 @@ class CancelSerializer(serializers.Serializer):
     reason = serializers.CharField(required=False, allow_blank=True)
 
 
-class PaymentSerializer(serializers.Serializer):
-    amount = serializers.DecimalField(max_digits=8, decimal_places=2, min_value=Decimal('0.01'))
-    note = serializers.CharField(required=False, allow_blank=True)
-
-
 class OccupancyPointSerializer(serializers.Serializer):
     date = serializers.DateField()
     count = serializers.IntegerField()
@@ -181,6 +173,3 @@ class StorageDashboardSerializer(serializers.Serializer):
     due_this_week = serializers.IntegerField()
     overdue = serializers.IntegerField()
     upcoming = serializers.IntegerField()
-    unpaid_count = serializers.IntegerField()
-    outstanding_amount = serializers.DecimalField(max_digits=10, decimal_places=2)
-    paid_amount_total = serializers.DecimalField(max_digits=10, decimal_places=2)

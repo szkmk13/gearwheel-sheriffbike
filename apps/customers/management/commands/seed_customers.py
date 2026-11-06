@@ -50,8 +50,8 @@ ITEMS = [
     ('part', 'Łańcuch', 50, 120),
     ('part', 'Kaseta', 90, 220),
     ('part', 'Linka hamulcowa', 10, 20),
-    ('labor', 'Robocizna serwisowa', 60, 160),
-    ('labor', 'Diagnostyka', 40, 80),
+    ('service', 'Robocizna serwisowa', 60, 160),
+    ('service', 'Diagnostyka', 40, 80),
 ]
 
 # Ułamek rowerów, dla których ostatnie zlecenie jest świeże (patrz _create_repair_history).
@@ -242,10 +242,10 @@ class Command(BaseCommand):
         # z momentu wejścia w dany status, a delivered_at tylko dla 'delivered'.
         accepted_at = timeline[0][1]
         delivered_at = next((at for name, at in timeline if name == 'delivered'), None)
-        # Kwota końcowa jest znana dopiero po zamknięciu naprawy; wycena wstępna
-        # to zaokrąglone przybliżenie tej kwoty (+/- 20%).
+        # Wycena wstępna to zaokrąglone przybliżenie sumy pozycji (+/- 20%), a final_cost
+        # zawsze równa się tej sumie (orders.services.recalculate_final_cost).
         estimated_cost = (items_total * Decimal(random.randint(80, 120)) / Decimal(100)).quantize(Decimal('1'))
-        final_cost = items_total if status in ('done', 'delivered') else None
+        final_cost = items_total
 
         for old_status, new_status, changed_at in self._transitions(timeline):
             history = StatusHistory.objects.create(

@@ -76,7 +76,7 @@ export default function MainLayout() {
             />
 
             {/* Główna zawartość */}
-            <main className="flex-1 overflow-y-auto min-w-0 bg-[var(--color-paper)]">
+            <main className="flex-1 overflow-y-auto [scrollbar-gutter:stable] min-w-0 bg-[var(--color-paper)]">
                 <Outlet />
             </main>
 

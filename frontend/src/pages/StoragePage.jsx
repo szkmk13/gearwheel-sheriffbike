@@ -13,7 +13,7 @@ import StorageIntakeModal from "../components/storage/StorageIntakeModal";
 import StorageBookingPanel from "../components/storage/StorageBookingPanel";
 import QRScannerModal from "../components/QRScannerModal";
 import {
-  ACTIVE_STORAGE_STATUSES, STORAGE_STATUS_TABS, formatMoney, storageKeys,
+  ACTIVE_STORAGE_STATUSES, STORAGE_STATUS_TABS, storageKeys,
 } from "../components/storage/storageData";
 import { fetchStorageBookings, fetchStorageDashboard } from "../api/storage";
 import { formatDate } from "../utils/dates";
@@ -28,7 +28,7 @@ const chipClass = (active) =>
   }`;
 
 function StatTile({ label, value, hint, tone = 'default' }) {
-  const toneClass = { default: 'text-[var(--color-ink)]', red: 'text-red-600', orange: 'text-orange-700' }[tone];
+  const toneClass = { default: 'text-[var(--color-ink)]', red: 'text-red-600' }[tone];
   return (
     <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl p-4 shadow-sm">
       <p className="text-xs sm:text-sm text-[var(--color-ink-3)]">{label}</p>
@@ -48,19 +48,6 @@ function OrderLink({ booking }) {
     >
       Zlecenie #{booking.repair_order}
     </Link>
-  );
-}
-
-function PaymentCell({ booking }) {
-  if (booking.status === 'cancelled') return <span className="text-[var(--color-ink-3)]">-</span>;
-  if (booking.is_paid) return <span className="text-green-700 font-medium">Opłacone</span>;
-  return (
-    <span className="text-orange-700 font-medium">
-      {formatMoney(booking.balance_due)}
-      <span className="block text-[10px] uppercase tracking-wider font-normal text-[var(--color-ink-3)]">
-        do zapłaty z {formatMoney(booking.price)}
-      </span>
-    </span>
   );
 }
 
@@ -175,18 +162,14 @@ export default function StoragePage() {
       </StickyHeader>
 
       {/* LICZNIKI */}
-      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
         {isStatsLoading || !stats ? (
-          Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-[104px] rounded-xl" />)
+          Array.from({ length: 3 }).map((_, i) => <Skeleton key={i} className="h-[104px] rounded-xl" />)
         ) : (
           <>
             <StatTile label="Na przechowaniu" value={stats.stored_now} hint="rowerów w serwisie" />
             <StatTile label="Odbiór w ciągu 7 dni" value={stats.due_this_week} hint="termin do tygodnia" />
             <StatTile label="Po terminie" value={stats.overdue} tone={stats.overdue ? 'red' : 'default'} hint="nieodebrane w terminie" />
-            <StatTile
-              label="Do zapłaty" value={formatMoney(stats.outstanding_amount)} tone={stats.unpaid_count ? 'orange' : 'default'}
-              hint={`${stats.unpaid_count} szt. nieopłaconych`}
-            />
           </>
         )}
       </div>
@@ -208,13 +191,12 @@ export default function StoragePage() {
                 <th className="py-4 px-6 font-medium">Rower</th>
                 <th className="py-4 px-6 font-medium">Termin</th>
                 <th className="py-4 px-6 font-medium">Status</th>
-                <th className="py-4 px-6 font-medium">Płatność</th>
                 <th className="py-4 px-6 font-medium">Zlecenie</th>
               </tr>
             </thead>
             <tbody className="text-sm text-[var(--color-ink)]">
               {isLoading ? (
-                <TableRowsSkeleton rows={6} cols={7} />
+                <TableRowsSkeleton rows={6} cols={6} />
               ) : bookings.length > 0 ? (
                 bookings.map((booking) => (
                   <tr
@@ -232,13 +214,12 @@ export default function StoragePage() {
                       {booking.is_overdue && <span className="block text-[10px] uppercase tracking-wider">Po terminie</span>}
                     </td>
                     <td className="py-4 px-6"><StatusBadge status={booking.status} /></td>
-                    <td className="py-4 px-6"><PaymentCell booking={booking} /></td>
                     <td className="py-4 px-6"><OrderLink booking={booking} /></td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="7" className="py-8 px-6 text-center text-[var(--color-ink-3)]">{emptyMessage}</td>
+                  <td colSpan="6" className="py-8 px-6 text-center text-[var(--color-ink-3)]">{emptyMessage}</td>
                 </tr>
               )}
             </tbody>
@@ -270,9 +251,8 @@ export default function StoragePage() {
                   {formatDate(booking.start_date)} - {formatDate(booking.end_date)}
                   {booking.is_overdue && ' (po terminie)'}
                 </span>
-                <span className="text-right text-sm"><PaymentCell booking={booking} /></span>
+                <span className="text-right text-sm"><OrderLink booking={booking} /></span>
               </div>
-              <div className="text-sm"><OrderLink booking={booking} /></div>
             </div>
           ))
         ) : (

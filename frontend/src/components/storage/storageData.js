@@ -34,11 +34,7 @@ export const defaultStorageEndDate = () => {
 export const categoryLabel = (category) =>
   CATEGORY_OPTIONS.find((c) => c.value === category)?.label ?? category;
 
-// Kwoty z DRF przychodzą jako stringi ("550.00").
-export const formatMoney = (value) => {
-  const number = Number(value ?? 0);
-  return `${number.toLocaleString('pl-PL', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} zł`;
-};
+export { formatMoney } from '../../utils/money';
 
 export const storageKeys = {
   all: ['storage'],

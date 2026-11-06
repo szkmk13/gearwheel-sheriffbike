@@ -60,14 +60,25 @@ export const fetchOrderStatusHistory = async (id) => {
   return get(`/api/orders/${id}/history/`);
 };
 
-// Pobiera listę pozycji (części i robocizna) dla zlecenia
+// Pobiera pozycje zlecenia (usługi, części, akcesoria)
 export const fetchOrderItems = async (id) => {
   return get(`/api/orders/${id}/items/`);
 };
 
-// Dodaje pozycję (część lub robociznę) do zlecenia
+// Dodaje pozycję: z katalogu ({ part, quantity }) albo jednorazową
+// ({ description, item_type, unit_price, quantity, save_to_catalog }). Przelicza final_cost zlecenia.
 export const createOrderItem = async (id, itemData) => {
   return post(`/api/orders/${id}/items/`, itemData);
+};
+
+// Poprawia ilość, cenę, opis albo rodzaj pozycji
+export const updateOrderItem = async (orderId, itemId, data) => {
+  return patch(`/api/orders/${orderId}/items/${itemId}/`, data);
+};
+
+// Usuwa pozycję ze zlecenia
+export const deleteOrderItem = async (orderId, itemId) => {
+  return del(`/api/orders/${orderId}/items/${itemId}/`);
 };
 
 // Pobiera statystyki dashboardu

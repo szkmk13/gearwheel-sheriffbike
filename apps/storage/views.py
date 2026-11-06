@@ -24,7 +24,6 @@ from .serializers import (
     IntakeResultSerializer,
     IntakeSerializer,
     OccupancySerializer,
-    PaymentSerializer,
     StorageBookingDetailSerializer,
     StorageBookingListSerializer,
     StorageBookingWriteSerializer,
@@ -45,7 +44,7 @@ DEFAULT_OCCUPANCY_DAYS = 365
             'tag number are read from the linked repair order (`customer`, `tag`), so they '
             'never drift from it. Supports filtering (`status` - also several comma-separated '
             'values, `customer`, `bike`, `repair_order`, `category`, `start_after`, '
-            '`end_before`, `active_on`, `overdue`, `unpaid`), searching (`search` over the '
+            '`end_before`, `active_on`, `overdue`), searching (`search` over the '
             'customer and equipment) and ordering (`ordering`).'
         ),
         parameters=[
@@ -74,10 +73,6 @@ DEFAULT_OCCUPANCY_DAYS = 365
                 'overdue', bool, OpenApiParameter.QUERY,
                 description=_('Equipment still stored past its agreed end date.'),
             ),
-            OpenApiParameter(
-                'unpaid', bool, OpenApiParameter.QUERY,
-                description=_('Stays with an outstanding balance (cancelled ones excluded).'),
-            ),
         ],
     ),
     retrieve=extend_schema(summary=_('Storage booking detail, with its event log')),
@@ -85,19 +80,17 @@ DEFAULT_OCCUPANCY_DAYS = 365
         summary=_('Reserve storage for one piece of equipment'),
         description=_(
             'The repair order is required - it carries the claim tag the equipment is '
-            'labelled with, and the equipment must be attached to that order. `price` '
-            'defaults to `STORAGE_DEFAULT_PRICE` and is stored on the booking, so later '
-            'price changes never rewrite existing bookings. The same piece of equipment '
+            'labelled with, and the equipment must be attached to that order. The booking '
+            'holds no price - money lives on the order as items. The same piece of equipment '
             'cannot have two overlapping active stays.'
         ),
     ),
     update=extend_schema(
         summary=_('Edit a storage booking'),
         description=_(
-            'Only active (`reserved` / `stored`) bookings can be edited, and only their dates, '
-            '`price` and notes - `repair_order` and `bike` are fixed once the booking exists. '
-            'The price cannot drop below `paid_amount`. Every change is written to the event '
-            'log as an `update` event listing the old and new values.'
+            'Only active (`reserved` / `stored`) bookings can be edited, and only their dates '
+            'and notes - `repair_order` and `bike` are fixed once the booking exists. Every '
+            'change is written to the event log as an `update` event listing the old and new values.'
         ),
     ),
     partial_update=extend_schema(summary=_('Edit a storage booking')),
@@ -114,14 +107,13 @@ class StorageBookingViewSet(ModelViewSet):
         'repair_order__customer__first_name', 'repair_order__customer__last_name',
         'repair_order__customer__phone', 'bike__brand', 'bike__model', 'bike__serial_no',
     ]
-    ordering_fields = ['start_date', 'end_date', 'created_at', 'price', 'status']
+    ordering_fields = ['start_date', 'end_date', 'created_at', 'status']
 
     ACTION_SERIALIZERS = {
         'check_in': CheckInSerializer,
         'check_out': CheckOutSerializer,
         'extend': ExtendSerializer,
         'cancel': CancelSerializer,
-        'payment': PaymentSerializer,
         'events': StorageEventSerializer,
     }
 
@@ -178,9 +170,8 @@ class StorageBookingViewSet(ModelViewSet):
     @extend_schema(
         summary=_('Hand the equipment back'),
         description=_(
-            'Moves a `stored` booking to `picked_up` and stamps `checked_out_at`. An '
-            'outstanding balance does not block the handover - the shop settles payment '
-            'separately - it stays visible as `balance_due`.'
+            'Moves a `stored` booking to `picked_up` and stamps `checked_out_at`. Payment is '
+            'settled on the repair order, so it is not checked here.'
         ),
         request=CheckOutSerializer, responses=StorageBookingDetailSerializer,
     )
@@ -208,18 +199,6 @@ class StorageBookingViewSet(ModelViewSet):
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         return self._run(request, services.cancel, reason='')
-
-    @extend_schema(
-        summary=_('Register a payment'),
-        description=_(
-            'Adds to `paid_amount`; paying the full price stamps `paid_at`. Paying more '
-            'than the remaining balance is rejected with a 400.'
-        ),
-        request=PaymentSerializer, responses=StorageBookingDetailSerializer,
-    )
-    @action(detail=True, methods=['post'])
-    def payment(self, request, pk=None):
-        return self._run(request, services.register_payment, amount=None, note='')
 
     @extend_schema(summary=_('Event log of one booking'), responses=StorageEventSerializer(many=True))
     @action(detail=True, methods=['get'])
@@ -275,8 +254,7 @@ class OccupancyView(APIView):
 @extend_schema(
     summary=_('Storage dashboard counters'),
     description=_(
-        'What is in the shop right now, due for pickup within a week, overdue, upcoming, '
-        'and how much money is still outstanding.'
+        'What is in the shop right now, due for pickup within a week, overdue and upcoming.'
     ),
     responses=StorageDashboardSerializer,
 )
@@ -291,9 +269,10 @@ class StorageDashboardView(APIView):
         'The shop takes no advance reservations: the repair order is created only when the '
         'customer brings the equipment in. This creates, in one transaction, a repair order '
         'for all the listed equipment under one claim tag and one stay per piece, already '
-        '`stored`. All the equipment must belong to `customer`. `start_date` defaults to '
-        'today and `price` (per piece) to `STORAGE_DEFAULT_PRICE`. If any piece already has '
-        'an overlapping stay, nothing is created.'
+        '`stored`, and adds a "Przechowanie zimowe" item to the order (quantity = number of '
+        'pieces, `price` per piece, defaulting to the catalogue price). All the equipment must '
+        'belong to `customer`. `start_date` defaults to today. If any piece already has an '
+        'overlapping stay, nothing is created.'
     ),
     request=IntakeSerializer,
     responses={201: IntakeResultSerializer},

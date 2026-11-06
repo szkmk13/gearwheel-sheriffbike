@@ -15,12 +15,17 @@ class SupplierSerializer(serializers.ModelSerializer):
 
 
 class PartListSerializer(serializers.ModelSerializer):
+    kind_display = serializers.CharField(source='get_kind_display', read_only=True)
+
     class Meta:
         model = Part
-        fields = ('id', 'name', 'sku', 'unit', 'stock_quantity', 'low_stock_threshold', 'sell_price', 'category', 'supplier')
+        fields = ('id', 'name', 'kind', 'kind_display', 'is_active', 'sku', 'unit', 'stock_quantity',
+                  'low_stock_threshold', 'sell_price', 'category', 'supplier')
 
 
 class PartDetailSerializer(serializers.ModelSerializer):
+    kind_display = serializers.CharField(source='get_kind_display', read_only=True)
+
     class Meta:
         model = Part
         fields = '__all__'

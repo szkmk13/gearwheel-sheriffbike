@@ -1,7 +1,6 @@
 from datetime import date
 from decimal import Decimal
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -11,12 +10,12 @@ User = get_user_model()
 
 
 def default_storage_price():
-    """Cena przechowania brana z ustawien, zapisywana na rezerwacji jako snapshot.
+    """Nieuzywane - zostaje tylko dlatego, ze odwoluje sie do niego migracja 0003.
 
-    Jest to `default=` pola, a nie odczyt w locie - podniesienie cennika za rok nie moze
-    przepisac kwot na rezerwacjach juz rozliczonych.
+    Cena przechowania jest teraz pozycja "Przechowanie zimowe" na zleceniu
+    (`services.intake`), a nie polem rezerwacji.
     """
-    return Decimal(settings.STORAGE_DEFAULT_PRICE)
+    return Decimal('550.00')
 
 
 class StorageBooking(models.Model):
@@ -27,8 +26,9 @@ class StorageBooking(models.Model):
     identyfikuje `bike_tag_number` ze zlecenia, stad `repair_order` jest obowiazkowe
     (kazdy sprzet jest w trakcie przechowania serwisowany i tak).
 
-    Rozliczamy per sztuka, a jedno zlecenie moze objac kilka sztuk naraz (rower i dwie
-    pary nart), dlatego rezerwacja wskazuje konkretny `bike` z tego zlecenia.
+    Jedno zlecenie moze objac kilka sztuk naraz (rower i dwie pary nart), dlatego
+    rezerwacja wskazuje konkretny `bike` z tego zlecenia. Pieniadze sa na zleceniu:
+    przyjecie dopisuje mu pozycje "Przechowanie zimowe", a rezerwacja nie trzyma ceny.
     """
 
     STATUS_RESERVED = 'reserved'
@@ -66,19 +66,6 @@ class StorageBooking(models.Model):
         verbose_name='Status',
     )
 
-    price = models.DecimalField(
-        max_digits=8, decimal_places=2, default=default_storage_price,
-        verbose_name='Cena',
-        help_text='Kwota ustalona przy rezerwacji. Domyslnie z STORAGE_DEFAULT_PRICE.',
-    )
-    paid_amount = models.DecimalField(
-        max_digits=8, decimal_places=2, default=Decimal('0.00'), verbose_name='Zaplacono',
-    )
-    paid_at = models.DateTimeField(
-        null=True, blank=True, verbose_name='Oplacone w calosci',
-        help_text='Ustawiane automatycznie, gdy wplaty pokryja cala cene.',
-    )
-
     checked_in_at = models.DateTimeField(null=True, blank=True, verbose_name='Przyjeto')
     checked_out_at = models.DateTimeField(null=True, blank=True, verbose_name='Wydano')
     check_in_notes = models.TextField(blank=True, verbose_name='Uwagi przy przyjeciu')
@@ -101,14 +88,6 @@ class StorageBooking(models.Model):
                 condition=Q(end_date__gte=F('start_date')),
                 name='storage_booking_end_after_start',
             ),
-            models.CheckConstraint(
-                condition=Q(paid_amount__gte=Decimal('0.00')),
-                name='storage_booking_paid_amount_not_negative',
-            ),
-            models.CheckConstraint(
-                condition=Q(paid_amount__lte=F('price')),
-                name='storage_booking_paid_amount_within_price',
-            ),
         ]
 
     def __str__(self):
@@ -125,14 +104,6 @@ class StorageBooking(models.Model):
         return self.repair_order.bike_tag_number
 
     @property
-    def balance_due(self):
-        return self.price - self.paid_amount
-
-    @property
-    def is_paid(self):
-        return self.paid_amount >= self.price
-
-    @property
     def is_overdue(self):
         """Sprzet lezy dluzej, niz ustalono. Liczone z daty, wiec nie moze byc statusem."""
         return self.status == self.STATUS_STORED and self.end_date < date.today()
@@ -147,9 +118,6 @@ class StorageBooking(models.Model):
         if self.repair_order_id and self.bike_id:
             if not self.repair_order.bikes.filter(pk=self.bike_id).exists():
                 errors['bike'] = 'Ten sprzet nie jest przypiety do wskazanego zlecenia.'
-
-        if self.price is not None and self.paid_amount is not None and self.paid_amount > self.price:
-            errors['paid_amount'] = 'Wplata nie moze przekroczyc ceny przechowania.'
 
         if not errors and self.bike_id and self.start_date and self.end_date:
             if self.status in self.ACTIVE_STATUSES and self.overlapping().exists():
@@ -182,6 +150,7 @@ class StorageEvent(models.Model):
     EVENT_CHECK_IN = 'check_in'
     EVENT_CHECK_OUT = 'check_out'
     EVENT_EXTEND = 'extend'
+    # Wplaty przeniosly sie na zlecenie - typ zostaje tylko dla starych wpisow w logu.
     EVENT_PAYMENT = 'payment'
     EVENT_CANCEL = 'cancel'
     EVENT_UPDATE = 'update'

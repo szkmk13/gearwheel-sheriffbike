@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.db import models
 from django.db.models import ProtectedError
@@ -5,6 +7,7 @@ from django.db.models.signals import pre_delete
 from django.dispatch import receiver
 
 from apps.customers.models import Bike
+from apps.inventory.models import Part
 
 User = get_user_model()
 
@@ -81,19 +84,33 @@ def protect_bike_used_by_orders(sender, instance, **kwargs):
 
 
 class RepairOrderItem(models.Model):
-    ITEM_TYPE_CHOICES = [
-        ('part', 'Part'),
-        ('labor', 'Labor'),
-    ]
+    """One line of an order: a catalogue entry (`part`) or a one-off item without one.
+
+    `description` and `unit_price` are copied from the catalogue when the line is added, so
+    a later price change never rewrites past orders. Lines go through `services`
+    (add/update/remove_item), which keep `RepairOrder.final_cost` equal to their sum.
+    """
+    # The catalogue's kinds (Part.KIND_CHOICES) - a one-off line picks one too.
+    ITEM_TYPE_CHOICES = Part.KIND_CHOICES
+
     repair_order = models.ForeignKey(RepairOrder, on_delete=models.CASCADE, related_name='items')
     part = models.ForeignKey('inventory.Part', on_delete=models.PROTECT, null=True, blank=True)
     item_type = models.CharField(max_length=10, choices=ITEM_TYPE_CHOICES)
     description = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=8, decimal_places=2, default=1)
     unit_price = models.DecimalField(max_digits=8, decimal_places=2)
+    # Usage reports group lines by month/year - by the order's `delivered_at`, falling back to this.
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ['id']
 
     def __str__(self):
         return f'{self.description} x{self.quantity}'
+
+    @property
+    def line_total(self):
+        return (self.quantity * self.unit_price).quantize(Decimal('0.01'))
 
 
 class StatusHistory(models.Model):

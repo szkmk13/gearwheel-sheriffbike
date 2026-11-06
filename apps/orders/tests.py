@@ -12,6 +12,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.customers.models import Bike, Customer
+from apps.inventory.models import Part
 
 from .models import RepairOrder, StatusHistory
 
@@ -604,3 +605,122 @@ class OrderCalendarTests(APITestCase):
 
     def test_six_week_month_grid_is_allowed(self):
         self.assertEqual(self._calendar(start='2026-09-28', end='2026-11-08').status_code, 200)
+
+
+class OrderItemsTests(APITestCase):
+    """Pozycje zlecenia: z katalogu albo jednorazowe, a final_cost zawsze równa się ich sumie."""
+
+    def setUp(self):
+        self.client.force_login(User.objects.create_user(username='mechanik', is_staff=True))
+        customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
+        self.order = RepairOrder.objects.create(customer=customer, bike_tag_number=3, description='Serwis')
+        self.url = f'/api/orders/{self.order.pk}/items/'
+        self.tube = Part.objects.create(
+            kind=Part.KIND_PART, sku='TEST-DETKA-28', name='Dętka 28"', unit='szt.', sell_price=Decimal('20.00'),
+        )
+
+    def add(self, **data):
+        return self.client.post(self.url, data, format='json')
+
+    def final_cost(self):
+        self.order.refresh_from_db()
+        return self.order.final_cost
+
+    def test_catalogue_item_copies_name_kind_and_price(self):
+        response = self.add(part=self.tube.pk, quantity='2')
+        self.assertEqual(response.status_code, 201, response.content)
+        body = response.json()
+        self.assertEqual(
+            (body['description'], body['item_type'], body['unit_price'], body['line_total']),
+            ('Dętka 28"', 'part', '20.00', '40.00'),
+        )
+        self.assertEqual(self.final_cost(), Decimal('40.00'))
+
+    def test_same_catalogue_entry_adds_to_quantity(self):
+        self.assertEqual(self.add(part=self.tube.pk).status_code, 201)
+        response = self.add(part=self.tube.pk, quantity='2')
+        self.assertEqual(response.status_code, 200, response.content)
+        item = self.order.items.get()
+        self.assertEqual((item.quantity, response.json()['id']), (Decimal('3'), item.pk))
+        self.assertEqual(self.final_cost(), Decimal('60.00'))
+
+    def test_merge_keeps_the_price_of_the_existing_item(self):
+        item_id = self.add(part=self.tube.pk).json()['id']
+        self.client.patch(f'{self.url}{item_id}/', {'unit_price': '15.00'}, format='json')
+        self.add(part=self.tube.pk, unit_price='20.00')
+        item = self.order.items.get()
+        self.assertEqual((item.quantity, item.unit_price), (Decimal('2'), Decimal('15.00')))
+        self.assertEqual(self.final_cost(), Decimal('30.00'))
+
+    def test_save_to_catalog_merges_with_the_matching_entry(self):
+        self.add(part=self.tube.pk)
+        response = self.add(description='dętka 28"', item_type='part', unit_price='25.00', save_to_catalog=True)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(self.order.items.get().quantity, Decimal('2'))
+
+    def test_one_off_items_are_never_merged(self):
+        for _ in range(2):
+            self.assertEqual(self.add(description='Naprawa koła', item_type='service', unit_price='50.00').status_code, 201)
+        self.assertEqual(self.order.items.count(), 2)
+
+    def test_catalogue_price_change_does_not_rewrite_the_item(self):
+        self.add(part=self.tube.pk)
+        Part.objects.filter(pk=self.tube.pk).update(sell_price=Decimal('99.00'))
+        self.assertEqual(self.order.items.get().unit_price, Decimal('20.00'))
+
+    def test_one_off_item_requires_description_type_and_price(self):
+        response = self.add(description='Siodło klienta')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(set(response.json()), {'unit_price', 'item_type'})
+
+        response = self.add(description='Siodło klienta', item_type='part', unit_price='120.00')
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertIsNone(response.json()['part'])
+        self.assertFalse(Part.objects.filter(name='Siodło klienta').exists())
+
+    def test_one_off_item_can_be_saved_to_catalogue(self):
+        response = self.add(description='Dzwonek', item_type='accessory', unit_price='15.00', save_to_catalog=True)
+        self.assertEqual(response.status_code, 201, response.content)
+        part = Part.objects.get(name='Dzwonek')
+        self.assertEqual((part.kind, part.sell_price), ('accessory', Decimal('15.00')))
+        self.assertEqual(response.json()['part'], part.pk)
+
+    def test_update_and_delete_recalculate_final_cost(self):
+        item_id = self.add(part=self.tube.pk).json()['id']
+        self.add(description='Usługi serwisowe', item_type='service', unit_price='50.00', quantity='1.5')
+        self.assertEqual(self.final_cost(), Decimal('95.00'))
+
+        response = self.client.patch(f'{self.url}{item_id}/', {'quantity': '3', 'unit_price': '25.00'}, format='json')
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(self.final_cost(), Decimal('150.00'))
+
+        self.assertEqual(self.client.delete(f'{self.url}{item_id}/').status_code, 204)
+        self.assertEqual(self.final_cost(), Decimal('75.00'))
+
+    def test_order_without_items_has_no_final_cost(self):
+        item_id = self.add(part=self.tube.pk).json()['id']
+        self.client.delete(f'{self.url}{item_id}/')
+        self.assertIsNone(self.final_cost())
+
+    def test_detail_sums_items_by_type(self):
+        self.add(part=self.tube.pk, quantity='2')
+        self.add(part=Part.objects.get(sku='USL-PRZEGLAD-PODST').pk)
+        body = self.client.get(f'/api/orders/{self.order.pk}/').json()
+        self.assertEqual(body['items_summary'], {'service': '250.00', 'part': '40.00', 'accessory': '0.00'})
+        self.assertEqual(body['final_cost'], '290.00')
+
+    def test_final_cost_cannot_be_written_by_hand(self):
+        self.add(part=self.tube.pk)
+        self.client.patch(f'/api/orders/{self.order.pk}/', {'final_cost': '1.00'}, format='json')
+        self.assertEqual(self.final_cost(), Decimal('20.00'))
+
+    def test_items_of_a_closed_order_are_locked(self):
+        item_id = self.add(part=self.tube.pk).json()['id']
+        RepairOrder.objects.filter(pk=self.order.pk).update(status='delivered')
+        self.assertEqual(self.add(part=self.tube.pk).status_code, 400)
+        self.assertEqual(self.client.delete(f'{self.url}{item_id}/').status_code, 400)
+
+    def test_item_of_another_order_is_404(self):
+        other = RepairOrder.objects.create(customer=self.order.customer, bike_tag_number=4, description='x')
+        item_id = self.add(part=self.tube.pk).json()['id']
+        self.assertEqual(self.client.delete(f'/api/orders/{other.pk}/items/{item_id}/').status_code, 404)

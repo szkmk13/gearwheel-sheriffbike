@@ -8,6 +8,8 @@ import { OrderDetailsSkeleton } from '../components/Skeleton';
 import { isOrderOverdue, formatDate, formatDateTime } from '../utils/dates';
 import PrintIntakeButton from '../print/PrintIntakeButton';
 import SmsPreviewModal from '../components/SmsPreviewModal';
+import OrderItemsSection, { ITEM_KINDS } from '../components/orders/OrderItemsSection';
+import { formatMoney } from '../utils/money';
 
 export default function OrderDetailsPage() {
     const { id } = useParams();
@@ -101,8 +103,8 @@ export default function OrderDetailsPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-                <div className="lg:col-span-2 space-y-4 sm:space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6">
+                <div className="lg:col-span-7 space-y-4 sm:space-y-6">
                     <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6 flex flex-col sm:flex-row gap-6 sm:gap-8">
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-2 sm:mb-3">
@@ -240,30 +242,31 @@ export default function OrderDetailsPage() {
                     </div>
                 </div>
 
-                <div className="space-y-4 sm:space-y-6">
+                <div className="lg:col-span-5 space-y-4 sm:space-y-6">
                     <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6">
-                        <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)] mb-4">Podsumowanie kosztów</h3>
-                        
-                        <div className="flex justify-between items-center mb-2 pb-2 border-b border-[var(--color-line)] text-sm">
-                            <span className="text-[var(--color-ink-3)]">Szacowany koszt:</span>
-                            <span className="font-medium text-[var(--color-ink-2)]">{order.estimated_cost ? `${order.estimated_cost} zł` : '-'}</span>
+                        <div className="flex justify-between items-center gap-3 mb-4">
+                            <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)]">Podsumowanie kosztów</h3>
+                            <span className="text-xl sm:text-2xl font-bold text-[var(--color-accent)] whitespace-nowrap" title="Do zapłaty">{formatMoney(order.final_cost)}</span>
                         </div>
-                        
-                        <div className="flex justify-between items-center mt-4 pt-2 text-base sm:text-lg">
-                            <span className="font-bold text-[var(--color-ink)]">Do zapłaty:</span>
-                            <span className="font-bold text-[var(--color-accent)]">{order.final_cost ? `${order.final_cost} zł` : '0 zł'}</span>
+
+                        <div className="flex justify-between items-center mb-3 pb-3 border-b border-[var(--color-line)] text-sm">
+                            <span className="text-[var(--color-ink-3)]">Szacowany koszt (przy przyjęciu):</span>
+                            <span className="font-medium text-[var(--color-ink-2)]">{order.estimated_cost ? formatMoney(order.estimated_cost) : '-'}</span>
                         </div>
+
+                        {/* Sumy pozycji według rodzaju - liczone przez backend (items_summary). */}
+                        {ITEM_KINDS.map((kind) => {
+                            const total = order.items_summary?.[kind.value];
+                            return (
+                                <div key={kind.value} className="flex justify-between items-center py-1 text-sm">
+                                    <span className="text-[var(--color-ink-3)]">{kind.plural}:</span>
+                                    <span className={Number(total) ? 'font-medium text-[var(--color-ink)]' : 'text-[var(--color-ink-3)]'}>{formatMoney(total)}</span>
+                                </div>
+                            );
+                        })}
                     </div>
 
-                    <div className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-lg p-4 sm:p-6 opacity-70">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-base sm:text-lg font-semibold text-[var(--color-ink)]">Części i usługi</h3>
-                            <span className="text-xs font-bold bg-yellow-100 text-yellow-800 px-2 py-1 rounded">W BUDOWIE</span>
-                        </div>
-                        <p className="text-sm text-[var(--color-ink-3)] text-center py-6 sm:py-8">
-                            Moduł dodawania części i robocizny zostanie wdrożony w kolejnym etapie.
-                        </p>
-                    </div>
+                    <OrderItemsSection order={order} />
                 </div>
             </div>
 

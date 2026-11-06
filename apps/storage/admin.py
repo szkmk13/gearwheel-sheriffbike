@@ -16,13 +16,12 @@ class StorageEventInline(admin.TabularInline):
 
 @admin.register(StorageBooking)
 class StorageBookingAdmin(admin.ModelAdmin):
-    list_display = ('bike', 'customer_name', 'tag', 'start_date', 'end_date', 'status',
-                    'price', 'paid_amount', 'is_overdue')
+    list_display = ('bike', 'customer_name', 'tag', 'start_date', 'end_date', 'status', 'is_overdue')
     list_filter = ('status', 'bike__category', 'start_date')
     search_fields = ('bike__brand', 'bike__model', 'repair_order__customer__last_name',
                      'repair_order__bike_tag_number')
     autocomplete_fields = ('repair_order', 'bike')
-    readonly_fields = ('checked_in_at', 'checked_out_at', 'paid_at', 'created_at', 'updated_at')
+    readonly_fields = ('checked_in_at', 'checked_out_at', 'created_at', 'updated_at')
     inlines = [StorageEventInline]
 
     def has_delete_permission(self, request, obj=None):

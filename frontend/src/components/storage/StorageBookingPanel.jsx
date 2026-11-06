@@ -4,15 +4,14 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
 
 import StatusBadge from "../StatusBadge";
-import Input from "../Input";
 import DateInput from "../DateInput";
 import Button from "../Button";
 import { Skeleton } from "../Skeleton";
 import {
-  cancelStorage, checkOutStorage, extendStorage, fetchStorageBooking, registerStoragePayment, updateStorageBooking,
+  cancelStorage, checkOutStorage, extendStorage, fetchStorageBooking, updateStorageBooking,
 } from "../../api/storage";
 import { addDays, formatDate, formatDateTime, parseISODate, toLocalISODate } from "../../utils/dates";
-import { ACTIVE_STORAGE_STATUSES, categoryLabel, formatMoney, storageKeys } from "./storageData";
+import { ACTIVE_STORAGE_STATUSES, categoryLabel, storageKeys } from "./storageData";
 
 const textareaClass = "w-full p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] min-h-[70px] resize-y shadow-sm";
 const cardClass = "bg-white border border-[var(--color-line)] rounded-xl p-4 sm:p-5 shadow-sm";
@@ -46,11 +45,10 @@ function NoteField({ label, value, onChange, placeholder }) {
 function ActionForm({ action, booking, onDone, onCancel }) {
   const queryClient = useQueryClient();
   const [values, setValues] = useState(() => {
-    if (action === 'payment') return { amount: booking.balance_due, note: '' };
     if (action === 'extend') return { end_date: '', note: '' };
     if (action === 'edit') {
       return {
-        start_date: booking.start_date, end_date: booking.end_date, price: booking.price,
+        start_date: booking.start_date, end_date: booking.end_date,
         check_in_notes: booking.check_in_notes, check_out_notes: booking.check_out_notes,
       };
     }
@@ -61,7 +59,6 @@ function ActionForm({ action, booking, onDone, onCancel }) {
   const run = {
     checkout: () => checkOutStorage({ id: booking.id, notes: values.text }),
     extend: () => extendStorage({ id: booking.id, ...values }),
-    payment: () => registerStoragePayment({ id: booking.id, ...values }),
     cancel: () => cancelStorage({ id: booking.id, reason: values.text }),
     edit: () => updateStorageBooking({ id: booking.id, data: values }),
   }[action];
@@ -69,7 +66,6 @@ function ActionForm({ action, booking, onDone, onCancel }) {
   const successMessage = {
     checkout: 'Sprzęt wydany klientowi.',
     extend: 'Przedłużono przechowanie.',
-    payment: 'Zapisano wpłatę.',
     cancel: 'Przechowanie anulowane.',
     edit: 'Zapisano zmiany.',
   }[action];
@@ -79,6 +75,11 @@ function ActionForm({ action, booking, onDone, onCancel }) {
     onSuccess: (updated) => {
       queryClient.setQueryData(storageKeys.detail(updated.id), updated);
       queryClient.invalidateQueries({ queryKey: storageKeys.all });
+      // Anulowanie zdejmuje sztukę z pozycji "Przechowanie zimowe" - kwota zlecenia się zmienia.
+      if (action === 'cancel') {
+        queryClient.invalidateQueries({ queryKey: ['order', String(updated.repair_order)] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+      }
       toast.success(successMessage);
       onDone();
     },
@@ -93,7 +94,6 @@ function ActionForm({ action, booking, onDone, onCancel }) {
   const titles = {
     checkout: 'Wydanie sprzętu',
     extend: 'Przedłużenie przechowania',
-    payment: 'Nowa wpłata',
     cancel: 'Anulowanie przechowania',
     edit: 'Edycja przechowania',
   };
@@ -104,11 +104,12 @@ function ActionForm({ action, booking, onDone, onCancel }) {
 
       {action === 'checkout' && (
         <>
-          {Number(booking.balance_due) > 0 && (
-            <p className="mb-4 p-3 text-sm rounded-lg bg-orange-50 border border-orange-200 text-orange-800">
-              Do zapłaty zostało <b>{formatMoney(booking.balance_due)}</b>. Wydanie nie jest blokowane, ale saldo zostanie widoczne.
-            </p>
-          )}
+          <p className="mb-4 p-3 text-sm rounded-lg bg-[var(--color-paper)] border border-[var(--color-line)] text-[var(--color-ink-2)]">
+            Rozliczenie jest na{' '}
+            <Link to={`/panel/orders/${booking.repair_order}`} className="font-medium text-[var(--color-accent)] hover:underline">
+              zleceniu #{booking.repair_order}
+            </Link>.
+          </p>
           <NoteField label="Uwagi przy wydaniu" value={values.text} onChange={set('text')} placeholder="np. odebrał syn klienta" />
         </>
       )}
@@ -120,29 +121,15 @@ function ActionForm({ action, booking, onDone, onCancel }) {
         </>
       )}
 
-      {action === 'payment' && (
-        <>
-          <Input
-            label={`Kwota (zł) - do zapłaty ${formatMoney(booking.balance_due)}`} type="number" min="0.01" step="0.01"
-            max={booking.balance_due} required value={values.amount} onChange={set('amount')}
-          />
-          <NoteField label="Notatka" value={values.note} onChange={set('note')} placeholder="np. gotówka, BLIK" />
-        </>
-      )}
-
       {action === 'cancel' && (
         <NoteField label="Powód anulowania" value={values.text} onChange={set('text')} placeholder="np. klient zrezygnował" />
       )}
 
       {action === 'edit' && (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4">
             <DateInput label="Od" value={values.start_date} onChange={set('start_date')} required />
             <DateInput label="Do" value={values.end_date} onChange={set('end_date')} min={values.start_date} required />
-            <Input
-              label="Cena (zł)" type="number" min={booking.paid_amount} step="0.01" required
-              value={values.price} onChange={set('price')}
-            />
           </div>
           <NoteField label="Uwagi przy przyjęciu" value={values.check_in_notes} onChange={set('check_in_notes')} />
           <NoteField label="Uwagi przy wydaniu" value={values.check_out_notes} onChange={set('check_out_notes')} />
@@ -188,7 +175,6 @@ export default function StorageBookingPanel({ bookingId }) {
   if (!booking) return null;
 
   const isActive = ACTIVE_STORAGE_STATUSES.includes(booking.status);
-  const hasBalance = Number(booking.balance_due) > 0;
   const { customer, bike } = booking;
   const closeAction = () => setAction(null);
 
@@ -207,13 +193,12 @@ export default function StorageBookingPanel({ bookingId }) {
       {action && !BOTTOM_ACTIONS.includes(action) ? (
         <ActionForm key={action} action={action} booking={booking} onDone={closeAction} onCancel={closeAction} />
       ) : (
-        (isActive || hasBalance) && booking.status !== 'cancelled' && (
+        isActive && (
           <div className="flex flex-wrap gap-2">
             {booking.status === 'stored' && (
               <Button type="button" onClick={() => setAction('checkout')}>Wydaj sprzęt</Button>
             )}
-            {isActive && <button type="button" className={secondaryBtn} onClick={() => setAction('extend')}>Przedłuż</button>}
-            {hasBalance && <button type="button" className={secondaryBtn} onClick={() => setAction('payment')}>Dodaj wpłatę</button>}
+            <button type="button" className={secondaryBtn} onClick={() => setAction('extend')}>Przedłuż</button>
           </div>
         )
       )}
@@ -245,28 +230,15 @@ export default function StorageBookingPanel({ bookingId }) {
         </div>
       </div>
 
-      {/* TERMIN I PŁATNOŚĆ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div className={cardClass}>
-          <p className="text-xs uppercase tracking-wider text-[var(--color-ink-3)] mb-2">Termin</p>
-          <Row label="Od">{formatDate(booking.start_date)}</Row>
-          <Row label="Do (odbiór)">
-            <span className={booking.is_overdue ? 'text-red-600' : ''}>{formatDate(booking.end_date)}</span>
-          </Row>
-          <Row label="Przyjęto">{formatDateTime(booking.checked_in_at)}</Row>
-          <Row label="Wydano">{formatDateTime(booking.checked_out_at)}</Row>
-        </div>
-        <div className={cardClass}>
-          <p className="text-xs uppercase tracking-wider text-[var(--color-ink-3)] mb-2">Płatność</p>
-          <Row label="Cena">{formatMoney(booking.price)}</Row>
-          <Row label="Zapłacono">{formatMoney(booking.paid_amount)}</Row>
-          <Row label="Do zapłaty">
-            <span className={hasBalance ? 'text-orange-700' : 'text-green-700'}>
-              {hasBalance ? formatMoney(booking.balance_due) : 'Opłacone'}
-            </span>
-          </Row>
-          {booking.paid_at && <Row label="Opłacone dnia">{formatDateTime(booking.paid_at)}</Row>}
-        </div>
+      {/* TERMIN - koszt przechowania jest pozycją na zleceniu */}
+      <div className={cardClass}>
+        <p className="text-xs uppercase tracking-wider text-[var(--color-ink-3)] mb-2">Termin</p>
+        <Row label="Od">{formatDate(booking.start_date)}</Row>
+        <Row label="Do (odbiór)">
+          <span className={booking.is_overdue ? 'text-red-600' : ''}>{formatDate(booking.end_date)}</span>
+        </Row>
+        <Row label="Przyjęto">{formatDateTime(booking.checked_in_at)}</Row>
+        <Row label="Wydano">{formatDateTime(booking.checked_out_at)}</Row>
       </div>
 
       {/* UWAGI */}

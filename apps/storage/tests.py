@@ -6,6 +6,8 @@ from django.test import TestCase
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from apps.customers.models import Bike, Customer
+from apps.inventory.catalog import STORAGE_SERVICE_SKU
+from apps.inventory.models import Part
 from apps.orders.models import RepairOrder
 
 from . import services
@@ -41,16 +43,6 @@ class StorageBookingModelTests(StorageTestCase):
         booking = self.make_booking()
         self.assertEqual(booking.customer, self.customer)
         self.assertEqual(booking.tag, 42)
-
-    def test_price_defaults_to_setting_and_is_snapshotted(self):
-        with self.settings(STORAGE_DEFAULT_PRICE='550.00'):
-            booking = self.make_booking()
-        self.assertEqual(booking.price, Decimal('550.00'))
-
-        # Podniesienie cennika nie rusza rezerwacji juz zalozonej.
-        with self.settings(STORAGE_DEFAULT_PRICE='650.00'):
-            booking.refresh_from_db()
-            self.assertEqual(booking.price, Decimal('550.00'))
 
     def test_overlapping_stay_of_same_equipment_is_rejected(self):
         self.make_booking()
@@ -142,24 +134,6 @@ class StorageServiceTests(StorageTestCase):
         with self.assertRaises(DRFValidationError):
             services.cancel(booking, user=self.user)
 
-    def test_payments_accumulate_and_stamp_paid_at(self):
-        booking = self.make_booking(price=Decimal('550.00'))
-        services.register_payment(booking, amount=Decimal('200.00'), user=self.user)
-        booking.refresh_from_db()
-        self.assertEqual(booking.balance_due, Decimal('350.00'))
-        self.assertFalse(booking.is_paid)
-        self.assertIsNone(booking.paid_at)
-
-        services.register_payment(booking, amount=Decimal('350.00'), user=self.user)
-        booking.refresh_from_db()
-        self.assertTrue(booking.is_paid)
-        self.assertIsNotNone(booking.paid_at)
-
-    def test_overpayment_is_rejected(self):
-        booking = self.make_booking(price=Decimal('550.00'))
-        with self.assertRaises(DRFValidationError):
-            services.register_payment(booking, amount=Decimal('600.00'), user=self.user)
-
     def test_occupancy_counts_peak_and_ignores_cancelled(self):
         self.make_booking(bike=self.bike, start='2026-11-01', end='2027-03-31')
         self.make_booking(bike=self.skis, start='2026-12-01', end='2027-01-31')
@@ -238,13 +212,6 @@ class StorageApiTests(StorageTestCase):
         response = self.client.post(url + 'check-out/', {}, content_type='application/json')
         self.assertEqual(response.json()['status'], StorageBooking.STATUS_PICKED_UP)
 
-    def test_payment_action(self):
-        booking = self.make_booking(price=Decimal('550.00'))
-        response = self.client.post(f'/api/storage/bookings/{booking.pk}/payment/',
-                                    {'amount': '550.00'}, content_type='application/json')
-        self.assertEqual(response.status_code, 200, response.content)
-        self.assertTrue(response.json()['is_paid'])
-
     def test_filters(self):
         stored = self.make_booking(bike=self.bike, start='2026-11-01', end='2027-03-31')
         services.check_in(stored, user=self.user)
@@ -256,9 +223,6 @@ class StorageApiTests(StorageTestCase):
 
         winter = self.client.get('/api/storage/bookings/?category=winter').json()
         self.assertEqual(winter['count'], 1)
-
-        unpaid = self.client.get('/api/storage/bookings/?unpaid=true').json()
-        self.assertEqual(unpaid['count'], 2)
 
     def test_occupancy_endpoint(self):
         self.make_booking(start='2026-11-01', end='2027-03-31')
@@ -272,12 +236,17 @@ class StorageApiTests(StorageTestCase):
         self.assertEqual(self.client.get('/api/storage/occupancy/?start=wczoraj').status_code, 400)
 
     def test_dashboard_endpoint(self):
-        booking = self.make_booking(price=Decimal('550.00'))
+        booking = self.make_booking()
         services.check_in(booking, user=self.user)
         body = self.client.get('/api/storage/dashboard/').json()
         self.assertEqual(body['stored_now'], 1)
-        self.assertEqual(body['unpaid_count'], 1)
-        self.assertEqual(Decimal(body['outstanding_amount']), Decimal('550.00'))
+        self.assertNotIn('unpaid_count', body)
+
+    def test_payment_action_is_gone(self):
+        booking = self.make_booking()
+        response = self.client.post(f'/api/storage/bookings/{booking.pk}/payment/',
+                                    {'amount': '550.00'}, content_type='application/json')
+        self.assertEqual(response.status_code, 404)
 
 
 class StorageBookingEditTests(StorageTestCase):
@@ -286,34 +255,25 @@ class StorageBookingEditTests(StorageTestCase):
     def setUp(self):
         super().setUp()
         self.client.force_login(self.user)
-        self.booking = self.make_booking(price=Decimal('550.00'))
+        self.booking = self.make_booking()
         self.url = f'/api/storage/bookings/{self.booking.pk}/'
 
     def patch(self, data):
         return self.client.patch(self.url, data, content_type='application/json')
 
     def test_edit_is_logged_with_old_and_new_values(self):
-        response = self.patch({'price': '600.00', 'end_date': '2027-04-15'})
+        response = self.patch({'end_date': '2027-04-15', 'check_in_notes': 'Bez pedalow'})
         self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(response.json()['price'], '600.00')
 
         event = self.booking.events.get(event_type=StorageEvent.EVENT_UPDATE)
         self.assertEqual(event.performed_by, self.user)
-        self.assertIn('550.00 -> 600.00', event.note)
         self.assertIn('2027-03-31 -> 2027-04-15', event.note)
+        self.assertIn('Bez pedalow', event.note)
 
     def test_unchanged_edit_writes_no_event(self):
-        response = self.patch({'price': '550.00'})
+        response = self.patch({'end_date': '2027-03-31'})
         self.assertEqual(response.status_code, 200, response.content)
         self.assertFalse(self.booking.events.filter(event_type=StorageEvent.EVENT_UPDATE).exists())
-
-    def test_price_below_paid_amount_is_400(self):
-        services.register_payment(self.booking, amount=Decimal('300.00'), user=self.user)
-        response = self.patch({'price': '100.00'})
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('price', response.json())
-        self.booking.refresh_from_db()
-        self.assertEqual(self.booking.price, Decimal('550.00'))
 
     def test_overlapping_edit_is_400(self):
         self.make_booking(start='2027-04-01', end='2027-04-30')
@@ -322,10 +282,9 @@ class StorageBookingEditTests(StorageTestCase):
     def test_finished_booking_cannot_be_edited(self):
         services.check_in(self.booking, user=self.user)
         services.check_out(self.booking, user=self.user)
-        response = self.patch({'price': '900.00', 'end_date': '2027-06-30'})
+        response = self.patch({'end_date': '2027-06-30'})
         self.assertEqual(response.status_code, 400)
         self.booking.refresh_from_db()
-        self.assertEqual(self.booking.price, Decimal('550.00'))
         self.assertEqual(self.booking.end_date, date(2027, 3, 31))
 
     def test_order_and_equipment_are_fixed_after_creation(self):
@@ -382,7 +341,6 @@ class StorageIntakeTests(StorageTestCase):
         for booking in bookings:
             self.assertEqual(booking.status, StorageBooking.STATUS_STORED)
             self.assertIsNotNone(booking.checked_in_at)
-            self.assertEqual(booking.price, Decimal('400.00'))
             self.assertEqual(booking.check_in_notes, 'Rysa na ramie')
             self.assertEqual(
                 list(booking.events.values_list('event_type', flat=True)),
@@ -390,14 +348,60 @@ class StorageIntakeTests(StorageTestCase):
             )
         self.assertEqual({b['tag'] for b in body['bookings']}, {77})
 
-    def test_defaults_start_date_to_today_and_price_to_setting(self):
+        # Cena trafia na zlecenie jako jedna pozycja na wszystkie sztuki.
+        item = order.items.get()
+        self.assertEqual(item.part.sku, STORAGE_SERVICE_SKU)
+        self.assertEqual(item.item_type, Part.KIND_SERVICE)
+        self.assertEqual((item.quantity, item.unit_price), (Decimal('2'), Decimal('400.00')))
+        order.refresh_from_db()
+        self.assertEqual(order.final_cost, Decimal('800.00'))
+
+    def test_defaults_start_date_to_today_and_price_to_catalogue(self):
         # `None` usuwa pole z payloadu - sprawdzamy wartosci domyslne.
-        with self.settings(STORAGE_DEFAULT_PRICE='550.00'):
-            response = self.post(start_date=None, bikes=[self.bike.pk], end_date='2099-03-31')
+        Part.objects.filter(sku=STORAGE_SERVICE_SKU).update(sell_price=Decimal('600.00'))
+        response = self.post(start_date=None, bikes=[self.bike.pk], end_date='2099-03-31')
         self.assertEqual(response.status_code, 201, response.content)
         booking = StorageBooking.objects.get(bike=self.bike)
         self.assertEqual(booking.start_date, date.today())
-        self.assertEqual(booking.price, Decimal('550.00'))
+        item = booking.repair_order.items.get()
+        self.assertEqual((item.description, item.quantity, item.unit_price),
+                         ('Przechowanie zimowe', Decimal('1'), Decimal('600.00')))
+
+    def test_cancelling_a_stay_takes_one_piece_off_the_order(self):
+        order = RepairOrder.objects.get(pk=self.post(price='400.00').json()['repair_order'])
+        first, second = order.storage_bookings.order_by('id')
+
+        services.cancel(first, user=self.user)
+        item = order.items.get()
+        self.assertEqual(item.quantity, Decimal('1'))
+        order.refresh_from_db()
+        self.assertEqual(order.final_cost, Decimal('400.00'))
+        self.assertIn('2 -> 1', first.events.get(event_type=StorageEvent.EVENT_CANCEL).note)
+
+        services.cancel(second, user=self.user)
+        self.assertFalse(order.items.exists())
+        order.refresh_from_db()
+        self.assertIsNone(order.final_cost)
+
+    def test_cancel_leaves_a_closed_order_alone(self):
+        order = RepairOrder.objects.get(pk=self.post().json()['repair_order'])
+        RepairOrder.objects.filter(pk=order.pk).update(status='cancelled')
+        services.cancel(order.storage_bookings.first(), user=self.user)
+        self.assertEqual(order.items.get().quantity, Decimal('2'))
+
+    def test_cancel_without_storage_item_still_works(self):
+        order = RepairOrder.objects.get(pk=self.post().json()['repair_order'])
+        order.items.all().delete()
+        booking = services.cancel(order.storage_bookings.first(), user=self.user)
+        self.assertEqual(booking.status, StorageBooking.STATUS_CANCELLED)
+
+    def test_without_catalogue_entry_adds_a_one_off_item(self):
+        Part.objects.filter(sku=STORAGE_SERVICE_SKU).delete()
+        response = self.post(price='500.00')
+        self.assertEqual(response.status_code, 201, response.content)
+        item = RepairOrder.objects.get(pk=response.json()['repair_order']).items.get()
+        self.assertIsNone(item.part)
+        self.assertEqual((item.description, item.unit_price), ('Przechowanie zimowe', Decimal('500.00')))
 
     def test_overlap_of_one_piece_rolls_back_everything(self):
         self.make_booking(bike=self.skis, start='2027-01-01', end='2027-02-28')

@@ -30,6 +30,24 @@ class Supplier(models.Model):
 
 
 class Part(models.Model):
+    """One catalogue entry: a stocked part, an accessory or a service.
+
+    The name is historical - services live here too, so a repair order picks every line
+    from one searchable catalogue. Stock levels are not tracked yet (everything is
+    treated as unlimited), so `stock_quantity` and `low_stock_threshold` are unused.
+    """
+    KIND_SERVICE = 'service'
+    KIND_PART = 'part'
+    KIND_ACCESSORY = 'accessory'
+    KIND_CHOICES = [
+        (KIND_SERVICE, 'Usługa'),
+        (KIND_PART, 'Część'),
+        (KIND_ACCESSORY, 'Akcesorium'),
+    ]
+
+    kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_PART, db_index=True)
+    # Never delete an entry used on an order (`RepairOrderItem.part` is PROTECT) - hide it instead.
+    is_active = models.BooleanField(default=True, db_index=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, related_name='parts')
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, related_name='parts')
     name = models.CharField(max_length=200, db_index=True)

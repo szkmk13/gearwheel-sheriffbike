@@ -1,8 +1,13 @@
+from datetime import timedelta
+
+from django.db.models import Count, Q
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from .catalog import BASE_CATALOG_SKUS, POPULAR_FILL_EXCLUDED_SKUS
 from .models import Category, Supplier, Part, Invoice, StockMovement
 from .serializers import (
     CategorySerializer, SupplierSerializer,
@@ -27,14 +32,45 @@ class SupplierViewSet(ModelViewSet):
 
 class PartViewSet(ModelViewSet):
     queryset = Part.objects.select_related('category', 'supplier').all()
-    filterset_fields = ['category', 'supplier']
+    # `?search=` po nazwie i SKU zasila wyszukiwarkę pozycji na zleceniu (z `is_active=true`).
+    filterset_fields = ['kind', 'is_active', 'category', 'supplier']
     search_fields = ['name', 'sku', 'barcode']
     ordering_fields = ['name', 'stock_quantity']
+    POPULAR_LIMIT = 8
+    POPULAR_DAYS = 90
 
     def get_serializer_class(self):
         if self.action == 'list':
             return PartListSerializer
         return PartDetailSerializer
+
+    @action(detail=False, methods=['get'], url_path='popular')
+    def popular(self, request):
+        """Najczęściej dodawane do zleceń aktywne pozycje z ostatnich POPULAR_DAYS dni.
+
+        Gdy historii jest za mało, resztę listy dopełnia katalog bazowy w kolejności z catalog.py.
+        """
+        try:
+            limit = min(max(int(request.query_params.get('limit', self.POPULAR_LIMIT)), 1), 50)
+        except ValueError:
+            limit = self.POPULAR_LIMIT
+        since = timezone.now() - timedelta(days=self.POPULAR_DAYS)
+        active = Part.objects.filter(is_active=True)
+
+        parts = list(
+            active.annotate(uses=Count('repairorderitem', filter=Q(repairorderitem__created_at__gte=since)))
+            .filter(uses__gt=0)
+            .order_by('-uses', 'name')[:limit]
+        )
+        if len(parts) < limit:
+            taken = {part.pk for part in parts}
+            fill = {
+                part.sku: part
+                for part in active.filter(sku__in=BASE_CATALOG_SKUS).exclude(pk__in=taken)
+                .exclude(sku__in=POPULAR_FILL_EXCLUDED_SKUS)
+            }
+            parts += [fill[sku] for sku in BASE_CATALOG_SKUS if sku in fill][:limit - len(parts)]
+        return Response(PartListSerializer(parts, many=True).data)
 
     @action(detail=True, methods=['get'], url_path='movements')
     def movements(self, request, pk=None):

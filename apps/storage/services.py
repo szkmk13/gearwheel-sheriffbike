@@ -1,4 +1,4 @@
-"""Logika przechowania sprzetu - przejscia statusow, wplaty i liczenie oblozenia.
+"""Logika przechowania sprzetu - przejscia statusow i liczenie oblozenia.
 
 Widoki trzymaja tu cala regule biznesowa, zeby ten sam przeplyw dalo sie wywolac z
 admina, komendy czy testu. Bledy leca jako `rest_framework.ValidationError`, bo kazdy
@@ -11,17 +11,59 @@ from decimal import Decimal
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import F, Q, Sum
+from django.db.models import Q
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
+from apps.inventory.catalog import STORAGE_SERVICE_SKU
+from apps.inventory.models import Part
 from apps.orders.models import RepairOrder
+from apps.orders.services import ITEMS_LOCKED_STATUSES, add_item, remove_item, update_item
 
 from .models import StorageBooking, StorageEvent
 
 # Pola, ktore wolno poprawic w aktywnej rezerwacji. Zlecenie i sprzet sa ustalane przy
-# tworzeniu - przepiecie oplaconej rezerwacji na inne zlecenie zmienialoby wlasciciela.
-EDITABLE_FIELDS = ('start_date', 'end_date', 'price', 'check_in_notes', 'check_out_notes')
+# tworzeniu - przepiecie rezerwacji na inne zlecenie zmienialoby wlasciciela.
+EDITABLE_FIELDS = ('start_date', 'end_date', 'check_in_notes', 'check_out_notes')
+
+STORAGE_ITEM_DESCRIPTION = 'Przechowanie zimowe'
+
+
+def add_storage_item(order, *, quantity, unit_price=None):
+    """Dopisuje do zlecenia pozycje "Przechowanie zimowe" - stad koszt widac w "Do zaplaty".
+
+    Cena z katalogu, chyba ze podano inna (np. rabat). Gdy pozycji katalogu nie ma
+    (usunieta w adminie), przyjecie i tak przechodzi z pozycja jednorazowa.
+    """
+    part = Part.objects.filter(sku=STORAGE_SERVICE_SKU).first()
+    if part is not None:
+        return add_item(order, part=part, quantity=quantity, unit_price=unit_price)
+    return add_item(
+        order, item_type=Part.KIND_SERVICE, description=STORAGE_ITEM_DESCRIPTION,
+        quantity=quantity, unit_price=unit_price if unit_price is not None else Decimal('0.00'),
+    )
+
+
+def release_storage_item(order):
+    """Zdejmuje jedna sztuke z pozycji "Przechowanie zimowe" (ostatnia sztuka usuwa linie).
+
+    Zwraca opis zmiany do logu albo '' - gdy pozycji nie ma (np. usunieta recznie) albo
+    zlecenie jest zamkniete, bo wtedy kwot juz nie ruszamy.
+    """
+    if order.status in ITEMS_LOCKED_STATUSES:
+        return ''
+    item = (
+        order.items.filter(Q(part__sku=STORAGE_SERVICE_SKU) | Q(part__isnull=True, description=STORAGE_ITEM_DESCRIPTION))
+        .order_by('id').first()
+    )
+    if item is None:
+        return ''
+    if item.quantity > 1:
+        update_item(item, quantity=item.quantity - 1)
+        before, after = (f'{q.normalize():f}' for q in (item.quantity + 1, item.quantity))
+        return f'Pozycja "{item.description}" na zleceniu: ilosc {before} -> {after}.'
+    remove_item(item)
+    return f'Usunieto pozycje "{item.description}" ze zlecenia.'
 
 
 def _full_clean(booking):
@@ -79,8 +121,9 @@ def intake(*, customer, bikes, bike_tag_number, end_date, start_date=None, price
     Serwis nie przyjmuje rezerwacji z wyprzedzeniem: zlecenie (z naklejka przypieta na
     sprzet) zaklada sie dopiero, gdy klient fizycznie przynosi sprzet. Jedno zlecenie
     obejmuje wszystkie przyniesione sztuki pod jedna naklejka, a kazda sztuka dostaje
-    wlasny pobyt od razu w statusie `stored`. Wszystko albo nic - kolizja terminu
-    jednej sztuki cofa cale przyjecie.
+    wlasny pobyt od razu w statusie `stored`, a zlecenie pozycje "Przechowanie zimowe"
+    (ilosc = liczba sztuk, `price` to cena za sztuke). Wszystko albo nic - kolizja
+    terminu jednej sztuki cofa cale przyjecie.
     """
     start_date = start_date or timezone.localdate()
     bikes = list(bikes)
@@ -101,7 +144,7 @@ def intake(*, customer, bikes, bike_tag_number, end_date, start_date=None, price
         order = RepairOrder.objects.create(
             customer=customer,
             bike_tag_number=bike_tag_number,
-            description=description or 'Przechowanie zimowe',
+            description=description or STORAGE_ITEM_DESCRIPTION,
             estimated_pickup_date=end_date,
         )
         order.bikes.set(bikes)
@@ -113,8 +156,6 @@ def intake(*, customer, bikes, bike_tag_number, end_date, start_date=None, price
                 status=StorageBooking.STATUS_STORED, checked_in_at=now, check_in_notes=notes,
                 created_by=user if user and user.is_authenticated else None,
             )
-            if price is not None:
-                booking.price = price
             # Kolizje sprawdzamy tu, a nie dopiero w `full_clean`, zeby komunikat wskazal
             # sztuke - przy kilku naraz samo "zachodzacy termin" nie mowi, o ktora chodzi.
             if booking.overlapping().exists():
@@ -125,6 +166,8 @@ def intake(*, customer, bikes, bike_tag_number, end_date, start_date=None, price
             booking.save()
             _log(booking, StorageEvent.EVENT_CHECK_IN, user, notes)
             bookings.append(booking)
+
+        add_storage_item(order, quantity=Decimal(len(bookings)), unit_price=price)
     return order, bookings
 
 
@@ -132,7 +175,7 @@ def intake(*, customer, bikes, bike_tag_number, end_date, start_date=None, price
 def update_booking(booking, *, user=None, **fields):
     """Poprawia dane aktywnej rezerwacji i zapisuje w logu, co sie zmienilo.
 
-    Jedyna droga edycji - PATCH/PUT z API tez tu trafia - zeby zmiana ceny czy terminu
+    Jedyna droga edycji - PATCH/PUT z API tez tu trafia - zeby zmiana terminu
     nie mogla przejsc bez sladu. Odebranych i anulowanych pobytow nie edytujemy.
     """
     booking = StorageBooking.objects.select_for_update().get(pk=booking.pk)
@@ -149,10 +192,6 @@ def update_booking(booking, *, user=None, **fields):
     if not changes:
         return booking
 
-    if booking.price < booking.paid_amount:
-        raise ValidationError(
-            {'price': f'Cena nie moze byc nizsza niz juz wplacona kwota ({booking.paid_amount} zl).'}
-        )
     _full_clean(booking)
     booking.save(update_fields=[name for name, _, _ in changes] + ['updated_at'])
 
@@ -184,8 +223,7 @@ def check_in(booking, *, user=None, notes=''):
 
 @transaction.atomic
 def check_out(booking, *, user=None, notes=''):
-    """Klient odbiera sprzet. Nie blokujemy wydania przy niedoplacie - kasa bywa
-    rozliczana osobno - ale `balance_due` zostaje widoczne na rezerwacji."""
+    """Klient odbiera sprzet. Rozliczenie jest na zleceniu, wiec tu go nie sprawdzamy."""
     if booking.status != StorageBooking.STATUS_STORED:
         raise ValidationError(
             {'status': f'Wydac mozna tylko sprzet na przechowaniu (obecny status: '
@@ -226,7 +264,7 @@ def extend(booking, *, end_date, user=None, note=''):
 
 @transaction.atomic
 def cancel(booking, *, user=None, reason=''):
-    """Anuluje rezerwacje i zwalnia jej termin."""
+    """Anuluje rezerwacje i zwalnia jej termin, a ze zlecenia zdejmuje jedna sztuke przechowania."""
     if booking.status == StorageBooking.STATUS_PICKED_UP:
         raise ValidationError({'status': 'Odebranego przechowania nie mozna anulowac.'})
     if booking.status == StorageBooking.STATUS_CANCELLED:
@@ -234,31 +272,9 @@ def cancel(booking, *, user=None, reason=''):
 
     booking.status = StorageBooking.STATUS_CANCELLED
     booking.save(update_fields=['status', 'updated_at'])
-    _log(booking, StorageEvent.EVENT_CANCEL, user, reason)
-    return booking
-
-
-@transaction.atomic
-def register_payment(booking, *, amount, user=None, note=''):
-    """Dopisuje wplate. Sumy pilnuje constraint `paid_amount <= price`, tu tylko
-    czytelny komunikat i znacznik pelnej zaplaty."""
-    amount = Decimal(amount)
-    if amount <= 0:
-        raise ValidationError({'amount': 'Kwota wplaty musi byc dodatnia.'})
-
-    booking = StorageBooking.objects.select_for_update().get(pk=booking.pk)
-    if booking.paid_amount + amount > booking.price:
-        raise ValidationError(
-            {'amount': f'Wplata przekracza kwote do zaplaty ({booking.balance_due} zl).'}
-        )
-
-    booking.paid_amount += amount
-    fields = ['paid_amount', 'updated_at']
-    if booking.is_paid and booking.paid_at is None:
-        booking.paid_at = timezone.now()
-        fields.append('paid_at')
-    booking.save(update_fields=fields)
-    _log(booking, StorageEvent.EVENT_PAYMENT, user, note or f'Wplata {amount} zl.')
+    # Świeży odczyt - status zlecenia (zamknięte?) mógł się zmienić od załadowania rezerwacji.
+    item_note = release_storage_item(RepairOrder.objects.select_for_update().get(pk=booking.repair_order_id))
+    _log(booking, StorageEvent.EVENT_CANCEL, user, '\n'.join(filter(None, [reason, item_note])))
     return booking
 
 
@@ -306,18 +322,11 @@ def occupancy(start_date, end_date, *, category=None):
 
 
 def dashboard():
-    """Liczby na panel: co lezy, co do odbioru, co sie przeterminowalo, co nieoplacone."""
+    """Liczby na panel: co lezy, co do odbioru w tym tygodniu, co sie przeterminowalo."""
     today = timezone.localdate()
     week_ahead = today + timedelta(days=7)
 
     stored = StorageBooking.objects.filter(status=StorageBooking.STATUS_STORED)
-    unpaid = (
-        StorageBooking.objects
-        .exclude(status=StorageBooking.STATUS_CANCELLED)
-        .filter(paid_amount__lt=F('price'))
-    )
-    settled = StorageBooking.objects.exclude(status=StorageBooking.STATUS_CANCELLED)
-
     return {
         'stored_now': stored.count(),
         'due_this_week': stored.filter(end_date__gte=today, end_date__lte=week_ahead).count(),
@@ -325,11 +334,6 @@ def dashboard():
         'upcoming': StorageBooking.objects.filter(
             status=StorageBooking.STATUS_RESERVED, start_date__gte=today,
         ).count(),
-        'unpaid_count': unpaid.count(),
-        'outstanding_amount': (
-            unpaid.aggregate(total=Sum(F('price') - F('paid_amount')))['total'] or Decimal('0.00')
-        ),
-        'paid_amount_total': settled.aggregate(total=Sum('paid_amount'))['total'] or Decimal('0.00'),
     }
 
 

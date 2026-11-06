@@ -146,12 +146,6 @@ REST_FRAMEWORK = {
     'NUM_PROXIES': 1,
 }
 
-# Winter storage (apps.storage). Only the default price lives here - the shop has no
-# numbered parking spots and staff see the free space on site, so there is no capacity
-# limit to configure. The price is copied onto each booking when it's created, so
-# changing it later never rewrites what was already agreed with a customer.
-STORAGE_DEFAULT_PRICE = env('STORAGE_DEFAULT_PRICE', default='550.00')
-
 GROQ_API_KEY = env('GROQ_API_KEY', default='')
 OCR_BACKEND = env('OCR_BACKEND', default='groq')
 

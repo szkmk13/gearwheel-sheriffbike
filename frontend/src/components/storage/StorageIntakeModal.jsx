@@ -10,14 +10,26 @@ import Button from "../Button";
 import ClientSearchSelect from "../ClientSearchSelect";
 import { createBike, createClient, fetchClientDetails, lookupClientByPhone } from "../../api/clients";
 import { fetchStorageBookings, storageIntake } from "../../api/storage";
+import { STORAGE_SERVICE_SKU, fetchCatalogItems } from "../../api/inventory";
 import { todayISODate } from "../../utils/dates";
+import { decimalInputProps, isNonNegative } from "../../utils/decimalInput";
 import {
   ACTIVE_STORAGE_STATUSES, BIKE_TYPE_OPTIONS, CATEGORY_OPTIONS, categoryLabel, defaultStorageEndDate, formatMoney,
   storageKeys,
 } from "./storageData";
 
-// Cena domyślna jest po stronie backendu (STORAGE_DEFAULT_PRICE) - tu tylko podpowiedź w polu.
-const DEFAULT_PRICE_HINT = '550';
+// Puste pole ceny = cena usługi "Przechowanie zimowe" z katalogu (ustala ją backend);
+// tu pobieramy ją tylko, żeby pokazać podpowiedź i sumę.
+const useCatalogStoragePrice = (enabled) => {
+  const { data } = useQuery({
+    queryKey: ['inventory', 'parts', { search: STORAGE_SERVICE_SKU }],
+    queryFn: () => fetchCatalogItems({ search: STORAGE_SERVICE_SKU }),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+  const entry = data?.results?.find((part) => part.sku === STORAGE_SERVICE_SKU);
+  return entry?.sell_price != null ? String(Number(entry.sell_price)) : null;
+};
 
 // Licznik zamiast crypto.randomUUID - ten działa tylko w bezpiecznym kontekście (HTTPS/localhost),
 // a panel bywa otwierany z telefonu po adresie IP w sieci lokalnej.
@@ -36,6 +48,7 @@ const sectionClass = "p-5 bg-[var(--color-paper)] border border-[var(--color-lin
 // `scannedBike` (z QR) od razu wybiera klienta i zaznacza ten rower.
 export default function StorageIntakeModal({ isOpen, onClose, onCreated, scannedBike = null }) {
   const queryClient = useQueryClient();
+  const catalogPrice = useCatalogStoragePrice(isOpen);
 
   const [isNewClient, setIsNewClient] = useState(false);
   const [client, setClient] = useState(null);
@@ -178,7 +191,8 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
         bike_tag_number: parseInt(form.tag, 10),
         start_date: form.startDate || undefined,
         end_date: form.endDate,
-        price: form.price === '' ? undefined : form.price,
+        // Puste (albo sama kropka) = cena z katalogu.
+        price: isNonNegative(form.price) ? String(Number(form.price)) : undefined,
         description: form.description,
         notes: form.notes,
       });
@@ -208,7 +222,7 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
   };
 
   const bikes = client?.bikes || [];
-  const pricePerPiece = form.price === '' ? Number(DEFAULT_PRICE_HINT) : Number(form.price);
+  const pricePerPiece = isNonNegative(form.price) ? Number(form.price) : Number(catalogPrice ?? 0);
 
   return (
     <Modal isOpen={isOpen} onClose={handleClose} title="Przyjęcie na przechowanie">
@@ -359,8 +373,8 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
           <DateInput label="Od" value={form.startDate} onChange={setField('startDate')} required />
           <DateInput label="Do (odbiór)" value={form.endDate} onChange={setField('endDate')} min={form.startDate || undefined} required />
           <Input
-            label="Cena za sztukę (zł)" type="number" min="0" step="0.01" placeholder={DEFAULT_PRICE_HINT}
-            value={form.price} onChange={setField('price')}
+            label="Cena za sztukę (zł)" placeholder={catalogPrice ?? 'z katalogu'}
+            {...decimalInputProps(form.price, (price) => setForm((prev) => ({ ...prev, price })))}
           />
         </div>
 
@@ -384,7 +398,7 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-4 border-t border-[var(--color-line)]">
           <p className="text-sm text-[var(--color-ink-2)]">
             {piecesCount > 0 ? (
-              <>Sztuk: <b>{piecesCount}</b>, razem <b>{formatMoney(pricePerPiece * piecesCount)}</b></>
+              <>Sztuk: <b>{piecesCount}</b>, razem <b>{formatMoney(pricePerPiece * piecesCount)}</b> - trafi na zlecenie jako "Przechowanie zimowe"</>
             ) : 'Nie wybrano sprzętu'}
           </p>
           <div className="flex justify-end gap-3">

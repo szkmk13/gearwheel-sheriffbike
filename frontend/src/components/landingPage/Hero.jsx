@@ -220,7 +220,7 @@ function HeroSplit({ c }) {
               alt="Rower szosowy"
               width="1200"
               height="800"
-              fetchPriority="high"
+              fetchpriority="high"
             />
           </picture>
           <div className="absolute -left-[26px] bottom-[34px] flex flex-col leading-none rounded-2xl bg-ink px-[22px] py-4 text-white shadow-lg max-[720px]:left-auto max-[720px]:right-3 max-[720px]:bottom-3 max-[720px]:px-[18px] max-[720px]:py-[13px]">
@@ -251,7 +251,7 @@ function HeroCentered({ c }) {
           alt="Warsztat rowerowy"
           width="1200"
           height="800"
-          fetchPriority="high"
+          fetchpriority="high"
         />
       </picture>
       <div className="absolute inset-0 bg-[radial-gradient(120%_90%_at_50%_50%,rgba(12,9,7,.35)_0%,rgba(12,9,7,.62)_70%,rgba(12,9,7,.8)_100%),linear-gradient(to_top,rgba(12,9,7,.55),rgba(12,9,7,.2))]" />
@@ -303,7 +303,7 @@ function HeroOverlay({ c }) {
           alt="Rower w warsztacie"
           width="1200"
           height="800"
-          fetchPriority="high"
+          fetchpriority="high"
         />
       </picture>
       <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(12,9,7,.78)_0%,rgba(12,9,7,.34)_42%,rgba(12,9,7,.10)_72%,rgba(12,9,7,.22)_100%),linear-gradient(to_right,rgba(12,9,7,.42)_0%,rgba(12,9,7,0)_58%)]" />

@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from django.db.models import Case, Count, F, IntegerField, Prefetch, Sum, When
 from django.db.models.functions import Coalesce, TruncWeek
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from drf_spectacular.types import OpenApiTypes
@@ -19,7 +20,10 @@ from .filters import RepairOrderFilter
 from .models import RepairOrder, RepairOrderItem
 from .services import (
     SmsNotAllowed,
+    add_item,
     change_order_status,
+    remove_item,
+    update_item,
     ready_for_pickup_sms_preview,
     send_ready_for_pickup_sms,
 )
@@ -32,7 +36,9 @@ from .serializers import (
     RepairOrderCreateSerializer,
     RepairOrderDetailSerializer,
     RepairOrderWriteSerializer,
+    RepairOrderItemCreateSerializer,
     RepairOrderItemSerializer,
+    RepairOrderItemUpdateSerializer,
     SendSmsSerializer,
     SmsResultSerializer,
     StatusHistorySerializer,
@@ -176,6 +182,12 @@ class RepairOrderViewSet(ModelViewSet):
         'estimated_pickup_date',
     ]
 
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action != 'list':
+            qs = qs.prefetch_related(Prefetch('items', queryset=RepairOrderItem.objects.select_related('part')))
+        return qs
+
     def get_serializer_class(self):
         if self.action == 'list':
             return RepairOrderListSerializer
@@ -298,12 +310,18 @@ class RepairOrderViewSet(ModelViewSet):
         return Response(StatusHistorySerializer(qs, many=True).data)
 
     @extend_schema(
-        summary=_('Repair order items (parts/labor)'),
+        summary=_('Repair order items'),
         description=_(
-            'GET - returns the list of items (parts and labor) attached to the order. '
-            'POST - adds a new item; `repair_order` is set automatically from the order in the URL.'
+            'GET - the order items (services, parts, accessories). '
+            'POST - adds an item: either a catalogue entry (`part`; description, type and price are '
+            'copied from it unless given) or a one-off item without `part` (`description`, '
+            '`item_type` and `unit_price` required; `save_to_catalog` also adds it to the catalogue). '
+            'A catalogue entry already on the order is not added twice: its quantity is added to the '
+            'existing item (whose price stays) and the response is 200 instead of 201. '
+            'Every change recalculates the order `final_cost` as the sum of its items. '
+            'Items of a delivered or cancelled order cannot be changed.'
         ),
-        request=RepairOrderItemSerializer,
+        request=RepairOrderItemCreateSerializer,
         responses={
             200: RepairOrderItemSerializer(many=True),
             201: RepairOrderItemSerializer,
@@ -313,11 +331,35 @@ class RepairOrderViewSet(ModelViewSet):
     def items(self, request, pk=None):
         order = self.get_object()
         if request.method == 'GET':
-            return Response(RepairOrderItemSerializer(order.items.all(), many=True).data)
-        serializer = RepairOrderItemSerializer(data={**request.data, 'repair_order': order.pk})
+            return Response(RepairOrderItemSerializer(order.items.select_related('part'), many=True).data)
+        serializer = RepairOrderItemCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        item = add_item(order, **serializer.validated_data)
+        return Response(
+            RepairOrderItemSerializer(item).data,
+            status=status.HTTP_200_OK if item.merged else status.HTTP_201_CREATED,
+        )
+
+    @extend_schema(
+        summary=_('Update or remove a repair order item'),
+        description=_(
+            'PATCH - changes the description, quantity, price or type of an item. '
+            'DELETE - removes it. Both recalculate the order `final_cost`.'
+        ),
+        request=RepairOrderItemUpdateSerializer,
+        responses={200: RepairOrderItemSerializer, 204: None},
+    )
+    @action(detail=True, methods=['patch', 'delete'], url_path=r'items/(?P<item_id>\d+)')
+    def item_detail(self, request, pk=None, item_id=None):
+        order = self.get_object()
+        item = get_object_or_404(order.items.all(), pk=item_id)
+        if request.method == 'DELETE':
+            remove_item(item)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        serializer = RepairOrderItemUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        item = update_item(item, **serializer.validated_data)
+        return Response(RepairOrderItemSerializer(item).data)
 
 
 class DashboardView(APIView):

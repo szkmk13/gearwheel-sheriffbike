@@ -3,9 +3,9 @@ from .views import CategoryViewSet, SupplierViewSet, PartViewSet, InvoiceViewSet
 
 router = DefaultRouter()
 router.register('categories', CategoryViewSet, basename='category')
-router.register('suppliers', SupplierViewSet, basename='supplier')
+# router.register('suppliers', SupplierViewSet, basename='supplier')
 router.register('parts', PartViewSet, basename='part')
-router.register('invoices', InvoiceViewSet, basename='invoice')
-router.register('movements', StockMovementViewSet, basename='stockmovement')
+# router.register('invoices', InvoiceViewSet, basename='invoice')
+# router.register('movements', StockMovementViewSet, basename='stockmovement')
 
 urlpatterns = router.urls

@@ -1,9 +1,12 @@
+from decimal import Decimal
+
 from django.db import transaction
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.customers.models import Bike
+from apps.inventory.models import Part
 from apps.customers.serializers import BikeNestedSerializer, BikeSerializer, CustomerListSerializer
 
 from .models import RepairOrder, RepairOrderItem, StatusHistory
@@ -24,9 +27,41 @@ class LegacyBikeFieldsMixin:
 
 
 class RepairOrderItemSerializer(serializers.ModelSerializer):
+    item_type_display = serializers.CharField(source='get_item_type_display', read_only=True)
+    line_total = serializers.DecimalField(max_digits=10, decimal_places=2, read_only=True)
+    part_sku = serializers.CharField(source='part.sku', read_only=True, allow_null=True, default=None)
+
     class Meta:
         model = RepairOrderItem
-        fields = '__all__'
+        fields = (
+            'id', 'repair_order', 'part', 'part_sku', 'item_type', 'item_type_display', 'description',
+            'quantity', 'unit_price', 'line_total', 'created_at',
+        )
+        read_only_fields = fields
+
+
+class RepairOrderItemCreateSerializer(serializers.Serializer):
+    """Pozycja z katalogu (`part`) albo jednorazowa (opis, rodzaj i cena wymagane)."""
+    part = serializers.PrimaryKeyRelatedField(queryset=Part.objects.all(), required=False, allow_null=True)
+    item_type = serializers.ChoiceField(choices=RepairOrderItem.ITEM_TYPE_CHOICES, required=False)
+    description = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    quantity = serializers.DecimalField(
+        max_digits=8, decimal_places=2, min_value=Decimal('0.01'), required=False, default=Decimal('1'),
+    )
+    unit_price = serializers.DecimalField(
+        max_digits=8, decimal_places=2, min_value=Decimal('0'), required=False, allow_null=True,
+    )
+    save_to_catalog = serializers.BooleanField(
+        required=False, default=False,
+        help_text='Only for a one-off item: also add it to the catalogue (or link the active entry of that name).',
+    )
+
+
+class RepairOrderItemUpdateSerializer(serializers.Serializer):
+    item_type = serializers.ChoiceField(choices=RepairOrderItem.ITEM_TYPE_CHOICES, required=False)
+    description = serializers.CharField(max_length=255, required=False)
+    quantity = serializers.DecimalField(max_digits=8, decimal_places=2, min_value=Decimal('0.01'), required=False)
+    unit_price = serializers.DecimalField(max_digits=8, decimal_places=2, min_value=Decimal('0'), required=False)
 
 
 class StatusHistorySerializer(serializers.ModelSerializer):
@@ -71,6 +106,7 @@ class RepairOrderDetailSerializer(LegacyBikeFieldsMixin, serializers.ModelSerial
     bike_label = serializers.SerializerMethodField()
     bikes = BikeNestedSerializer(many=True, read_only=True)
     items = RepairOrderItemSerializer(many=True, read_only=True)
+    items_summary = serializers.SerializerMethodField()
     status_history = StatusHistorySerializer(many=True, read_only=True)
 
     class Meta:
@@ -79,9 +115,20 @@ class RepairOrderDetailSerializer(LegacyBikeFieldsMixin, serializers.ModelSerial
             'id', 'customer', 'bike', 'bike_label', 'bike_tag_number', 'bikes',
             'status', 'priority', 'description', 'estimated_cost', 'final_cost',
             'accepted_at', 'estimated_pickup_date', 'delivered_at', 'created_at', 'updated_at',
-            'items', 'status_history',
+            'items', 'items_summary', 'status_history',
         )
         read_only_fields = ('created_at', 'updated_at')
+
+    @extend_schema_field({
+        'type': 'object',
+        'properties': {kind: {'type': 'string', 'format': 'decimal'} for kind, _ in RepairOrderItem.ITEM_TYPE_CHOICES},
+    })
+    def get_items_summary(self, obj):
+        """Suma wartości pozycji w podziale na rodzaj (usługi / części / akcesoria)."""
+        totals = {kind: Decimal('0.00') for kind, _ in RepairOrderItem.ITEM_TYPE_CHOICES}
+        for item in obj.items.all():
+            totals[item.item_type] = totals.get(item.item_type, Decimal('0.00')) + item.line_total
+        return {kind: str(total) for kind, total in totals.items()}
 
     @extend_schema_field(BikeSerializer(allow_null=True))
     def get_bike(self, obj):
@@ -163,7 +210,8 @@ class RepairOrderWriteSerializer(BikesWriteMixin, serializers.ModelSerializer):
             'description', 'estimated_cost', 'final_cost', 'accepted_at', 'estimated_pickup_date',
             'delivered_at', 'created_at', 'updated_at',
         )
-        read_only_fields = ('created_at', 'updated_at')
+        # final_cost to suma pozycji (services.recalculate_final_cost) - nie wpisuje się jej ręcznie.
+        read_only_fields = ('final_cost', 'created_at', 'updated_at')
 
     def validate(self, attrs):
         if 'bikes' in attrs and not attrs['bikes']:
