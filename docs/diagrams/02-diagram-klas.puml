@@ -1,0 +1,292 @@
+@startuml 02-diagram-klas
+!include _styl.iuml
+title Diagram klas - model domeny
+hide empty methods
+
+package "django.contrib.auth" {
+  class User {
+    id : int
+    username : str
+    is_staff : bool
+  }
+}
+
+package "customers" {
+  class Customer {
+    id : int
+    first_name : str
+    last_name : str
+    phone : PhoneNumber {unique, E.164}
+    email : str
+    notes : str
+    rodo_accepted : bool
+    created_at : datetime
+  }
+
+  class Bike {
+    id : int
+    uuid : UUID {unique}
+    category : Kategoria
+    brand : str
+    model : str
+    bike_type : TypRoweru
+    color : str
+    serial_no : str
+    year : int
+    photo : Image
+    notes : str
+    created_at : datetime
+    --
+    /sheriff_code : str
+    clean()
+  }
+
+  enum Kategoria {
+    bike
+    winter
+  }
+
+  enum TypRoweru {
+    road
+    mtb
+    city
+    gravel
+    electric
+    other
+  }
+}
+
+package "orders" {
+  class RepairOrder {
+    id : int
+    bike_tag_number : int
+    status : StatusZlecenia
+    priority : Priorytet
+    description : str
+    estimated_cost : Decimal
+    final_cost : Decimal {readOnly}
+    accepted_at : datetime
+    estimated_pickup_date : date
+    delivered_at : datetime
+    created_at : datetime
+    updated_at : datetime
+    --
+    /primary_bike : Bike
+  }
+
+  class RepairOrderItem {
+    id : int
+    item_type : RodzajPozycji
+    description : str
+    quantity : Decimal
+    unit_price : Decimal
+    created_at : datetime
+    --
+    /line_total : Decimal
+  }
+
+  class StatusHistory {
+    id : int
+    old_status : str
+    new_status : str
+    note : str
+    changed_at : datetime
+  }
+
+  enum StatusZlecenia {
+    accepted
+    estimating
+    waiting_parts
+    in_progress
+    done
+    delivered
+    cancelled
+  }
+
+  enum Priorytet {
+    low
+    normal
+    high
+    urgent
+  }
+}
+
+package "storage" {
+  class StorageBooking {
+    id : int
+    start_date : date
+    end_date : date
+    status : StatusPrzechowania
+    checked_in_at : datetime
+    checked_out_at : datetime
+    check_in_notes : str
+    check_out_notes : str
+    created_at : datetime
+    updated_at : datetime
+    --
+    /customer : Customer
+    /tag : int
+    /is_overdue : bool
+    clean()
+    overlapping() : QuerySet
+  }
+
+  class StorageEvent {
+    id : int
+    event_type : TypZdarzenia
+    note : str
+    created_at : datetime
+  }
+
+  enum StatusPrzechowania {
+    reserved
+    stored
+    picked_up
+    cancelled
+  }
+
+  enum TypZdarzenia {
+    reserve
+    check_in
+    check_out
+    extend
+    update
+    cancel
+    payment (tylko stare wpisy)
+  }
+}
+
+package "inventory" {
+  class Category {
+    id : int
+    name : str {unique}
+  }
+
+  class Supplier {
+    id : int
+    name : str
+    contact : str
+    email : str
+    phone : str
+  }
+
+  class Part {
+    id : int
+    kind : RodzajPozycji
+    is_active : bool
+    name : str
+    sku : str
+    barcode : str
+    description : str
+    unit : str
+    stock_quantity : Decimal
+    low_stock_threshold : Decimal
+    purchase_price : Decimal
+    sell_price : Decimal
+    created_at : datetime
+    updated_at : datetime
+  }
+
+  enum RodzajPozycji {
+    service
+    part
+    accessory
+  }
+
+  class Invoice <<nieuzywane>> {
+    id : int
+    image : Image
+    status : StatusFaktury
+    raw_ocr_text : str
+    parsed_data : JSON
+    invoice_number : str
+    invoice_date : date
+    total_amount : Decimal
+  }
+
+  class StockMovement <<nieuzywane>> {
+    id : int
+    movement_type : TypRuchu
+    quantity : Decimal
+    unit_cost : Decimal
+    note : str
+    created_at : datetime
+  }
+
+  enum StatusFaktury {
+    uploaded
+    processing
+    parsed
+    failed
+    confirmed
+  }
+
+  enum TypRuchu {
+    in
+    out
+    adjustment
+    return
+  }
+}
+
+' --- customers
+Customer "1" *-- "0..*" Bike : posiada >
+
+' --- orders
+Customer "1" -- "0..*" RepairOrder : zleca >
+RepairOrder "0..*" o-- "1..*" Bike : obejmuje >
+RepairOrder "1" *-- "0..*" RepairOrderItem : zawiera >
+RepairOrder "1" *-- "0..*" StatusHistory : historia >
+StatusHistory "0..*" --> "0..1" User : changed_by
+RepairOrderItem "0..*" --> "0..1" Part : z katalogu >
+
+' --- storage
+StorageBooking "0..*" --> "1" RepairOrder : repair_order
+StorageBooking "0..*" --> "1" Bike : bike
+StorageBooking "1" *-- "0..*" StorageEvent : log >
+StorageBooking "0..*" --> "0..1" User : created_by
+StorageEvent "0..*" --> "0..1" User : performed_by
+
+' --- inventory
+Category "0..1" -- "0..*" Category : parent
+Category "0..1" -- "0..*" Part
+Supplier "0..1" -- "0..*" Part
+Supplier "0..1" -- "0..*" Invoice
+Part "1" *-- "0..*" StockMovement : ruchy >
+StockMovement "0..*" --> "0..1" Invoice
+StockMovement "0..*" --> "0..1" RepairOrder
+Invoice "0..*" --> "0..1" User : uploaded_by
+
+note bottom of Bike
+  sheriff_code = "sheriff-<id>-<uuid>"
+  - tresc kodu QR naklejanego na sprzet.
+  Usuniecie sprzetu przypietego do zlecenia
+  blokuje sygnal pre_delete (ProtectedError).
+end note
+
+note bottom of RepairOrderItem
+  Opis, rodzaj i cena kopiowane z katalogu
+  w chwili dodania - zmiana cennika nie zmienia
+  starych zlecen. Pozycje zmienia tylko
+  orders/services.py, ktory utrzymuje
+  final_cost = suma(quantity x unit_price).
+  Zlecenie delivered / cancelled: pozycje zablokowane.
+end note
+
+note bottom of StorageBooking
+  Ograniczenia:
+  end_date >= start_date (CHECK w bazie)
+  Aktywne pobyty (reserved, stored) tej samej
+  sztuki nie moga zachodzic na siebie.
+  bike musi nalezec do repair_order.bikes.
+  Brak pol pienieznych - oplata to pozycja
+  "Przechowanie zimowe" na zleceniu.
+end note
+
+note bottom of Part
+  Katalog wszystkich pozycji zlecen.
+  Uzytej pozycji sie nie usuwa (PROTECT),
+  tylko ukrywa: is_active = false.
+  Stany magazynowe nie sa jeszcze sledzone.
+end note
+@enduml

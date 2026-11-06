@@ -1,0 +1,47 @@
+@startuml 08b-stany-przechowania
+!include _styl.iuml
+title Diagram stanow - przechowanie zimowe (StorageBooking)
+
+state "Zarezerwowane\n(reserved)" as reserved
+state "Na przechowaniu\n(stored)" as stored
+state "Odebrane\n(picked_up)" as picked_up
+state "Anulowane\n(cancelled)" as cancelled
+
+[*] --> stored : intake()\n/ zlecenie + pozycja "Przechowanie zimowe",\nchecked_in_at, zdarzenie check_in
+[*] -[dashed]-> reserved : create_booking()\n/ zdarzenie reserve
+
+reserved -[dashed]-> stored : check_in()\n/ checked_in_at, zdarzenie check_in
+stored --> picked_up : check_out()\n/ checked_out_at, zdarzenie check_out
+
+reserved --> cancelled : cancel()\n/ zdarzenie cancel
+stored --> cancelled : cancel()\n/ -1 szt. pozycji "Przechowanie zimowe",\nzdarzenie cancel
+
+reserved : extend(end_date) [brak kolizji] / zdarzenie extend
+reserved : update_booking(...) [brak kolizji] / zdarzenie update
+stored : extend(end_date) [brak kolizji] / zdarzenie extend
+stored : update_booking(...) [brak kolizji] / zdarzenie update
+
+picked_up --> [*]
+cancelled --> [*]
+
+note right of stored
+  Stany aktywne (reserved, stored) licza sie
+  do oblozenia przechowalni i nie moga
+  zachodzic na siebie dla tej samej sztuki.
+  is_overdue = stored i end_date < dzis
+  (wyliczane, nie jest osobnym stanem).
+end note
+
+note left of reserved
+  Linia przerywana: sciezka dostepna w API,
+  ale nieuzywana przez panel - serwis nie
+  przyjmuje rezerwacji z wyprzedzeniem.
+end note
+
+note left of picked_up
+  Kazde przejscie realizuje storage/services.py
+  i zapisuje StorageEvent (log audytowy).
+  Rozliczenie jest na zleceniu, wiec wydanie
+  nie sprawdza platnosci. Pobytow sie nie usuwa.
+end note
+@enduml

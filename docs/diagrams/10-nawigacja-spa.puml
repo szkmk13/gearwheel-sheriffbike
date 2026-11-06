@@ -1,0 +1,54 @@
+@startuml 10-nawigacja-spa
+!include _styl.iuml
+title Mapa nawigacji aplikacji SPA (React Router)
+hide empty description
+
+state "Strona glowna\n/" as Home
+state "Logowanie\n/login" as Login
+state "Nie znaleziono\n* (404)" as NotFound
+
+state "Panel pracownika /panel (MainLayout + Sidebar)" as Panel {
+  state "Dashboard\n/panel" as Dash
+  state "Zlecenia\n/panel/orders" as Orders
+  state "Szczegoly zlecenia\n/panel/orders/:id" as OrderDet
+  state "Kalendarz odbiorow\n/panel/calendar" as Cal
+  state "Klienci\n/panel/clients" as Clients
+  state "Szczegoly klienta\n/panel/clients/:id" as ClientDet
+  state "Szczegoly sprzetu\n/panel/bikes/:id" as BikeDet
+  state "Skaner QR\n/panel/scan" as Scan
+  state "Przechowalnia\n/panel/storage" as Storage
+  state "Magazyn (w budowie)\n/panel/inventory" as Inv
+
+  [*] --> Dash
+  Dash --> Orders
+  Dash --> OrderDet : ostatnie zlecenia
+  Dash --> Cal : odbiory w tym tygodniu\n/ wybrany dzien
+  Cal --> OrderDet
+  Orders --> OrderDet
+  Clients --> ClientDet
+  ClientDet --> BikeDet
+  ClientDet --> OrderDet
+  OrderDet --> ClientDet
+  OrderDet --> BikeDet
+  BikeDet --> OrderDet
+  Storage --> OrderDet : zlecenie pobytu
+  Scan --> BikeDet : tryb "szczegoly"
+  Scan --> Orders : tryb "nowe zlecenie"\n(?newOrder=true&bikeId=...)
+  Scan --> OrderDet : link do zlecenia
+}
+
+[*] --> Home
+Home --> Login : link w nawigacji
+Login --> Panel : poprawne logowanie
+Panel --> Login : brak sesji / wylogowanie\n(user == null)
+[*] --> NotFound : nieznany adres
+
+note right of Panel
+  Sidebar (z kazdego widoku panelu): Dashboard,
+  Zlecenia, Kalendarz, Klienci, przycisk
+  "Skanuj kod QR" (QRScannerModal, pelny widok:
+  /panel/scan) oraz sekcja "Zima": Przechowalnia.
+  Magazyn to na razie pusta strona,
+  dostepna tylko z adresu URL.
+end note
+@enduml

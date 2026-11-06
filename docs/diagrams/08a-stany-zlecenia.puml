@@ -1,0 +1,52 @@
+@startuml 08a-stany-zlecenia
+!include _styl.iuml
+title Diagram stanow - cykl zycia zlecenia naprawy (RepairOrder)
+hide empty description
+
+[*] --> accepted : utworzenie zlecenia\n(POST /api/orders/ albo\nPOST /api/storage/intake/)
+
+state "Przyjete\n(accepted)" as accepted
+state "Wycena\n(estimating)" as estimating
+state "Czeka na czesci\n(waiting_parts)" as waiting_parts
+state "W realizacji\n(in_progress)" as in_progress
+state "Gotowe do odbioru\n(done)" as done
+state "Wydane klientowi\n(delivered)" as delivered
+state "Anulowane\n(cancelled)" as cancelled
+
+accepted : entry / ustaw accepted_at
+done : entry / propozycja SMS (sms_preview)
+done : wyslij SMS / POST .../sms/, dopisek w StatusHistory
+delivered : entry / ustaw delivered_at, zablokuj pozycje
+cancelled : entry / zablokuj pozycje
+
+accepted --> estimating : rozpoczecie wyceny
+estimating --> waiting_parts : brak czesci
+estimating --> in_progress : czesci dostepne
+waiting_parts --> in_progress : dostawa czesci
+in_progress --> waiting_parts : potrzebna dodatkowa czesc
+in_progress --> done : naprawa zakonczona
+done --> delivered : odbior przez klienta
+
+accepted --> cancelled : rezygnacja
+estimating --> cancelled : rezygnacja
+waiting_parts --> cancelled : rezygnacja
+
+delivered --> [*]
+cancelled --> [*]
+
+note right of done
+  Kazda zmiana przez POST /api/orders/<id>/status/
+  zapisuje wpis StatusHistory
+  (old_status, new_status, changed_by, note).
+  API odrzuca status nieznany lub rowny obecnemu;
+  pokazane przejscia to typowy przebieg pracy serwisu.
+  Zmiana statusu sama nie wysyla SMS -
+  pracownik zatwierdza go osobno.
+end note
+
+note left of delivered
+  W stanach delivered i cancelled pozycji
+  zlecenia nie mozna dodawac, zmieniac
+  ani usuwac - kwota final_cost jest zamknieta.
+end note
+@enduml

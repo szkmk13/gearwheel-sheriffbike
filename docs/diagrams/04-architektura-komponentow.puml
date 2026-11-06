@@ -1,0 +1,80 @@
+@startuml 04-architektura-komponentow
+!include _styl.iuml
+title Diagram komponentow - architektura systemu
+
+node "Przegladarka uzytkownika" {
+  component "React SPA (Vite)" as SPA {
+    component "React Router\n(/, /login, /panel/*)" as Router
+    component "Strona publiczna\n(components/landingPage)" as Landing
+    component "Panel pracownika\n(pages/*, MainLayout)" as Panel
+    component "AuthContext\n(stan sesji)" as AuthCtx
+    component "React Query\n(cache danych serwera)" as RQ
+    component "Warstwa HTTP\n(api/config.js: apiFetch)" as ApiFetch
+    component "Skaner QR\n(jsQR + kamera)" as Scanner
+  }
+}
+
+node "Serwer aplikacji" {
+  component "Django 5.2" as Django {
+    component "Powloka SPA\n(templates/home.html,\ndjango-vite)" as Shell
+    component "Uwierzytelnianie\n(auth_views: login/logout/me,\nsesja + CSRF, limit prob)" as Auth
+    component "Django REST Framework\n(viewsety, serializery,\ndrf-spectacular)" as DRF
+    component "Panel admin\n(/admin)" as Admin
+
+    package "Aplikacje domenowe (apps/)" {
+      component "customers\n(klienci, sprzet, QR,\nwyszukanie po telefonie)" as AppCustomers
+      component "orders\n(zlecenia, pozycje, statusy,\nkalendarz, dashboard, SMS)" as AppOrders
+      component "storage\n(przechowalnia: intake,\noblozenie, services.py)" as AppStorage
+      component "inventory\n(katalog uslug, czesci\ni akcesoriow)" as AppInventory
+      component "landing\n(formularz, opinie)" as AppLanding
+    }
+    component "Django ORM" as ORM
+  }
+}
+
+database "Baza danych\n(SQLite)" as DB
+folder "Pliki media\n(zdjecia sprzetu)" as Media
+
+cloud "Uslugi zewnetrzne" {
+  component "Google Sheets API" as GSheets
+  component "Google Places API" as GPlaces
+  component "Cloudflare Turnstile" as CFT
+  component "Bramka SMS\n(obecnie symulacja - log)" as Sms
+}
+
+Router --> Landing
+Router --> Panel
+Panel --> AuthCtx
+Panel --> RQ
+Panel --> Scanner
+RQ --> ApiFetch
+AuthCtx --> ApiFetch
+Landing --> ApiFetch
+
+ApiFetch --> Auth : JSON / HTTPS\n(cookie sessionid,\nX-CSRFToken)
+ApiFetch --> DRF : REST /api/*
+Router ..> Shell : pierwsze zaladowanie\n/ deep link
+
+DRF --> AppCustomers
+DRF --> AppOrders
+DRF --> AppStorage
+DRF --> AppInventory
+DRF --> AppLanding
+
+AppStorage --> AppOrders : zlecenie + pozycja\n"Przechowanie zimowe"
+AppOrders --> AppInventory : pozycje z katalogu
+
+AppCustomers --> ORM
+AppOrders --> ORM
+AppStorage --> ORM
+AppInventory --> ORM
+Auth --> ORM
+Admin --> ORM
+ORM --> DB
+AppCustomers --> Media
+
+AppLanding --> GSheets : zapis zgloszenia
+AppLanding --> GPlaces : opinie (cache 12h)
+AppLanding --> CFT : weryfikacja tokenu
+AppOrders ..> Sms : SMS "gotowe do odbioru"
+@enduml

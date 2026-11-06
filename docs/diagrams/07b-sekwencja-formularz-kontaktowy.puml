@@ -1,0 +1,57 @@
+@startuml 07b-sekwencja-formularz-kontaktowy
+!include _styl.iuml
+title Diagram sekwencji - wyslanie formularza rezerwacji ze strony publicznej
+autonumber
+
+actor "Klient" as K
+participant "Strona publiczna\n(Footer.jsx)" as FE
+participant "Widzet Turnstile" as TW
+participant "ContactFormView\n(apps/landing)" as View
+participant "services.leads" as Svc
+participant "Cloudflare\nTurnstile API" as CF
+participant "Google\nSheets API" as GS
+
+K -> FE : wypelnia formularz\n(imie, telefon, sprzet, usluga, data, wiadomosc)
+FE -> TW : wyzwanie captcha
+TW --> FE : turnstile_token
+K -> FE : "Wyslij"
+FE -> View : POST /api/contact_form/\n{..., turnstile_token}
+activate View
+alt limit przekroczony (5 / godz. z adresu IP)
+  View --> FE : 429 Too Many Requests
+else w limicie
+  View -> View : ContactFormSerializer.is_valid()
+  alt dane niepoprawne
+    View --> FE : 400 {bledy pol}
+  else dane poprawne
+    View -> Svc : verify_turnstile(token, remote_ip)
+    activate Svc
+    alt brak TURNSTILE_SECRET_KEY
+      Svc --> View : True (srodowisko deweloperskie)
+    else klucz skonfigurowany
+      Svc -> CF : POST /siteverify
+      CF --> Svc : {success}
+      Svc --> View : success
+    end
+    deactivate Svc
+    alt captcha odrzucona
+      View --> FE : 400 "Weryfikacja captcha nie powiodla sie"
+    else captcha poprawna
+      View -> Svc : append_lead_to_sheet(wiersz)
+      activate Svc
+      Svc -> GS : spreadsheets.values.append\n(konto serwisowe)
+      GS --> Svc : OK
+      deactivate Svc
+      View --> FE : 201 {ok: true}
+      FE --> K : potwierdzenie wyslania
+    end
+  end
+end
+deactivate View
+
+note over Svc, GS
+  Gdy Google Sheets nie jest skonfigurowane,
+  zapis jest pomijany (ostrzezenie w logach),
+  a endpoint i tak zwraca 201.
+end note
+@enduml

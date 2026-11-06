@@ -1,0 +1,96 @@
+@startuml 06-pakiety
+!include _styl.iuml
+title Diagram pakietow - struktura kodu zrodlowego
+hide class circle
+hide empty members
+
+package "gearwheel-sherifbike" {
+
+  package "config" as Config {
+    package "settings" as PSettings {
+      class "base.py" as sBase
+      class "local.py" as sLocal
+      class "dev.py" as sDev
+    }
+    class "urls.py" as cUrls
+    class "auth_views.py" as cAuth
+    class "exceptions.py" as cExc
+  }
+
+  package "apps" as PApps {
+    package "customers" as PCustomers {
+    }
+    package "orders" as POrders {
+      class "sms.py" as oSms
+    }
+    package "storage" as PStorage {
+    }
+    package "inventory" as PInventory {
+      class "catalog.py\nservice_parts.py" as iCatalog
+    }
+    package "landing" as PLanding {
+      package "services (leads, reviews)" as PLandServices {
+      }
+    }
+  }
+
+  package "templates" as PTemplates {
+  }
+  package "deploy" as PDeploy {
+  }
+
+  package "frontend/src" as PFront {
+    package "pages" as FPages {
+    }
+    package "layouts" as FLayouts {
+    }
+    package "components" as FComponents {
+      package "landingPage" as FLanding {
+      }
+      package "orders" as FOrders {
+      }
+      package "storage" as FStorage {
+      }
+      package "calendar" as FCalendar {
+      }
+    }
+    package "context" as FContext {
+    }
+    package "api" as FApi {
+    }
+  }
+}
+
+sLocal ..> sBase : import
+sDev ..> sBase : import
+cUrls ..> PCustomers
+cUrls ..> POrders
+cUrls ..> PStorage
+cUrls ..> PInventory
+cUrls ..> PLanding
+cUrls ..> cAuth
+cUrls ..> PTemplates
+cAuth ..> PCustomers : AuthenticatedUserSerializer
+
+POrders ..> PCustomers : Customer, Bike
+POrders ..> PInventory : Part
+PStorage ..> POrders : RepairOrder,\nservices.add_item
+PStorage ..> PCustomers : Bike
+PStorage ..> iCatalog : STORAGE_SERVICE_SKU
+PInventory ..> POrders : RepairOrder
+
+FPages ..> FApi
+FPages ..> FComponents
+FLayouts ..> FContext
+FContext ..> FApi
+FLanding ..> FApi
+FOrders ..> FApi
+FStorage ..> FApi
+PTemplates ..> PFront : django-vite\n(manifest / dev server)
+
+note bottom of PApps
+  Kazda aplikacja Django ma uklad:
+  models.py, serializers.py, views.py,
+  urls.py, services.py, admin.py
+end note
+@enduml

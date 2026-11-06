@@ -1,0 +1,69 @@
+@startuml 09-aktywnosc-przyjecie-sprzetu
+!include _styl.iuml
+title Diagram aktywnosci - przyjecie sprzetu do serwisu
+
+|Klient|
+start
+:Przynosi sprzet do serwisu;
+
+|Pracownik|
+:Wpisuje numer telefonu klienta;
+|System|
+:Wyszukuje klienta po numerze\n(GET /api/customers/lookup/, E.164);
+|Pracownik|
+if (Klient istnieje w systemie?) then (tak)
+  :Formularz przelacza sie na klienta\ni pokazuje jego sprzet;
+else (nie)
+  :Wprowadza dane klienta\n(imie, nazwisko, e-mail);
+  :Odnotowuje zgode RODO (rodo_accepted);
+  |System|
+  :Zapisuje Customer\n(numer juz istnieje -> zwraca istniejacego);
+  |Pracownik|
+endif
+
+repeat
+  if (Sprzet jest juz zarejestrowany?) then (tak)
+    :Wybiera sprzet z listy klienta;
+  else (nie)
+    :Wprowadza dane sprzetu\n(kategoria, marka, model, nr seryjny);
+    |System|
+    :Zapisuje Bike\n(generuje uuid i sheriff_code);
+    |Pracownik|
+    :Drukuje i nakleja etykiete z kodem QR;
+  endif
+repeat while (Kolejna sztuka sprzetu?) is (tak)
+-> nie;
+
+if (Cel wizyty?) then (naprawa)
+  :Wpisuje numer przywieszki (bike_tag_number),\nopis usterki, priorytet, szacowany koszt\ni planowana date odbioru;
+  |System|
+  :Tworzy RepairOrder (status accepted)\ni wiaze z nim sprzet (M:N);
+  |Pracownik|
+  :Dodaje pozycje z katalogu\n(uslugi, czesci, akcesoria);
+  |System|
+  :Przelicza final_cost = suma pozycji;
+  |Pracownik|
+else (przechowanie zimowe)
+  :Wpisuje numer przywieszki,\ndate konca pobytu i cene za sztuke;
+  |System|
+  :intake(): w jednej transakcji;
+  :Tworzy RepairOrder pod jedna przywieszka;
+  if (Termin koliduje z aktywnym pobytem\nktorejs sztuki?) then (tak)
+    :Wycofuje cale przyjecie\n(blad 400 ze wskazaniem sztuki);
+    |Pracownik|
+    :Koryguje termin albo sprzet;
+    detach
+  else (nie)
+    |System|
+    :Tworzy StorageBooking (stored)\n+ StorageEvent check_in dla kazdej sztuki;
+    :Dodaje pozycje "Przechowanie zimowe"\n(ilosc = liczba sztuk);
+  endif
+  |Pracownik|
+endif
+
+:Przekazuje klientowi potwierdzenie\nz numerem przywieszki;
+
+|Klient|
+:Otrzymuje potwierdzenie przyjecia;
+stop
+@enduml
