@@ -1,6 +1,7 @@
 export default function Select({
     label,
     options = [],
+    groups,
     placeholder = "Wybierz...",
     required = false,
     ...props
@@ -30,6 +31,17 @@ export default function Select({
                     <option key={option.value} value={option.value}>
                         {option.label}
                     </option>
+                ))}
+
+                {/* Opcjonalnie opcje w grupach: [{ label, options: [...] }] */}
+                {groups?.filter((group) => group.options.length > 0).map((group) => (
+                    <optgroup key={group.label} label={group.label}>
+                        {group.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                                {option.label}
+                            </option>
+                        ))}
+                    </optgroup>
                 ))}
             </select>
         </div>

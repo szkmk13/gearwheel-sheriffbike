@@ -180,7 +180,7 @@ export default function ClientSearchSelect({
                     <span className="block text-xs text-gray-500 truncate">{client.phone}</span>
                   </span>
                   <span className="text-xs text-gray-400 shrink-0">
-                    {client.bikes?.length ? `rowery: ${client.bikes.length}` : 'brak rowerów'}
+                    {client.bikes?.length ? `sprzęt: ${client.bikes.length}` : 'brak sprzętu'}
                   </span>
                 </li>
               ))

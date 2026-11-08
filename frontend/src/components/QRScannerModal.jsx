@@ -64,7 +64,7 @@ export default function QRScannerModal({
   }, []);
 
   const handleSuccessWithBike = useCallback((bike) => {
-    toast.success(`Rozpoznano rower: ${bike.brand} ${bike.model || ''}`);
+    toast.success(`Rozpoznano sprzęt: ${bike.brand} ${bike.model || ''}`);
     stopCamera();
     onClose();
 
@@ -105,7 +105,7 @@ export default function QRScannerModal({
               return;
             }
           } else {
-            toast.success(`Zeskanowano link do roweru #${bikeId}`);
+            toast.success(`Zeskanowano link do sprzętu #${bikeId}`);
             stopCamera();
             onClose();
             navigate(`/panel/bikes/${bikeId}`);
@@ -167,7 +167,7 @@ export default function QRScannerModal({
         throw apiErr;
       }
     } catch (err) {
-      toast.error(`Nie znaleziono roweru dla kodu: "${code}"`);
+      toast.error(`Nie znaleziono sprzętu dla kodu: "${code}"`);
       // Krótkie opóźnienie przed ponownym skanowaniem
       setTimeout(() => {
         setIsProcessing(false);
@@ -295,7 +295,7 @@ export default function QRScannerModal({
             <div>
               <h2 className="text-base sm:text-lg font-bold text-gray-900">Skaner SheriffBike QR</h2>
               <p className="text-xs text-gray-500">
-                {hint || (scanAction === 'new_order' ? 'Zeskanuj rower, by natychmiast utworzyć zlecenie' : 'Skieruj aparat na etykietę roweru')}
+                {hint || (scanAction === 'new_order' ? 'Zeskanuj sprzęt, by natychmiast utworzyć zlecenie' : 'Skieruj aparat na etykietę sprzętu')}
               </p>
             </div>
           </div>
@@ -331,7 +331,7 @@ export default function QRScannerModal({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
               </svg>
-              <span>Karta roweru</span>
+              <span>Karta sprzętu</span>
             </button>
             <button
               type="button"
