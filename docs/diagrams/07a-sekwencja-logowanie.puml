@@ -1,0 +1,66 @@
+@startuml 07a-sekwencja-logowanie
+!include _styl.iuml
+title Diagram sekwencji - logowanie i uwierzytelnianie sesyjne
+autonumber
+
+actor "Pracownik" as U
+participant "Przegladarka\n(React SPA)" as SPA
+participant "AuthContext" as Ctx
+participant "apiFetch\n(api/config.js)" as Api
+participant "Django\n(urls / auth_views)" as Dj
+database "Baza danych" as DB
+
+U -> SPA : otwiera /panel
+SPA -> Dj : GET /panel
+Dj --> SPA : home.html (noindex)\nSet-Cookie: csrftoken
+activate Ctx
+SPA -> Ctx : montowanie AuthProvider
+Ctx -> Api : fetchMe()
+Api -> Dj : GET /api/auth/me/
+Dj --> Api : 401 Unauthorized
+Api --> Ctx : blad
+Ctx -> Ctx : user = null
+deactivate Ctx
+SPA -> SPA : MainLayout: przekierowanie na /login
+
+U -> SPA : wpisuje login i haslo
+SPA -> Ctx : login(credentials)
+activate Ctx
+Ctx -> Api : loginApi()
+Api -> Api : odczyt cookie csrftoken
+Api -> Dj : POST /api/auth/login/\nX-CSRFToken, {username, password}
+activate Dj
+Dj -> Dj : csrf_protect: weryfikacja tokenu
+alt limit prob przekroczony (5 / min z adresu IP)
+  Dj --> Api : 429 Too Many Requests
+  Api --> SPA : komunikat bledu
+else w limicie
+  Dj -> DB : authenticate(): SELECT auth_user
+  DB --> Dj : uzytkownik / brak
+  alt dane poprawne i is_staff
+    Dj -> DB : login(): zapis sesji
+    Dj --> Api : 200 {id, username, ...}\nSet-Cookie: sessionid (httpOnly),\nnowy csrftoken
+    Api --> Ctx : dane uzytkownika
+    Ctx -> Ctx : user = dane
+    Ctx --> SPA : toast "Witaj, ..."
+    SPA -> SPA : przejscie do /panel (dashboard)
+  else dane bledne albo konto bez is_staff
+    Dj --> Api : 401 "Invalid username or password"
+    Api --> SPA : komunikat bledu
+  end
+end
+deactivate Dj
+deactivate Ctx
+
+== Kolejne zadania ==
+SPA -> Api : np. PATCH /api/orders/12/
+Api -> Dj : cookie sessionid + X-CSRFToken
+alt sesja wygasla
+  Dj --> Api : 401
+  Api -> Ctx : sessionExpiredHandler()
+  Ctx -> Ctx : user = null
+  SPA -> SPA : przekierowanie na /login
+else sesja aktywna
+  Dj --> Api : 200
+end
+@enduml

@@ -1,0 +1,61 @@
+@startuml 05-wdrozenie
+!include _styl.iuml
+title Diagram wdrozenia - srodowisko produkcyjne
+
+node "Urzadzenie uzytkownika\n(komputer / smartfon)" <<device>> {
+  node "Przegladarka WWW" <<execution environment>> {
+    artifact "React SPA\n(bundle JS/CSS z Vite)" as Bundle
+  }
+}
+
+node "GitHub" <<cloud>> {
+  node "GitHub Actions\n(deploy.yml, push na master)" as CI
+}
+
+node "Serwer VPS mikr.us (Linux)" <<device>> {
+  node "nginx" <<web server>> as Nginx {
+    artifact "nginx.conf" as NginxConf
+  }
+  node "systemd --user" <<execution environment>> {
+    node "gunicorn\n(1 worker)" <<application server>> as Gunicorn {
+      artifact "config.wsgi:application\n(Django, settings: config.settings.dev)" as Wsgi
+    }
+    artifact "gearwheel.service" as Unit
+  }
+  folder "staticfiles/\n(collectstatic, w tym\nstatic/frontend - build Vite)" as Static
+  folder "media/\n(zdjecia sprzetu)" as MediaDir
+  artifact ".env\n(SECRET_KEY, klucze API)" as Env
+  database "SQLite\n(/home/sheriff_bike/db.sqlite3)" as DB
+}
+
+cloud "Google Cloud" {
+  node "Sheets API" as Sheets
+  node "Places API" as Places
+}
+cloud "Cloudflare" {
+  node "Turnstile" as Turnstile
+}
+
+Bundle -- Nginx : HTTP(S)
+Nginx --> Static : /static/
+Nginx --> MediaDir : /media/
+Nginx --> Gunicorn : proxy_pass\n(gniazdo unix gunicorn.sock)
+Unit ..> Gunicorn : uruchamia\ni restartuje
+Wsgi ..> Env : odczyt konfiguracji
+Wsgi --> DB : SQL
+Wsgi --> MediaDir : zapis uploadow
+Wsgi --> Sheets : HTTPS
+Wsgi --> Places : HTTPS
+Wsgi --> Turnstile : HTTPS
+CI --> Unit : rsync kodu (bez db.sqlite3)\n+ ssh deploy_remote.sh
+
+note bottom of Unit
+  Wdrozenie: deploy/deploy_remote.sh
+  (wywolywany przez GitHub Actions po testach
+  i buildzie frontendu)
+  1. pip install -r requirements.txt
+  2. manage.py migrate
+  3. manage.py collectstatic
+  4. systemctl --user restart gearwheel.service
+end note
+@enduml

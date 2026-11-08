@@ -1,0 +1,15 @@
+' Wspolny styl dla wszystkich diagramow - dolaczany przez !include _styl.iuml
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam shadowing false
+skinparam roundCorner 6
+skinparam dpi 150
+skinparam ArrowColor #444444
+skinparam BorderColor #444444
+skinparam BackgroundColor #FFFFFF
+skinparam titleFontSize 16
+skinparam titleFontStyle bold
+skinparam NoteBackgroundColor #FFF6E5
+skinparam NoteBorderColor #D9601C
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle

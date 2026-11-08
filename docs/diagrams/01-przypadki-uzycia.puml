@@ -1,0 +1,105 @@
+@startuml 01-przypadki-uzycia
+!include _styl.iuml
+title Diagram przypadkow uzycia - system Sheriff Bike
+left to right direction
+
+actor "Klient\n(odwiedzajacy strone)" as Klient
+actor "Pracownik serwisu" as Pracownik
+actor "Administrator" as Admin
+actor "Google Sheets" as Sheets <<system>>
+actor "Google Places API" as Places <<system>>
+actor "Cloudflare Turnstile" as Turnstile <<system>>
+actor "Bramka SMS\n(obecnie symulacja)" as Bramka <<system>>
+
+Admin --|> Pracownik
+
+rectangle "Strona publiczna (landing page)" {
+  usecase "Przegladanie oferty\ni cennika" as UC_Oferta
+  usecase "Przegladanie opinii Google" as UC_Opinie
+  usecase "Wyslanie formularza\nrezerwacji wizyty" as UC_Formularz
+  usecase "Weryfikacja captcha" as UC_Captcha
+}
+
+rectangle "Panel pracownika (/panel)" {
+  usecase "Logowanie / wylogowanie" as UC_Login
+
+  usecase "Przeglad dashboardu\n(statystyki, trend tygodniowy)" as UC_Dashboard
+  usecase "Kalendarz odbiorow\n(dzien / tydzien / miesiac)" as UC_Kalendarz
+
+  usecase "Zarzadzanie klientami" as UC_Klienci
+  usecase "Wyszukanie klienta\npo numerze telefonu" as UC_Telefon
+  usecase "Rejestracja sprzetu klienta\n(rower / sprzet zimowy)" as UC_Sprzet
+  usecase "Generowanie naklejki\nz kodem QR" as UC_QR
+
+  usecase "Przyjecie zlecenia naprawy" as UC_Zlecenie
+  usecase "Zmiana statusu zlecenia" as UC_Status
+  usecase "Przeglad historii statusow" as UC_Historia
+  usecase "Dodanie pozycji zlecenia\n(usluga / czesc / akcesorium)" as UC_Pozycje
+  usecase "Wybor pozycji z katalogu" as UC_Katalog
+  usecase "Wyslanie SMS\no gotowosci do odbioru" as UC_Sms
+
+  usecase "Skanowanie kodu QR\nsprzetu" as UC_Skan
+
+  usecase "Przyjecie sprzetu\nna przechowanie zimowe" as UC_Przech
+  usecase "Edycja / przedluzenie /\nanulowanie pobytu" as UC_PrzechEdycja
+  usecase "Wydanie sprzetu\nz przechowalni" as UC_Wydanie
+  usecase "Podglad oblozenia\nprzechowalni" as UC_Oblozenie
+}
+
+rectangle "Panel administracyjny Django (/admin)" {
+  usecase "Zarzadzanie kontami\npracownikow" as UC_Konta
+  usecase "Zarzadzanie katalogiem\n(uslugi, czesci, akcesoria)" as UC_KatalogAdmin
+}
+
+Klient --> UC_Oferta
+Klient --> UC_Opinie
+Klient --> UC_Formularz
+UC_Formularz ..> UC_Captcha : <<include>>
+UC_Captcha --> Turnstile
+UC_Formularz --> Sheets
+UC_Opinie --> Places
+
+Pracownik --> UC_Login
+Pracownik --> UC_Dashboard
+Pracownik --> UC_Kalendarz
+Pracownik --> UC_Klienci
+Pracownik --> UC_Sprzet
+Pracownik --> UC_Zlecenie
+Pracownik --> UC_Status
+Pracownik --> UC_Pozycje
+Pracownik --> UC_Skan
+Pracownik --> UC_Przech
+Pracownik --> UC_PrzechEdycja
+Pracownik --> UC_Wydanie
+Pracownik --> UC_Oblozenie
+
+UC_Sprzet ..> UC_QR : <<include>>
+UC_Zlecenie ..> UC_Telefon : <<include>>
+UC_Pozycje ..> UC_Katalog : <<include>>
+UC_Historia ..> UC_Status : <<extend>>
+UC_Sms ..> UC_Status : <<extend>>
+UC_Sms --> Bramka
+UC_Przech ..> UC_Telefon : <<include>>
+
+Admin --> UC_Konta
+Admin --> UC_KatalogAdmin
+
+note right of UC_Login
+  Wszystkie przypadki panelu wymagaja
+  aktywnej sesji konta z is_staff
+  (uwierzytelnienie sesyjne Django + token CSRF).
+end note
+
+note right of UC_Sms
+  Proponowany tekst pojawia sie po zmianie
+  statusu na "gotowe do odbioru"; pracownik
+  moze go poprawic przed wyslaniem.
+end note
+
+note right of UC_Przech
+  Jeden krok (POST /api/storage/intake/):
+  zlecenie pod jedna przywieszka, pobyt
+  "na przechowaniu" dla kazdej sztuki
+  i pozycja "Przechowanie zimowe".
+end note
+@enduml

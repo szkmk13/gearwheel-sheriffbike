@@ -3,7 +3,7 @@ import ServicesBlock from "./sections/ServicesBlock";
 import CustomerStub from "./sections/CustomerStub";
 import "./print.css";
 
-// Arkusz A4 "Przyjecie serwisowe roweru": czesc serwisowa + odcinek dla klienta.
+// Arkusz A4 "Przyjecie serwisowe" (rower / sprzet zimowy): czesc serwisowa + odcinek dla klienta.
 //
 // data: {
 //   order: { tagNumber },

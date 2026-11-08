@@ -1,11 +1,18 @@
 import Field from "../Field";
 import { formatDate } from "../../utils/dates";
 
+const TITLES = {
+    bike: "Przyjęcie serwisowe roweru",
+    winter: "Przyjęcie serwisowe sprzętu zimowego",
+    mixed: "Przyjęcie serwisowe sprzętu",
+};
+
 // Tytul + siatka pol czesci serwisowej. Etykiety 1:1 z papierowa kartka.
 export default function IntakeHeader({ data }) {
+    const isBike = data.category === "bike";
     return (
         <>
-            <h1 className="sheet-title">Przyjęcie serwisowe roweru</h1>
+            <h1 className="sheet-title">{TITLES[data.category] ?? TITLES.bike}</h1>
 
             {/* Wiersz 1: daty i dane klienta. Wiersz 2: sprzet na dwie kolumny - zwykle to
                 najdluzszy tekst (marka, model, nr ramy). */}
@@ -15,7 +22,7 @@ export default function IntakeHeader({ data }) {
                 <Field label="Telefon">{data.customer.phone}</Field>
 
                 <Field label="Data odbioru" bold>{data.plannedPickupAt && formatDate(data.plannedPickupAt)}</Field>
-                <Field label="Model roweru i numer" wide>
+                <Field label={isBike ? "Model roweru i numer" : "Model sprzętu i numer"} wide>
                     {/* Jedna zawieszka obejmuje cale zlecenie, wiec tylko przed pierwsza pozycja. */}
                     {data.bikes.length === 0 && data.order.tagNumber && (
                         <span className="line"><strong>#{data.order.tagNumber}</strong></span>

@@ -1,0 +1,57 @@
+@startuml 07c-sekwencja-skan-qr
+!include _styl.iuml
+title Diagram sekwencji - identyfikacja sprzetu przez skan kodu QR
+autonumber
+
+actor "Pracownik" as U
+participant "ScanQRPage /\nQRScannerModal" as Page
+participant "Kamera\n(getUserMedia)" as Cam
+participant "jsQR" as QR
+participant "api/bikes.js" as Api
+participant "BikeLookupView\n(apps/customers)" as View
+database "Baza danych" as DB
+
+U -> Page : otwiera /panel/scan\n(albo "Skanuj kod QR" w Sidebar)
+U -> Page : wybiera tryb: "szczegoly sprzetu"\nalbo "nowe zlecenie"
+Page -> Cam : uruchomienie strumienia wideo
+loop az do rozpoznania kodu
+  Cam --> Page : klatka obrazu
+  Page -> QR : dekodowanie klatki
+  QR --> Page : tekst kodu / brak
+end
+Page -> Page : sygnal dzwiekowy
+
+alt kod to link /panel/orders/<id>
+  Page -> Page : navigate(/panel/orders/<id>)
+else kod to link /panel/bikes/<id> albo "sheriff-<id>-<uuid>"
+  opt kod "sheriff-<id>-<uuid>"
+    Page -> Api : lookupBike(code)
+    Api -> View : GET /api/customers/bikes/lookup/?code=...
+    activate View
+    View -> View : rozbior kodu na id i uuid
+    View -> DB : SELECT bike WHERE id = ? AND uuid = ?
+    DB --> View : rekord / brak
+    alt znaleziono
+      View --> Api : 200 {id, brand, model, customer, ...}
+      Api --> Page : dane sprzetu
+    else nie znaleziono
+      View --> Api : 404
+      Api --> Page : blad
+      Page --> U : komunikat o nieznanym kodzie
+    end
+    deactivate View
+  end
+  Page -> Cam : zatrzymanie kamery
+  Page --> U : toast "Rozpoznano rower ..."
+  alt tryb "nowe zlecenie"
+    Page -> Page : navigate(/panel/orders?newOrder=true\n&bikeId=<id>&customerId=<id>)
+  else tryb "szczegoly sprzetu"
+    Page -> Page : navigate(/panel/bikes/<id>)
+  end
+end
+
+note right of View
+  Porownanie id oraz uuid chroni przed
+  zgadywaniem kodow po samym numerze id.
+end note
+@enduml

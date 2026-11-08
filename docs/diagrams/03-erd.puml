@@ -1,0 +1,210 @@
+@startuml 03-erd
+!include _styl.iuml
+title Diagram ERD - schemat bazy danych
+hide circle
+hide empty methods
+skinparam linetype ortho
+
+entity "auth_user" as user {
+  * id : integer <<PK>>
+  --
+  * username : varchar(150)
+  * password : varchar(128)
+  is_staff : boolean
+  is_superuser : boolean
+}
+
+entity "customers_customer" as customer {
+  * id : bigint <<PK>>
+  --
+  * first_name : varchar(100)
+  * last_name : varchar(100)
+  * phone : varchar(128) <<UQ>>
+  email : varchar(254)
+  notes : text
+  * rodo_accepted : boolean
+  * created_at : timestamp
+}
+
+entity "customers_bike" as bike {
+  * id : bigint <<PK>>
+  --
+  * uuid : uuid <<UQ>>
+  * customer_id : bigint <<FK>>
+  * category : varchar(10)
+  * brand : varchar(100)
+  model : varchar(100)
+  * bike_type : varchar(20)
+  color : varchar(50)
+  serial_no : varchar(100)
+  year : smallint
+  photo : varchar(100)
+  notes : text
+  * created_at : timestamp
+}
+
+entity "orders_repairorder" as ro {
+  * id : bigint <<PK>>
+  --
+  * customer_id : bigint <<FK>>
+  * bike_tag_number : integer
+  * status : varchar(20)
+  * priority : varchar(10)
+  * description : text
+  estimated_cost : numeric(8,2)
+  final_cost : numeric(8,2)
+  accepted_at : timestamp
+  estimated_pickup_date : date
+  delivered_at : timestamp
+  * created_at : timestamp
+  * updated_at : timestamp
+}
+
+entity "orders_repairorder_bikes" as ro_bikes {
+  * id : bigint <<PK>>
+  --
+  * repairorder_id : bigint <<FK>>
+  * bike_id : bigint <<FK>>
+  <<UQ (repairorder_id, bike_id)>>
+}
+
+entity "orders_repairorderitem" as roi {
+  * id : bigint <<PK>>
+  --
+  * repair_order_id : bigint <<FK>>
+  part_id : bigint <<FK>>
+  * item_type : varchar(10)
+  * description : varchar(255)
+  * quantity : numeric(8,2)
+  * unit_price : numeric(8,2)
+  * created_at : timestamp
+}
+
+entity "orders_statushistory" as sh {
+  * id : bigint <<PK>>
+  --
+  * repair_order_id : bigint <<FK>>
+  changed_by_id : integer <<FK>>
+  old_status : varchar(20)
+  * new_status : varchar(20)
+  note : text
+  * changed_at : timestamp
+}
+
+entity "storage_storagebooking" as sb {
+  * id : bigint <<PK>>
+  --
+  * repair_order_id : bigint <<FK>>
+  * bike_id : bigint <<FK>>
+  * start_date : date
+  * end_date : date
+  * status : varchar(20)
+  checked_in_at : timestamp
+  checked_out_at : timestamp
+  check_in_notes : text
+  check_out_notes : text
+  created_by_id : integer <<FK>>
+  * created_at : timestamp
+  * updated_at : timestamp
+  <<CHECK end_date >= start_date>>
+}
+
+entity "storage_storageevent" as se {
+  * id : bigint <<PK>>
+  --
+  * booking_id : bigint <<FK>>
+  * event_type : varchar(20)
+  performed_by_id : integer <<FK>>
+  note : text
+  * created_at : timestamp
+}
+
+entity "inventory_category" as cat {
+  * id : bigint <<PK>>
+  --
+  * name : varchar(100) <<UQ>>
+  parent_id : bigint <<FK>>
+}
+
+entity "inventory_supplier" as sup {
+  * id : bigint <<PK>>
+  --
+  * name : varchar(200)
+  contact : varchar(200)
+  email : varchar(254)
+  phone : varchar(20)
+}
+
+entity "inventory_part" as part {
+  * id : bigint <<PK>>
+  --
+  * kind : varchar(20)
+  * is_active : boolean
+  category_id : bigint <<FK>>
+  supplier_id : bigint <<FK>>
+  * name : varchar(200)
+  sku : varchar(100)
+  barcode : varchar(100)
+  description : text
+  * unit : varchar(20)
+  * stock_quantity : numeric(10,2)
+  * low_stock_threshold : numeric(10,2)
+  purchase_price : numeric(8,2)
+  sell_price : numeric(8,2)
+  * created_at : timestamp
+  * updated_at : timestamp
+}
+
+entity "inventory_invoice" as inv {
+  * id : bigint <<PK>>
+  --
+  supplier_id : bigint <<FK>>
+  * image : varchar(100)
+  * status : varchar(20)
+  raw_ocr_text : text
+  parsed_data : json
+  invoice_number : varchar(100)
+  invoice_date : date
+  total_amount : numeric(10,2)
+  uploaded_by_id : integer <<FK>>
+  * created_at : timestamp
+  * updated_at : timestamp
+}
+
+entity "inventory_stockmovement" as sm {
+  * id : bigint <<PK>>
+  --
+  * part_id : bigint <<FK>>
+  * movement_type : varchar(20)
+  * quantity : numeric(10,2)
+  unit_cost : numeric(8,2)
+  repair_order_id : bigint <<FK>>
+  invoice_id : bigint <<FK>>
+  note : text
+  * created_at : timestamp
+}
+
+customer ||--o{ bike : "CASCADE"
+customer ||--o{ ro : "PROTECT"
+ro ||--o{ ro_bikes
+bike ||--o{ ro_bikes
+ro ||--o{ roi : "CASCADE"
+part |o--o{ roi : "PROTECT"
+ro ||--o{ sh : "CASCADE"
+user |o--o{ sh : "SET NULL"
+
+ro ||--o{ sb : "PROTECT"
+bike ||--o{ sb : "PROTECT"
+user |o--o{ sb : "SET NULL"
+sb ||--o{ se : "PROTECT"
+user |o--o{ se : "SET NULL"
+
+cat |o--o{ cat : "parent, SET NULL"
+cat |o--o{ part : "SET NULL"
+sup |o--o{ part : "SET NULL"
+sup |o--o{ inv : "SET NULL"
+user |o--o{ inv : "SET NULL"
+part ||--o{ sm : "CASCADE"
+inv |o--o{ sm : "SET NULL"
+ro |o--o{ sm : "SET NULL"
+@enduml

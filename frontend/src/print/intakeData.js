@@ -21,9 +21,17 @@ export function formatCost(value) {
     })} zł`;
 }
 
+// 'bike' / 'winter' gdy cale zlecenie jest jednego rodzaju, 'mixed' gdy sa oba.
+function intakeCategory(bikes) {
+    const categories = new Set(bikes.map((bike) => bike.category || "bike"));
+    if (categories.size === 1) return [...categories][0];
+    return categories.size === 0 ? "bike" : "mixed";
+}
+
 export function toIntakeData(order) {
     const customer = order.customer || {};
     return {
+        category: intakeCategory(order.bikes || []),
         order: { tagNumber: order.bike_tag_number },
         receivedAt: order.accepted_at || order.created_at,
         plannedPickupAt: order.estimated_pickup_date,
