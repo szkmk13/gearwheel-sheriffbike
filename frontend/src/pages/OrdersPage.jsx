@@ -17,6 +17,12 @@ import ClientSearchSelect from "../components/ClientSearchSelect";
 import QRScannerModal from "../components/QRScannerModal";
 import { TableRowsSkeleton, MobileOrderCardsSkeleton } from "../components/Skeleton";
 import { todayISODate, defaultPickupDate, isOrderOverdue, formatDate } from "../utils/dates";
+import CategorySwitch from "../components/equipment/CategorySwitch";
+import { CategoryIcons } from "../components/equipment/CategoryIcon";
+import {
+  BIKE_TYPE_OPTIONS, CATEGORY_GROUP_LABELS, EQUIPMENT_PLACEHOLDERS,
+  bikeTypeShortLabel, defaultCategoryForDate, equipmentPayload, orderCategories,
+} from "../utils/equipment";
 
 const PRIORITY_OPTIONS = [
   { value: 'low', label: 'Niski' },
@@ -27,6 +33,18 @@ const PRIORITY_OPTIONS = [
 
 const priorityLabel = (priority) =>
   PRIORITY_OPTIONS.find((p) => p.value === priority)?.label ?? priority;
+
+// Filtr listy - domyślnie wszystko, żeby zlecenia "spoza sezonu" nie znikały z widoku.
+const CATEGORY_FILTERS = [
+  { value: '', label: 'Wszystko' },
+  { value: 'bike', label: 'Rowery' },
+  { value: 'winter', label: 'Zimowe' },
+];
+
+const equipmentOptionLabel = (bike) => {
+  const name = `${bike.brand} ${bike.model || ''}`.trim();
+  return bike.category === 'winter' ? name : `${name} (${bikeTypeShortLabel(bike.bike_type)})`;
+};
 
 export default function OrdersPage() {
   const navigate = useNavigate();
@@ -46,11 +64,16 @@ export default function OrdersPage() {
   // Tekst wpisany w wyszukiwarkę przed kliknięciem "+ Nowy klient" trafia do formularza nowego.
   const [newClientPrefill, setNewClientPrefill] = useState({ fullName: '', phone: '' });
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  // Rodzaj przyjmowanego sprzętu - domyślnie wg sezonu, zawsze do zmiany.
+  // categorySource: 'season' | 'manual' | 'equipment' - skąd wzięła się wartość (podpowiedź pod przełącznikiem).
+  const [equipmentCategory, setEquipmentCategory] = useState(() => defaultCategoryForDate());
+  const [categorySource, setCategorySource] = useState('season');
 
   // Stan wyszukiwania i filtrowania
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilters, setStatusFilters] = useState([]);
   const [priorityFilters, setPriorityFilters] = useState([]);
+  const [categoryFilter, setCategoryFilter] = useState('');
   const [ordering, setOrdering] = useState("");
 
   const [openStatusMenu, setOpenStatusMenu] = useState(false);
@@ -93,6 +116,7 @@ export default function OrdersPage() {
           .then((bike) => {
             if (bike) {
               setScannedBike(bike);
+              followEquipmentCategory(bike);
               if (bike.customer?.id && !customerIdParam) {
                 setSelectedClientId(String(bike.customer.id));
               }
@@ -107,8 +131,16 @@ export default function OrdersPage() {
     }
   }, [searchParams, setSearchParams]);
 
+  // Przełącznik zawsze opisuje to, co faktycznie przyjmujemy - wybrany sprzęt ustawia kategorię.
+  function followEquipmentCategory(bike) {
+    if (!bike?.category) return;
+    setEquipmentCategory(bike.category);
+    setCategorySource('equipment');
+  }
+
   const handleBikeScannedForOrder = (bike) => {
     setScannedBike(bike);
+    followEquipmentCategory(bike);
     const customerId = bike.customer?.id || (typeof bike.customer === 'number' ? bike.customer : '');
     if (customerId) {
       setSelectedClientId(String(customerId));
@@ -117,11 +149,11 @@ export default function OrdersPage() {
     setIsNewClient(false);
     setIsNewBike(false);
     setIsAddOrderFormOpen(true);
-    toast.success(`Wybrano rower: ${bike.brand} ${bike.model || ''}`);
+    toast.success(`Wybrano sprzęt: ${bike.brand} ${bike.model || ''}`);
   };
 
   // Klient jest unikalny po numerze - jeśli już istnieje, przełączamy formularz na niego,
-  // żeby nie rejestrować drugi raz jego roweru.
+  // żeby nie rejestrować drugi raz jego sprzętu.
   const handleNewClientPhoneBlur = async (e) => {
     const phone = e.target.value.trim();
     if (!phone) return;
@@ -142,7 +174,7 @@ export default function OrdersPage() {
     setIsNewBike(!hasBikes);
 
     const name = `${client.first_name} ${client.last_name}`;
-    const next = hasBikes ? 'wybierz rower z listy.' : 'nie ma jeszcze rowerów, zarejestruj nowy.';
+    const next = hasBikes ? 'wybierz sprzęt z listy.' : 'nie ma jeszcze sprzętu, zarejestruj nowy.';
     toast(`Klient z numerem ${client.phone} już istnieje: ${name} - ${next}`, { duration: 6000 });
     if (!client.rodo_accepted) {
       toast.error(`${name} nie ma w bazie zgody RODO - poproś o jej podpisanie.`, { duration: 8000 });
@@ -159,12 +191,15 @@ export default function OrdersPage() {
     setScannedBike(null);
     setFoundClient(null);
     setNewClientPrefill({ fullName: '', phone: '' });
+    setEquipmentCategory(defaultCategoryForDate());
+    setCategorySource('season');
   };
 
   const { data: ordersData, isLoading: isOrdersLoading, isError, error } = useQuery({
-    queryKey: ['orders', { search: searchQuery, status: statusFilters.join(','), priority: priorityFilters.join(','), ordering }],
+    queryKey: ['orders', { search: searchQuery, status: statusFilters.join(','), priority: priorityFilters.join(','), category: categoryFilter, ordering }],
     queryFn: () => fetchOrders({ 
       search: searchQuery || undefined,
+      category: categoryFilter || undefined,
       status: statusFilters.length > 0 ? statusFilters.join(',') : undefined, 
       priority: priorityFilters.length > 0 ? priorityFilters.join(',') : undefined, 
       ordering: ordering || undefined 
@@ -199,20 +234,32 @@ export default function OrdersPage() {
     setSelectedBikeId("");
   };
 
-  let bikeOptions = (selectedClientDetails?.bikes || []).map(bike => ({
-    value: String(bike.id),
-    label: `${bike.brand} ${bike.model || ''} (${bike.bike_type})`
+  let clientEquipment = selectedClientDetails?.bikes || [];
+  if (scannedBike && !clientEquipment.some(b => String(b.id) === String(scannedBike.id))) {
+    clientEquipment = [scannedBike, ...clientEquipment];
+  }
+
+  // Najpierw sprzęt z wybranej kategorii, niżej reszta - nic nie jest ukryte.
+  const otherCategory = equipmentCategory === 'winter' ? 'bike' : 'winter';
+  const equipmentGroups = [equipmentCategory, otherCategory].map((category) => ({
+    label: CATEGORY_GROUP_LABELS[category],
+    options: clientEquipment
+      .filter((bike) => (bike.category || 'bike') === category)
+      .map((bike) => ({ value: String(bike.id), label: equipmentOptionLabel(bike) })),
   }));
 
-  if (scannedBike && !bikeOptions.some(b => String(b.value) === String(scannedBike.id))) {
-    bikeOptions = [
-      {
-        value: String(scannedBike.id),
-        label: `${scannedBike.brand} ${scannedBike.model || ''} (${scannedBike.bike_type})`
-      },
-      ...bikeOptions
-    ];
-  }
+  const handleEquipmentPicked = (bikeId) => {
+    setSelectedBikeId(bikeId);
+    followEquipmentCategory(clientEquipment.find((b) => String(b.id) === String(bikeId)));
+  };
+
+  const handleCategoryChange = (category) => {
+    setEquipmentCategory(category);
+    setCategorySource('manual');
+    // Wybrany sprzęt z drugiej kategorii przestałby pasować do przełącznika.
+    const picked = clientEquipment.find((b) => String(b.id) === String(selectedBikeId));
+    if (picked && (picked.category || 'bike') !== category) setSelectedBikeId("");
+  };
 
   const mutation = useMutation({
     mutationFn: async (formData) => {
@@ -241,12 +288,13 @@ export default function OrdersPage() {
       }
 
       if (isNewClient || isNewBike) {
-        const newBikeData = {
+        const newBikeData = equipmentPayload({
           customer: parseInt(finalCustomerId),
+          category: equipmentCategory,
           brand: formData.get('brand'),
           model: formData.get('model'),
-          bike_type: formData.get('bike_type')
-        };
+          bike_type: formData.get('bike_type'),
+        });
         const createdBike = await createBike(newBikeData);
         finalBikeId = createdBike.id; 
       }
@@ -315,7 +363,7 @@ export default function OrdersPage() {
               type="button"
               onClick={() => setIsScannerOpen(true)}
               className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 px-3.5 sm:px-4 py-2.5 bg-[var(--color-paper-2)] border border-[var(--color-line)] hover:bg-white text-[var(--color-ink)] rounded-md font-medium text-sm transition-colors shadow-xs cursor-pointer"
-              title="Zeskanuj kod QR roweru, aby natychmiast utworzyć nowe zlecenie"
+              title="Zeskanuj kod QR sprzętu, aby natychmiast utworzyć nowe zlecenie"
             >
               <svg className="w-4 h-4 text-[var(--color-accent)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
@@ -323,7 +371,7 @@ export default function OrdersPage() {
               <span>Skanuj QR i przyjmij</span>
             </button>
             <Button onClick={() => setIsAddOrderFormOpen(true)} className="flex-1 sm:flex-initial justify-center">
-              + Przyjmij rower
+              + Przyjmij sprzęt
             </Button>
           </div>
         </div>
@@ -338,6 +386,27 @@ export default function OrdersPage() {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            {/* Filtr kategorii sprzętu */}
+            <div role="radiogroup" aria-label="Rodzaj sprzętu" className="flex items-center h-[46px] p-1 gap-1 border border-[var(--color-line)] rounded-lg bg-[var(--color-paper-2)] shadow-sm">
+              {CATEGORY_FILTERS.map((f) => {
+                const active = categoryFilter === f.value;
+                return (
+                  <button
+                    key={f.value || 'all'}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => setCategoryFilter(f.value)}
+                    className={`h-full px-2.5 sm:px-3 rounded-md text-xs sm:text-sm cursor-pointer transition-colors motion-reduce:transition-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-accent)] ${
+                      active ? 'bg-[var(--color-paper-3)] text-[var(--color-ink)] font-medium' : 'text-[var(--color-ink-3)] hover:text-[var(--color-ink)]'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Dropdown filtrowania statusów (wielokrotny wybór) */}
             <div className="relative" ref={statusMenuRef}>
               <button
@@ -438,7 +507,7 @@ export default function OrdersPage() {
               <tr className="bg-[var(--color-paper-2)] border-b border-solid border-[var(--color-line)] text-sm text-[var(--color-ink-2)]">
                 <th className="py-4 px-6 font-medium">Zawieszka</th>
                 <th className="py-4 px-6 font-medium">Klient</th>
-                <th className="py-4 px-6 font-medium">Rower</th>
+                <th className="py-4 px-6 font-medium">Sprzęt</th>
                 <th className="py-4 px-6 font-medium">Status</th>
 
                 {/* Sortowalna kolumna: Data przyjęcia */}
@@ -496,7 +565,12 @@ export default function OrdersPage() {
                   >
                     <td className="py-4 px-6 font-bold text-[var(--color-ink)]">#{order.bike_tag_number}</td>
                     <td className="py-4 px-6 font-medium">{order.customer_name}</td>
-                    <td className="py-4 px-6 text-[var(--color-ink-2)]">{order.bike_label}</td>
+                    <td className="py-4 px-6 text-[var(--color-ink-2)]">
+                      <span className="inline-flex items-start gap-2">
+                        <span className="mt-0.5"><CategoryIcons categories={orderCategories(order)} /></span>
+                        {order.bike_label}
+                      </span>
+                    </td>
                     <td className="py-4 px-6"> <StatusBadge status={order.status}/> </td>
                     <td className="py-4 px-6 text-[var(--color-ink-3)]">{formatDate(order.created_at)}</td>
                     <td className={`py-4 px-6 ${isOrderOverdue(order) ? 'font-semibold text-red-600' : 'text-[var(--color-ink-3)]'}`}>
@@ -528,7 +602,9 @@ export default function OrdersPage() {
             <div
               key={order.id}
               onClick={() => navigate(`/panel/orders/${order.id}`)}
-              className="bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl p-4 shadow-sm active:bg-[var(--color-paper-3)] transition-colors cursor-pointer space-y-2.5"
+              className={`bg-[var(--color-paper-2)] border border-[var(--color-line)] rounded-xl p-4 shadow-sm active:bg-[var(--color-paper-3)] transition-colors cursor-pointer space-y-2.5 ${
+                orderCategories(order).includes('winter') ? 'border-l-4 border-l-[var(--color-winter-ice)]' : ''
+              }`}
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
@@ -546,7 +622,10 @@ export default function OrdersPage() {
 
               <div>
                 <p className="text-base font-semibold text-[var(--color-ink)]">{order.customer_name}</p>
-                <p className="text-sm text-[var(--color-ink-2)]">{order.bike_label}</p>
+                <p className="text-sm text-[var(--color-ink-2)] flex items-center gap-1.5">
+                  <CategoryIcons categories={orderCategories(order)} className="w-3.5 h-3.5" />
+                  {order.bike_label}
+                </p>
               </div>
 
               <div className="pt-2 border-t border-[var(--color-line)] flex justify-between items-center text-xs text-[var(--color-ink-3)]">
@@ -636,7 +715,7 @@ export default function OrdersPage() {
                 <div className="p-5 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-xl shadow-sm transition-all">
                 <div className="flex justify-between items-center mb-4">
                     <h4 className="text-sm font-semibold text-[var(--color-ink)]">
-                    {(isNewClient || isNewBike) ? "Rejestracja nowego roweru" : "Wybór przypisanego roweru"}
+                    {(isNewClient || isNewBike) ? "Nowy sprzęt" : "Sprzęt klienta"}
                     </h4>
                     
                     <div className="flex items-center gap-3">
@@ -645,12 +724,12 @@ export default function OrdersPage() {
                                 type="button"
                                 onClick={() => setIsScannerOpen(true)}
                                 className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
-                                title="Zeskanuj kod QR roweru"
+                                title="Zeskanuj kod QR sprzętu"
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                                 </svg>
-                                <span>Skanuj QR roweru</span>
+                                <span>Skanuj QR sprzętu</span>
                             </button>
                         )}
 
@@ -664,38 +743,34 @@ export default function OrdersPage() {
                             }}
                             className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
                             />
-                            <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-[var(--color-ink-2)] cursor-pointer">Nowy rower</label>
+                            <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-[var(--color-ink-2)] cursor-pointer">Nowy sprzęt</label>
                         </div>
                         )}
                     </div>
                 </div>
 
+                <div className="mb-4">
+                  <CategorySwitch value={equipmentCategory} onChange={handleCategoryChange} hint={categorySource} />
+                </div>
+
                 {(!isNewClient && !isNewBike) ? (
                     <Select
-                      name="bike" 
-                      label="Rower przypisany do klienta" 
-                      options={bikeOptions} 
-                      placeholder="Wybierz rower..."
+                      name="bike"
+                      label="Sprzęt przypisany do klienta"
+                      groups={equipmentGroups}
+                      placeholder="Wybierz sprzęt..."
                       value={selectedBikeId}
-                      onChange={(e) => setSelectedBikeId(e.target.value)}
-                      required={(!isNewClient && !isNewBike)} 
-                      disabled={!selectedClientId || bikeOptions.length === 0}
+                      onChange={(e) => handleEquipmentPicked(e.target.value)}
+                      required={(!isNewClient && !isNewBike)}
+                      disabled={!selectedClientId || clientEquipment.length === 0}
                     />
                 ) : (
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                    <Input name="brand" label="Producent" placeholder="np. Trek" required={true} />
-                    <Input name="model" label="Model" placeholder="np. Domane SL5" required={true} />
-                    <Select
-                        name="bike_type" label="Typ roweru" required={true}
-                        options={[
-                            { value: 'road', label: 'Szosowy (road)' },
-                            { value: 'mtb', label: 'Górski (mtb)' },
-                            { value: 'city', label: 'Miejski (city)' },
-                            { value: 'gravel', label: 'Gravel (gravel)' },
-                            { value: 'electric', label: 'Elektryczny (electric)' },
-                            { value: 'other', label: 'Inny (other)' }
-                        ]}
-                    />
+                    <div className={`grid grid-cols-1 gap-4 ${equipmentCategory === 'bike' ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
+                    <Input name="brand" label="Producent" placeholder={EQUIPMENT_PLACEHOLDERS[equipmentCategory].brand} required={true} />
+                    <Input name="model" label="Model" placeholder={EQUIPMENT_PLACEHOLDERS[equipmentCategory].model} required={true} />
+                    {equipmentCategory === 'bike' && (
+                      <Select name="bike_type" label="Typ roweru" required={true} options={BIKE_TYPE_OPTIONS} />
+                    )}
                     </div>
                 )}
                 </div>

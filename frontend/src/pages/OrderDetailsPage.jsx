@@ -51,7 +51,7 @@ export default function OrderDetailsPage() {
     const bikeModel = order.bike?.model || '';
     const bikeFullName = (bikeBrand || bikeModel) 
         ? `${bikeBrand} ${bikeModel}`.trim() 
-        : (order.bike_label || 'Rower');
+        : (order.bike_label || 'Sprzęt');
 
     return (
         <div className="p-4 sm:p-6 md:p-8 bg-[var(--color-paper)] min-h-full">
@@ -150,13 +150,13 @@ export default function OrderDetailsPage() {
 
                         <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between mb-2 sm:mb-3">
-                                <h3 className="text-xs sm:text-sm font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Rower i zawieszka</h3>
+                                <h3 className="text-xs sm:text-sm font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Sprzęt i zawieszka</h3>
                                 {bikeId && (
                                     <button
                                         onClick={() => navigate(`/panel/bikes/${bikeId}`)}
                                         className="text-xs font-medium text-[var(--color-accent)] hover:underline cursor-pointer"
                                     >
-                                        Karta roweru →
+                                        Karta sprzętu
                                     </button>
                                 )}
                             </div>

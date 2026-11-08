@@ -6,19 +6,7 @@ export const STORAGE_STATUS_TABS = [
   { value: 'history', label: 'Historia', status: 'picked_up,cancelled' },
 ];
 
-export const CATEGORY_OPTIONS = [
-  { value: 'bike', label: 'Rower' },
-  { value: 'winter', label: 'Sprzęt zimowy' },
-];
-
-export const BIKE_TYPE_OPTIONS = [
-  { value: 'road', label: 'Szosowy (road)' },
-  { value: 'mtb', label: 'Górski (mtb)' },
-  { value: 'city', label: 'Miejski (city)' },
-  { value: 'gravel', label: 'Gravel (gravel)' },
-  { value: 'electric', label: 'Elektryczny (electric)' },
-  { value: 'other', label: 'Inny (other)' },
-];
+export { CATEGORY_OPTIONS, BIKE_TYPE_OPTIONS, categoryLabel } from '../../utils/equipment';
 
 // Statusy zajmujące miejsce - tylko taki pobyt da się edytować, przedłużyć czy anulować.
 export const ACTIVE_STORAGE_STATUSES = ['reserved', 'stored'];
@@ -30,9 +18,6 @@ export const defaultStorageEndDate = () => {
   const year = today.getMonth() < 2 ? today.getFullYear() : today.getFullYear() + 1;
   return `${year}-03-01`;
 };
-
-export const categoryLabel = (category) =>
-  CATEGORY_OPTIONS.find((c) => c.value === category)?.label ?? category;
 
 export { formatMoney } from '../../utils/money';
 

@@ -13,24 +13,9 @@ import StatusBadge from "../components/StatusBadge";
 import { getInitials } from "../components/ClientCard";
 import { BikeDetailsSkeleton } from "../components/Skeleton";
 import { formatDate } from "../utils/dates";
-
-const BIKE_TYPE_LABELS = {
-  road: 'Szosowy (road)',
-  mtb: 'Górski (mtb)',
-  city: 'Miejski (city)',
-  gravel: 'Gravel (gravel)',
-  electric: 'Elektryczny (electric)',
-  other: 'Inny (other)'
-};
-
-const BIKE_TYPE_OPTIONS = [
-  { value: 'road', label: 'Szosowy (road)' },
-  { value: 'mtb', label: 'Górski (mtb)' },
-  { value: 'city', label: 'Miejski (city)' },
-  { value: 'gravel', label: 'Gravel (gravel)' },
-  { value: 'electric', label: 'Elektryczny (electric)' },
-  { value: 'other', label: 'Inny (other)' }
-];
+import CategorySwitch from "../components/equipment/CategorySwitch";
+import CategoryIcon from "../components/equipment/CategoryIcon";
+import { BIKE_TYPE_OPTIONS, bikeTypeLabel, categoryLabel, equipmentPayload } from "../utils/equipment";
 
 const BikeIcon = ({ className = "w-7 h-7" }) => (
   <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -50,6 +35,8 @@ export default function BikeDetailsPage() {
   const queryClient = useQueryClient();
 
   const [isEditOpen, setIsEditOpen] = useState(false);
+  // Kategoria w formularzu edycji - od niej zależy, czy pokazać typ roweru.
+  const [editCategory, setEditCategory] = useState('bike');
   const [copied, setCopied] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState('');
   const formRef = useRef(null);
@@ -76,7 +63,7 @@ export default function BikeDetailsPage() {
         queryClient.invalidateQueries({ queryKey: ['client', String(bike.customer.id)] });
       }
       setIsEditOpen(false);
-      toast.success("Dane roweru zostały zaktualizowane!");
+      toast.success("Dane sprzętu zostały zaktualizowane!");
     },
     onError: (err) => {
       toast.error(`Wystąpił błąd zapisu: ${err.message}`);
@@ -87,9 +74,9 @@ export default function BikeDetailsPage() {
     e.preventDefault();
     const formData = new FormData(e.target);
     const updated = {
+      ...equipmentPayload({ category: editCategory, bike_type: formData.get('bike_type') }),
       brand: formData.get('brand'),
       model: formData.get('model'),
-      bike_type: formData.get('bike_type'),
       color: formData.get('color') || '',
       serial_no: formData.get('serial_no') || '',
       year: formData.get('year') ? parseInt(formData.get('year'), 10) : null,
@@ -107,11 +94,13 @@ export default function BikeDetailsPage() {
   };
 
   if (isLoading) return <BikeDetailsSkeleton />;
-  if (isError) return <div className="p-8 text-red-500 font-medium">Błąd pobierania danych roweru: {error.message}</div>;
-  if (!bike) return <div className="p-8 text-red-500 font-medium">Nie znaleziono roweru.</div>;
+  if (isError) return <div className="p-8 text-red-500 font-medium">Błąd pobierania danych sprzętu: {error.message}</div>;
+  if (!bike) return <div className="p-8 text-red-500 font-medium">Nie znaleziono sprzętu.</div>;
 
   const clientFullName = bike.customer ? `${bike.customer.first_name} ${bike.customer.last_name}`.trim() : 'Brak właściciela';
   const repairOrders = bike.repair_orders || [];
+  const isWinter = bike.category === 'winter';
+  const kindLabel = isWinter ? categoryLabel(bike.category) : bikeTypeLabel(bike.bike_type);
 
   return (
     <div className="p-4 sm:p-6 md:p-8 bg-[var(--color-paper)] min-h-full">
@@ -135,9 +124,11 @@ export default function BikeDetailsPage() {
         <div className="flex items-center gap-4 sm:gap-6 min-w-0">
           <div 
             className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center shrink-0"
-            style={{ backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}
+            style={isWinter
+              ? { backgroundColor: 'var(--color-winter-bg)', color: 'var(--color-winter-ice)' }
+              : { backgroundColor: 'var(--color-accent-soft)', color: 'var(--color-accent)' }}
           >
-            <BikeIcon className="w-8 h-8 sm:w-9 sm:h-9" />
+            {isWinter ? <CategoryIcon category="winter" className="w-8 h-8 sm:w-9 sm:h-9" /> : <BikeIcon className="w-8 h-8 sm:w-9 sm:h-9" />}
           </div>
 
           <div className="min-w-0">
@@ -146,12 +137,12 @@ export default function BikeDetailsPage() {
                 {bike.brand} {bike.model}
               </h1>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
-                {BIKE_TYPE_LABELS[bike.bike_type] || bike.bike_type}
+                {kindLabel}
               </span>
             </div>
             <p className="text-xs sm:text-sm text-gray-500 truncate">
               Właściciel: <span className="font-medium text-gray-700">{clientFullName}</span>
-              {bike.serial_no && ` • Nr ramy: ${bike.serial_no}`}
+              {bike.serial_no && ` • ${isWinter ? 'Nr seryjny' : 'Nr ramy'}: ${bike.serial_no}`}
             </p>
           </div>
         </div>
@@ -173,7 +164,7 @@ export default function BikeDetailsPage() {
           </Button>
 
           <button
-            onClick={() => setIsEditOpen(true)}
+            onClick={() => { setEditCategory(bike.category || 'bike'); setIsEditOpen(true); }}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors shadow-sm cursor-pointer"
           >
             <EditIcon /> Edytuj dane
@@ -193,7 +184,7 @@ export default function BikeDetailsPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Lewa kolumna: dane techniczne i historia zleceń */}
         <div className="lg:col-span-2 space-y-4 sm:space-y-6">
-          {/* Specyfikacja roweru */}
+          {/* Specyfikacja sprzętu */}
           <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
             <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">Specyfikacja techniczna</h3>
             
@@ -209,9 +200,9 @@ export default function BikeDetailsPage() {
               </div>
 
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <span className="text-xs text-gray-400 uppercase font-semibold block mb-0.5">Typ roweru</span>
+                <span className="text-xs text-gray-400 uppercase font-semibold block mb-0.5">{isWinter ? 'Kategoria' : 'Typ roweru'}</span>
                 <span className="text-sm sm:text-base font-medium text-gray-800">
-                  {BIKE_TYPE_LABELS[bike.bike_type] || bike.bike_type}
+                  {kindLabel}
                 </span>
               </div>
 
@@ -221,7 +212,7 @@ export default function BikeDetailsPage() {
               </div>
 
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
-                <span className="text-xs text-gray-400 uppercase font-semibold block mb-0.5">Numer ramy / seryjny</span>
+                <span className="text-xs text-gray-400 uppercase font-semibold block mb-0.5">{isWinter ? 'Numer seryjny' : 'Numer ramy / seryjny'}</span>
                 <span className="text-sm sm:text-base font-mono font-medium text-gray-800">
                   {bike.serial_no || 'Brak wpisu'}
                 </span>
@@ -241,12 +232,12 @@ export default function BikeDetailsPage() {
           {/* Notatki */}
           {bike.notes && (
             <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2">Notatki do roweru</h3>
+              <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-2">Notatki do sprzętu</h3>
               <p className="text-sm text-gray-600 whitespace-pre-wrap">{bike.notes}</p>
             </div>
           )}
 
-          {/* Historia zleceń tego roweru */}
+          {/* Historia zleceń tego sprzętu */}
           <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-base sm:text-lg font-semibold text-gray-800">Historia zleceń serwisowych</h3>
@@ -288,7 +279,7 @@ export default function BikeDetailsPage() {
               </div>
             ) : (
               <div className="bg-gray-50 rounded-lg text-gray-500 text-sm p-6 text-center border border-gray-100">
-                Ten rower nie ma jeszcze zarejestrowanych zleceń naprawy.
+                Ten sprzęt nie ma jeszcze zarejestrowanych zleceń naprawy.
               </div>
             )}
           </div>
@@ -300,7 +291,7 @@ export default function BikeDetailsPage() {
           {bike.customer && (
             <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
               <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">
-                Właściciel roweru
+                Właściciel sprzętu
               </h3>
 
               <div className="flex items-center gap-3.5 mb-4">
@@ -343,12 +334,12 @@ export default function BikeDetailsPage() {
           {/* Identyfikator Sheriff Code */}
           <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
             <h3 className="text-xs sm:text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
-              Kod identyfikacyjny roweru
+              Kod identyfikacyjny sprzętu
             </h3>
 
             {qrDataUrl && (
               <div className="flex flex-col items-center justify-center p-3 mb-3 bg-gray-50 rounded-xl border border-gray-100">
-                <img src={qrDataUrl} alt="QR Code roweru" className="w-32 h-32 rounded-lg bg-white p-1 shadow-2xs" />
+                <img src={qrDataUrl} alt="Kod QR sprzętu" className="w-32 h-32 rounded-lg bg-white p-1 shadow-2xs" />
                 <span className="text-[11px] font-semibold text-gray-400 mt-1.5 uppercase tracking-wider">Kod QR sprzętu</span>
               </div>
             )}
@@ -361,14 +352,16 @@ export default function BikeDetailsPage() {
         </div>
       </div>
 
-      {/* Panel boczny edycji roweru */}
+      {/* Panel boczny edycji sprzętu */}
       <SlidePanel isOpen={isEditOpen} onClose={() => setIsEditOpen(false)}>
         <div className="space-y-6">
-          <h2 className="text-2xl font-bold text-gray-900 px-1">Edytuj dane roweru</h2>
+          <h2 className="text-2xl font-bold text-gray-900 px-1">Edytuj dane sprzętu</h2>
 
           <form ref={formRef} onSubmit={handleEditSubmit} className="flex flex-col gap-6">
             <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-4">
               <h3 className="text-lg font-semibold text-gray-800 mb-2">Parametry sprzętu</h3>
+
+              <CategorySwitch size="sm" value={editCategory} onChange={setEditCategory} />
 
               <Input
                 name="brand"
@@ -384,13 +377,15 @@ export default function BikeDetailsPage() {
                 required={true}
               />
 
-              <Select
-                name="bike_type"
-                label="Typ roweru"
-                defaultValue={bike.bike_type}
-                required={true}
-                options={BIKE_TYPE_OPTIONS}
-              />
+              {editCategory === 'bike' && (
+                <Select
+                  name="bike_type"
+                  label="Typ roweru"
+                  defaultValue={bike.bike_type}
+                  required={true}
+                  options={BIKE_TYPE_OPTIONS}
+                />
+              )}
 
               <Input
                 name="color"
@@ -401,7 +396,7 @@ export default function BikeDetailsPage() {
 
               <Input
                 name="serial_no"
-                label="Numer seryjny / ramy"
+                label={editCategory === 'winter' ? 'Numer seryjny' : 'Numer seryjny / ramy'}
                 defaultValue={bike.serial_no}
                 placeholder="np. WTU12345678"
               />
@@ -421,7 +416,7 @@ export default function BikeDetailsPage() {
                 name="notes"
                 defaultValue={bike.notes}
                 className="w-full mt-2 p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] min-h-[120px] resize-y"
-                placeholder="Dodatkowe uwagi dotyczące tego roweru..."
+                placeholder="Dodatkowe uwagi dotyczące tego sprzętu..."
               ></textarea>
             </div>
 

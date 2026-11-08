@@ -12,6 +12,11 @@ import { getInitials } from "../components/ClientCard";
 import StatusBadge from "../components/StatusBadge"; 
 import { ClientDetailsSkeleton } from "../components/Skeleton"; 
 import { formatDate } from "../utils/dates";
+import CategorySwitch from "../components/equipment/CategorySwitch";
+import CategoryIcon from "../components/equipment/CategoryIcon";
+import {
+    BIKE_TYPE_OPTIONS, EQUIPMENT_PLACEHOLDERS, bikeTypeLabel, categoryLabel, defaultCategoryForDate, equipmentPayload,
+} from "../utils/equipment";
 
 const EditIcon = () => (
   <div className="text-gray-400 transition-colors">
@@ -26,6 +31,14 @@ export default function ClientDetailsPage() {
 
     const [isEditFormOpen, setIsEditFormOpen] = useState(false);
     const [isAddBikeFormOpen, setIsAddBikeFormOpen] = useState(false);
+    const [newBikeCategory, setNewBikeCategory] = useState(() => defaultCategoryForDate());
+    const [newBikeCategorySource, setNewBikeCategorySource] = useState('season');
+
+    const openAddBikeForm = () => {
+        setNewBikeCategory(defaultCategoryForDate());
+        setNewBikeCategorySource('season');
+        setIsAddBikeFormOpen(true);
+    };
 
     const editFormRef = useRef(null);
     const bikeFormRef = useRef(null);
@@ -53,9 +66,9 @@ export default function ClientDetailsPage() {
             queryClient.invalidateQueries({ queryKey: ['client', id] }); 
             bikeFormRef.current?.reset();
             setIsAddBikeFormOpen(false);
-            toast.success("Rower został pomyślnie dodany!");
+            toast.success("Sprzęt został dodany!");
         },
-        onError: (error) => toast.error(`Wystąpił błąd zapisu roweru: ${error.message}`)
+        onError: (error) => toast.error(`Wystąpił błąd zapisu sprzętu: ${error.message}`)
     });
 
     const handleEditClient = (e) => {
@@ -82,12 +95,13 @@ export default function ClientDetailsPage() {
         e.preventDefault();
         const formData = new FormData(e.target);
         
-        const newBikeData = {
+        const newBikeData = equipmentPayload({
             customer: parseInt(id),
+            category: newBikeCategory,
             brand: formData.get('brand'),
             model: formData.get('model'),
-            bike_type: formData.get('bike_type')
-        };
+            bike_type: formData.get('bike_type'),
+        });
 
         bikeMutation.mutate(newBikeData);
     };
@@ -148,8 +162,8 @@ export default function ClientDetailsPage() {
                         <EditIcon /> Edytuj profil
                     </button>
 
-                    <Button onClick={() => setIsAddBikeFormOpen(true)} className="justify-center">
-                        + Dodaj rower
+                    <Button onClick={openAddBikeForm} className="justify-center">
+                        + Dodaj sprzęt
                     </Button>
                 </div>
             </div>
@@ -164,7 +178,7 @@ export default function ClientDetailsPage() {
                     )}
 
                     <div className="bg-white border border-gray-200 rounded-lg p-4 sm:p-6">
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Zarejestrowane rowery</h3>
+                        <h3 className="text-lg font-semibold text-gray-800 mb-4">Zarejestrowany sprzęt</h3>
                         {clientBikes.length > 0 ? (
                         <div className="space-y-3">
                             {clientBikes.map(bike => (
@@ -173,11 +187,16 @@ export default function ClientDetailsPage() {
                                 onClick={() => navigate(`/panel/bikes/${bike.id}`)}
                                 className="p-3.5 sm:p-4 border border-gray-100 rounded-lg bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors cursor-pointer group"
                             >
-                                <div className="min-w-0">
+                                <div className="min-w-0 flex items-start gap-3">
+                                    <span className="mt-0.5 text-gray-400"><CategoryIcon category={bike.category} className="w-5 h-5" /></span>
+                                    <div className="min-w-0">
                                     <p className="font-semibold text-gray-800 text-sm sm:text-base group-hover:text-[var(--color-accent)] transition-colors truncate">
                                         {bike.brand} <span className="font-normal text-gray-600 ml-1">{bike.model}</span>
                                     </p>
-                                    <p className="text-xs text-gray-500 mt-1 capitalize">{bike.bike_type}</p>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        {bike.category === 'winter' ? categoryLabel(bike.category) : bikeTypeLabel(bike.bike_type)}
+                                    </p>
+                                    </div>
                                 </div>
                                 <div className="flex items-center gap-1 text-xs font-medium text-gray-400 group-hover:text-[var(--color-accent)] shrink-0 ml-3 transition-colors">
                                     <span>Szczegóły</span>
@@ -189,7 +208,7 @@ export default function ClientDetailsPage() {
                             ))}
                         </div>
                         ) : (
-                        <p className="text-sm text-gray-500">Brak rowerów w bazie.</p>
+                        <p className="text-sm text-gray-500">Klient nie ma jeszcze sprzętu.</p>
                         )}
                     </div>
                 </div>
@@ -316,48 +335,49 @@ export default function ClientDetailsPage() {
                 </div>
             </SlidePanel>
             
-            {/* Formularz dodania roweru */}
+            {/* Formularz dodania sprzętu */}
             <SlidePanel 
                 isOpen={isAddBikeFormOpen}
                 onClose={() => setIsAddBikeFormOpen(false)}
             >
                 <div className="space-y-6">
-                    <h2 className="text-2xl font-bold text-gray-900 px-1">Nowy rower</h2>
+                    <h2 className="text-2xl font-bold text-gray-900 px-1">Nowy sprzęt</h2>
 
                     <form ref={bikeFormRef} onSubmit={handleAddBike} className="flex flex-col gap-6">
                         <div className="bg-white border border-gray-200 rounded-lg p-6 flex flex-col gap-4">
-                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Dane roweru</h3>
+                            <h3 className="text-lg font-semibold text-gray-800 mb-4">Dane sprzętu</h3>
 
                             <div className="mb-2">
                                 <p className="text-sm font-medium text-gray-700">Właściciel</p>
                                 <p className="text-sm text-gray-900 mt-1 font-semibold">{fullName}</p>
                             </div>
 
+                            <CategorySwitch
+                                size="sm"
+                                value={newBikeCategory}
+                                onChange={(category) => { setNewBikeCategory(category); setNewBikeCategorySource('manual'); }}
+                                hint={newBikeCategorySource}
+                            />
                             <Input
                                 name="brand"
                                 label="Producent"
-                                placeholder="np. Trek, Giant, Kross"
+                                placeholder={EQUIPMENT_PLACEHOLDERS[newBikeCategory].brand}
                                 required={true}
                             />
                             <Input
                                 name="model"
                                 label="Model"
-                                placeholder="np. Domane SL5"
+                                placeholder={EQUIPMENT_PLACEHOLDERS[newBikeCategory].model}
                                 required={true}
                             />
-                            <Select
-                                name="bike_type"
-                                label="Typ roweru"
-                                required={true}
-                                options={[
-                                    { value: 'road', label: 'Szosowy (road)' },
-                                    { value: 'mtb', label: 'Górski (mtb)' },
-                                    { value: 'city', label: 'Miejski (city)' },
-                                    { value: 'gravel', label: 'Gravel (gravel)' },
-                                    { value: 'electric', label: 'Elektryczny (electric)' },
-                                    { value: 'other', label: 'Inny (other)' }
-                                ]}
-                            />
+                            {newBikeCategory === 'bike' && (
+                                <Select
+                                    name="bike_type"
+                                    label="Typ roweru"
+                                    required={true}
+                                    options={BIKE_TYPE_OPTIONS}
+                                />
+                            )}
                         </div>
                         
                         <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
@@ -371,7 +391,7 @@ export default function ClientDetailsPage() {
                             >Anuluj</button>
 
                             <Button type="submit" disabled={bikeMutation.isPending}>
-                                {bikeMutation.isPending ? "Zapisywanie..." : "Zapisz rower"}
+                                {bikeMutation.isPending ? "Zapisywanie..." : "Zapisz sprzęt"}
                             </Button>
                         </div>
                     </form>
