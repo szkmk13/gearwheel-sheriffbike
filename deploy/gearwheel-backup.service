@@ -1,0 +1,20 @@
+# Daily database backup, triggered by gearwheel-backup.timer.
+# Install together with the timer (see README, "Backup"):
+#   cp deploy/gearwheel-backup.service deploy/gearwheel-backup.timer ~/.config/systemd/user/
+#   systemctl --user daemon-reload
+#   systemctl --user enable --now gearwheel-backup.timer
+# Run by hand:  systemctl --user start gearwheel-backup.service
+# Logs:         journalctl --user -u gearwheel-backup.service
+
+[Unit]
+Description=gearwheel-sherifbike database backup
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/sheriff_bike
+Environment=DJANGO_SETTINGS_MODULE=config.settings.dev
+EnvironmentFile=/home/sheriff_bike/.env
+# rclone is usually installed to /usr/bin; add ~/bin in case it was installed per user.
+Environment=PATH=/home/sheriff_bike/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/home/sheriff_bike/.venv/bin/python manage.py backup_db
+Nice=10

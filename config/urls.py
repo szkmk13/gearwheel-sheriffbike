@@ -8,6 +8,7 @@ from django.views.generic import TemplateView
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 from rest_framework.permissions import AllowAny
 
+from apps.core.views import health
 from config.auth_views import LoginView, LogoutView, MeView
 
 # ensure_csrf_cookie: the SPA is served from this shell with no server-rendered
@@ -35,6 +36,8 @@ _docs_view_kwargs = {'permission_classes': [AllowAny]} if settings.DEBUG else {}
 urlpatterns = [
     path('robots.txt', robots_txt, name='robots-txt'),
     path('admin/', admin.site.urls),
+    # Public liveness probe (deploy script, uptime monitor)
+    path('api/health/', health, name='health'),
     # Auth
     path('api/auth/login/', LoginView.as_view(), name='login'),
     path('api/auth/logout/', LogoutView.as_view(), name='logout'),

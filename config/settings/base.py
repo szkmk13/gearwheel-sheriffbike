@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'apps.inventory',
     'apps.storage',
     'apps.landing',
+    'apps.core',
 ]
 
 MIDDLEWARE = [
@@ -198,16 +199,49 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
 SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
 
+# Error alerts by email (Gmail SMTP). EMAIL_HOST_PASSWORD is a Google *app
+# password* (account with 2FA -> Security -> App passwords), not the account
+# password. With ADMIN_EMAILS empty nothing is sent, so local/CI need no setup.
+EMAIL_BACKEND = env('EMAIL_BACKEND', default='django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = env('EMAIL_HOST', default='smtp.gmail.com')
+EMAIL_PORT = env.int('EMAIL_PORT', default=587)
+EMAIL_USE_TLS = env.bool('EMAIL_USE_TLS', default=True)
+EMAIL_HOST_USER = env('EMAIL_HOST_USER', default='')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default='')
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default=EMAIL_HOST_USER or 'webmaster@localhost')
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+EMAIL_SUBJECT_PREFIX = '[Sheriff Bike] '
+ADMINS = [(email, email) for email in env.list('ADMIN_EMAILS', default=[])]
+
+# Backups (python manage.py backup_db, run daily by deploy/gearwheel-backup.timer).
+# BACKUP_DIR must be excluded from the deploy rsync (it is: backups/).
+# BACKUP_RCLONE_REMOTE is an rclone target such as `gdrive:sheriff-bike-backups`;
+# HEALTHCHECK_PING_URL is a healthchecks.io check URL pinged after each backup.
+BACKUP_DIR = env.path('BACKUP_DIR', default=BASE_DIR / 'backups')
+BACKUP_RCLONE_REMOTE = env('BACKUP_RCLONE_REMOTE', default='')
+HEALTHCHECK_PING_URL = env('HEALTHCHECK_PING_URL', default='')
+
 # Unhandled view exceptions (500s) get logged with a traceback to stderr,
-# which systemd captures into `journalctl --user -u gearwheel.service` -
-# without this, DEBUG=False leaves them only going to django's default
-# mail_admins handler (no ADMINS configured here, so effectively nowhere).
+# which systemd captures into `journalctl --user -u gearwheel.service`, and
+# are also emailed to ADMINS (only when DEBUG=False). ERROR records from our
+# own apps (e.g. a failed backup) are emailed the same way.
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
     'handlers': {
         'console': {
             'class': 'logging.StreamHandler',
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'filters': ['require_debug_false'],
+            'class': 'django.utils.log.AdminEmailHandler',
         },
     },
     'loggers': {
@@ -217,13 +251,13 @@ LOGGING = {
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['console'],
+            'handlers': ['console', 'mail_admins'],
             'level': 'ERROR',
             'propagate': False,
         },
         # Our own apps, e.g. the mock SMS gateway logs each message it would send.
         'apps': {
-            'handlers': ['console'],
+            'handlers': ['console', 'mail_admins'],
             'level': 'INFO',
             'propagate': False,
         },
