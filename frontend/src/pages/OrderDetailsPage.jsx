@@ -5,10 +5,11 @@ import toast from 'react-hot-toast';
 import { fetchOrderDetails, changeOrderStatus, updateOrder } from '../api/orders';
 import StatusBadge from '../components/StatusBadge';
 import { OrderDetailsSkeleton } from '../components/Skeleton';
-import { isOrderOverdue, formatDate, formatDateTime } from '../utils/dates';
+import { formatDate, formatDateTime } from '../utils/dates';
 import PrintIntakeButton from '../print/PrintIntakeButton';
 import SmsPreviewModal from '../components/SmsPreviewModal';
 import OrderItemsSection, { ITEM_KINDS, ITEMS_LOCKED_STATUSES } from '../components/orders/OrderItemsSection';
+import OrderEquipmentSection from '../components/orders/OrderEquipmentSection';
 import { formatMoney } from '../utils/money';
 
 export default function OrderDetailsPage() {
@@ -45,13 +46,7 @@ export default function OrderDetailsPage() {
     if (isError) return <div className="p-8 text-[var(--color-accent)] font-medium bg-[var(--color-paper)] min-h-full">Wystąpił błąd: {error.message}</div>;
     if (!order) return <div className="p-8 text-[var(--color-accent)] font-medium bg-[var(--color-paper)] min-h-full">Nie znaleziono zlecenia.</div>;
 
-    const bikeId = order.bike?.id || (typeof order.bike === 'number' ? order.bike : null);
     const customerId = order.customer?.id || (typeof order.customer === 'number' ? order.customer : null);
-    const bikeBrand = order.bike?.brand || '';
-    const bikeModel = order.bike?.model || '';
-    const bikeFullName = (bikeBrand || bikeModel) 
-        ? `${bikeBrand} ${bikeModel}`.trim() 
-        : (order.bike_label || 'Sprzęt');
 
     return (
         <div className="p-4 sm:p-6 md:p-8 bg-[var(--color-paper)] min-h-full">
@@ -148,42 +143,7 @@ export default function OrderDetailsPage() {
                         <div className="w-px bg-[var(--color-line)] hidden sm:block"></div>
                         <div className="h-px bg-[var(--color-line)] block sm:hidden"></div>
 
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-2 sm:mb-3">
-                                <h3 className="text-xs sm:text-sm font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">Sprzęt i zawieszka</h3>
-                                {bikeId && (
-                                    <button
-                                        onClick={() => navigate(`/panel/bikes/${bikeId}`)}
-                                        className="text-xs font-medium text-[var(--color-accent)] hover:underline cursor-pointer"
-                                    >
-                                        Karta sprzętu
-                                    </button>
-                                )}
-                            </div>
-                            <p 
-                                onClick={bikeId ? () => navigate(`/panel/bikes/${bikeId}`) : undefined}
-                                className={`text-base sm:text-lg font-medium text-[var(--color-ink)] truncate ${bikeId ? 'hover:text-[var(--color-accent)] cursor-pointer transition-colors' : ''}`}
-                            >
-                                {bikeFullName}
-                            </p>
-                            <div className="mt-2 text-sm text-[var(--color-ink-2)] space-y-1">
-                                <p className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[var(--color-ink-3)] text-xs font-medium">Producent:</span>
-                                    <span className="text-[var(--color-ink)] font-medium">{bikeBrand || '-'}</span>
-                                    <span className="text-[var(--color-line)] mx-1">•</span>
-                                    <span className="text-[var(--color-ink-3)] text-xs font-medium">Model:</span>
-                                    <span className="text-[var(--color-ink)] font-medium">{bikeModel || '-'}</span>
-                                </p>
-                                <div className="pt-1 flex flex-wrap gap-2">
-                                    <span className="inline-block px-2.5 py-0.5 bg-[var(--color-paper)] rounded text-xs font-semibold text-[var(--color-ink-2)] border border-[var(--color-line)]">
-                                        Zawieszka: #{order.bike_tag_number || '-'}
-                                    </span>
-                                    <span className={`inline-block px-2.5 py-0.5 rounded text-xs font-semibold border ${isOrderOverdue(order) ? 'bg-red-50 text-red-700 border-red-200' : 'bg-[var(--color-paper)] text-[var(--color-ink-2)] border-[var(--color-line)]'}`}>
-                                        Planowany odbiór: {formatDate(order.estimated_pickup_date)}{isOrderOverdue(order) && ' - po terminie'}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
+                        <OrderEquipmentSection order={order} locked={ITEMS_LOCKED_STATUSES.includes(order.status)} />
                     </div>
 
                     <OrderDescriptionCard order={order} />

@@ -60,3 +60,41 @@ export const equipmentPayload = ({ category, bike_type, ...rest }) => ({
   category,
   bike_type: category === 'winter' ? 'other' : (bike_type || 'other'),
 });
+
+// "Trek Marlin 7 (Górski)" / "Atomic Redster" - etykieta sztuki na listach wyboru.
+export const equipmentName = (bike) => {
+  const name = `${bike.brand} ${bike.model || ''}`.trim();
+  return bike.category === 'winter' || !bike.bike_type ? name : `${name} (${bikeTypeShortLabel(bike.bike_type)})`;
+};
+
+// Licznik zamiast crypto.randomUUID - ten dziala tylko w bezpiecznym kontekscie (HTTPS/localhost),
+// a panel bywa otwierany z telefonu po adresie IP w sieci lokalnej.
+let nextNewItemKey = 0;
+
+// Wiersz "nowego sprzetu" w formularzu - jeszcze niezapisana sztuka.
+export const newEquipmentItem = (category = 'bike') => ({
+  key: ++nextNewItemKey, category, brand: '', model: '', bike_type: 'other',
+});
+
+/**
+ * Rejestruje po kolei nowe sztuki sprzetu klienta i zwraca ich id.
+ *
+ * `onCreated(bike, item)` wola sie po kazdej zapisanej sztuce - formularz przenosi ja wtedy
+ * z "nowych" do zaznaczonych, wiec gdy cos dalej sie nie uda (np. samo zlecenie), ponowna
+ * proba nie zarejestruje tego sprzetu drugi raz.
+ */
+export async function saveNewEquipment(customerId, items, createBike, onCreated) {
+  const ids = [];
+  for (const item of items) {
+    const bike = await createBike(equipmentPayload({
+      customer: customerId,
+      category: item.category,
+      brand: item.brand.trim(),
+      model: item.model.trim(),
+      bike_type: item.bike_type,
+    }));
+    ids.push(bike.id);
+    onCreated?.(bike, item);
+  }
+  return ids;
+}
