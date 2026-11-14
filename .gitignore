@@ -6,6 +6,7 @@
 /.idea/
 /frontend/node_modules/
 /media/
+/backups/
 /docs/superpowers/
 __pycache__/
 *.pyc

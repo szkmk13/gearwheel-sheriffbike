@@ -13,8 +13,14 @@ fi
 .venv/bin/pip install --upgrade pip
 .venv/bin/pip install -r requirements.txt
 
+# Snapshot the database before migrations touch it; a failed backup stops the deploy.
+.venv/bin/python manage.py backup_db --predeploy --settings=config.settings.dev
+
 .venv/bin/python manage.py migrate --settings=config.settings.dev --noinput
 .venv/bin/python manage.py collectstatic --settings=config.settings.dev --noinput
 
 systemctl --user restart gearwheel.service
 systemctl --user status gearwheel.service --no-pager
+
+# Fails the deploy (red in GitHub Actions) if the app did not come back up.
+bash deploy/healthcheck.sh
