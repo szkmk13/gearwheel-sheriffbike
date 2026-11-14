@@ -19,9 +19,9 @@ import { TableRowsSkeleton, MobileOrderCardsSkeleton } from "../components/Skele
 import { todayISODate, defaultPickupDate, isOrderOverdue, formatDate } from "../utils/dates";
 import CategorySwitch from "../components/equipment/CategorySwitch";
 import { CategoryIcons } from "../components/equipment/CategoryIcon";
+import EquipmentPicker from "../components/equipment/EquipmentPicker";
 import {
-  BIKE_TYPE_OPTIONS, CATEGORY_GROUP_LABELS, EQUIPMENT_PLACEHOLDERS,
-  bikeTypeShortLabel, defaultCategoryForDate, equipmentPayload, orderCategories,
+  defaultCategoryForDate, newEquipmentItem, orderCategories, saveNewEquipment,
 } from "../utils/equipment";
 
 const PRIORITY_OPTIONS = [
@@ -41,10 +41,7 @@ const CATEGORY_FILTERS = [
   { value: 'winter', label: 'Zimowe' },
 ];
 
-const equipmentOptionLabel = (bike) => {
-  const name = `${bike.brand} ${bike.model || ''}`.trim();
-  return bike.category === 'winter' ? name : `${name} (${bikeTypeShortLabel(bike.bike_type)})`;
-};
+const bikeCustomerId = (bike) => String(bike?.customer?.id || (typeof bike?.customer === 'number' ? bike.customer : '') || '');
 
 export default function OrdersPage() {
   const navigate = useNavigate();
@@ -54,10 +51,12 @@ export default function OrdersPage() {
 
   const [isAddOrderFormOpen, setIsAddOrderFormOpen] = useState(false);
   const [isNewClient, setIsNewClient] = useState(false);
-  const [isNewBike, setIsNewBike] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
-  const [selectedBikeId, setSelectedBikeId] = useState("");
-  const [scannedBike, setScannedBike] = useState(null);
+  // Jedno zlecenie obejmuje kilka sztuk: zaznaczony sprzęt klienta + nowy, jeszcze niezapisany.
+  const [selectedBikeIds, setSelectedBikeIds] = useState([]);
+  const [newItems, setNewItems] = useState([]);
+  // Sprzęt z QR / z linku, widoczny na liście zanim dociągną się szczegóły klienta.
+  const [scannedBikes, setScannedBikes] = useState([]);
   // Klient wybrany z wyszukiwarki albo znaleziony po numerze w formularzu nowego klienta -
   // pokazywany od razu, zanim dociągną się jego szczegóły (rowery).
   const [foundClient, setFoundClient] = useState(null);
@@ -103,22 +102,22 @@ export default function OrdersPage() {
     if (newOrderParam === 'true') {
       setIsAddOrderFormOpen(true);
       setIsNewClient(false);
-      setIsNewBike(false);
+      setNewItems([]);
 
       if (bikeIdParam) {
-        setSelectedBikeId(String(bikeIdParam));
+        setSelectedBikeIds([Number(bikeIdParam)]);
         if (customerIdParam) {
           setSelectedClientId(String(customerIdParam));
         }
 
-        // Pobierz dane roweru, aby uzupełnić dane klienta i nazwę roweru w opcjach
+        // Pobierz dane roweru, aby uzupełnić dane klienta i nazwę roweru na liście
         fetchBikeDetails(bikeIdParam)
           .then((bike) => {
             if (bike) {
-              setScannedBike(bike);
+              setScannedBikes([bike]);
               followEquipmentCategory(bike);
-              if (bike.customer?.id && !customerIdParam) {
-                setSelectedClientId(String(bike.customer.id));
+              if (bikeCustomerId(bike) && !customerIdParam) {
+                setSelectedClientId(bikeCustomerId(bike));
               }
             }
           })
@@ -138,18 +137,37 @@ export default function OrdersPage() {
     setCategorySource('equipment');
   }
 
+  // Skan dokłada sztukę do zlecenia. Sprzęt innego klienta przełącza formularz na tego klienta
+  // (zlecenie ma jednego właściciela, a backend i tak odrzuci cudzy sprzęt).
   const handleBikeScannedForOrder = (bike) => {
-    setScannedBike(bike);
-    followEquipmentCategory(bike);
-    const customerId = bike.customer?.id || (typeof bike.customer === 'number' ? bike.customer : '');
-    if (customerId) {
-      setSelectedClientId(String(customerId));
+    const customerId = bikeCustomerId(bike);
+    const name = `${bike.brand} ${bike.model || ''}`.trim();
+    const sameClient = isAddOrderFormOpen && !isNewClient && customerId && customerId === String(selectedClientId);
+
+    if (sameClient) {
+      setScannedBikes((prev) => (prev.some((b) => b.id === bike.id) ? prev : [...prev, bike]));
+      if (selectedBikeIds.includes(bike.id)) {
+        toast(`${name} jest już na tym zleceniu.`);
+      } else {
+        setSelectedBikeIds((prev) => [...prev, bike.id]);
+        toast.success(`Dodano sprzęt: ${name}`);
+      }
+      return;
     }
-    setSelectedBikeId(String(bike.id));
+
+    if (isAddOrderFormOpen && (selectedClientId || isNewClient)) {
+      toast(`${name} należy do innego klienta - formularz przełączono na właściciela sprzętu.`, { duration: 6000 });
+    } else {
+      toast.success(`Wybrano sprzęt: ${name}`);
+    }
+    setScannedBikes([bike]);
+    followEquipmentCategory(bike);
+    setFoundClient(null);
+    setSelectedClientId(customerId);
+    setSelectedBikeIds([bike.id]);
+    setNewItems([]);
     setIsNewClient(false);
-    setIsNewBike(false);
     setIsAddOrderFormOpen(true);
-    toast.success(`Wybrano sprzęt: ${bike.brand} ${bike.model || ''}`);
   };
 
   // Klient jest unikalny po numerze - jeśli już istnieje, przełączamy formularz na niego,
@@ -169,9 +187,13 @@ export default function OrdersPage() {
     const hasBikes = client.bikes?.length > 0;
     setFoundClient(client);
     setSelectedClientId(String(client.id));
-    setSelectedBikeId("");
+    setSelectedBikeIds([]);
     setIsNewClient(false);
-    setIsNewBike(!hasBikes);
+    // Wpisany już nowy sprzęt zostaje; pusty wiersz znika, jeśli klient ma sprzęt do wybrania.
+    setNewItems((prev) => {
+      const filled = prev.filter((item) => item.brand.trim() || item.model.trim());
+      return filled.length || hasBikes ? filled : [newEquipmentItem(equipmentCategory)];
+    });
 
     const name = `${client.first_name} ${client.last_name}`;
     const next = hasBikes ? 'wybierz sprzęt z listy.' : 'nie ma jeszcze sprzętu, zarejestruj nowy.';
@@ -185,10 +207,10 @@ export default function OrdersPage() {
     formRef.current?.reset();
     setIsAddOrderFormOpen(false);
     setIsNewClient(false);
-    setIsNewBike(false);
     setSelectedClientId("");
-    setSelectedBikeId("");
-    setScannedBike(null);
+    setSelectedBikeIds([]);
+    setNewItems([]);
+    setScannedBikes([]);
     setFoundClient(null);
     setNewClientPrefill({ fullName: '', phone: '' });
     setEquipmentCategory(defaultCategoryForDate());
@@ -219,8 +241,10 @@ export default function OrdersPage() {
   const handleClientPicked = (client) => {
     setFoundClient(client);
     setSelectedClientId(client ? String(client.id) : "");
-    setSelectedBikeId("");
-    setScannedBike(null);
+    setSelectedBikeIds([]);
+    setScannedBikes([]);
+    // Klient bez sprzętu - od razu wiersz nowego, jak przy nowym kliencie.
+    setNewItems(client && !client.bikes?.length ? [newEquipmentItem(equipmentCategory)] : []);
     if (client && !client.rodo_accepted) {
       toast.error(`${client.first_name} ${client.last_name} nie ma w bazie zgody RODO - poproś o jej podpisanie.`, { duration: 8000 });
     }
@@ -228,43 +252,44 @@ export default function OrdersPage() {
 
   const handleCreateNewClient = (prefill) => {
     setNewClientPrefill({ fullName: '', phone: '', ...prefill });
-    setIsNewClient(true);
-    setIsNewBike(true);
-    setSelectedClientId("");
-    setSelectedBikeId("");
+    startNewClient();
   };
 
-  let clientEquipment = selectedClientDetails?.bikes || [];
-  if (scannedBike && !clientEquipment.some(b => String(b.id) === String(scannedBike.id))) {
-    clientEquipment = [scannedBike, ...clientEquipment];
-  }
+  const startNewClient = () => {
+    setIsNewClient(true);
+    setSelectedClientId("");
+    setSelectedBikeIds([]);
+    setScannedBikes([]);
+    setNewItems((prev) => (prev.length ? prev : [newEquipmentItem(equipmentCategory)]));
+  };
 
-  // Najpierw sprzęt z wybranej kategorii, niżej reszta - nic nie jest ukryte.
-  const otherCategory = equipmentCategory === 'winter' ? 'bike' : 'winter';
-  const equipmentGroups = [equipmentCategory, otherCategory].map((category) => ({
-    label: CATEGORY_GROUP_LABELS[category],
-    options: clientEquipment
-      .filter((bike) => (bike.category || 'bike') === category)
-      .map((bike) => ({ value: String(bike.id), label: equipmentOptionLabel(bike) })),
-  }));
+  const clientEquipment = [...(selectedClient?.bikes || [])];
+  scannedBikes.forEach((bike) => {
+    if (!clientEquipment.some((b) => b.id === bike.id)) clientEquipment.unshift(bike);
+  });
 
-  const handleEquipmentPicked = (bikeId) => {
-    setSelectedBikeId(bikeId);
-    followEquipmentCategory(clientEquipment.find((b) => String(b.id) === String(bikeId)));
+  const handleSelectedEquipmentChange = (ids) => {
+    setSelectedBikeIds(ids);
+    // Przełącznik opisuje to, co przyjmujemy - przy pierwszej wybranej sztuce idzie za nią.
+    if (ids.length === 1 && newItems.length === 0) {
+      followEquipmentCategory(clientEquipment.find((b) => b.id === ids[0]));
+    }
   };
 
   const handleCategoryChange = (category) => {
     setEquipmentCategory(category);
     setCategorySource('manual');
-    // Wybrany sprzęt z drugiej kategorii przestałby pasować do przełącznika.
-    const picked = clientEquipment.find((b) => String(b.id) === String(selectedBikeId));
-    if (picked && (picked.category || 'bike') !== category) setSelectedBikeId("");
+    // Jeszcze niewypełnione wiersze nowego sprzętu idą za przełącznikiem; zaznaczony sprzęt zostaje.
+    setNewItems((prev) => prev.map((item) => (
+      item.brand.trim() || item.model.trim() ? item : { ...item, category }
+    )));
   };
+
+  const piecesCount = selectedBikeIds.length + newItems.length;
 
   const mutation = useMutation({
     mutationFn: async (formData) => {
       let finalCustomerId = formData.get('customer') || selectedClientId;
-      let finalBikeId = formData.get('bike') || selectedBikeId;
 
       if (isNewClient) {
         const fullName = formData.get('fullName').trim();
@@ -285,23 +310,23 @@ export default function OrdersPage() {
         if (createdClient.existing) {
           toast(`Klient z numerem ${createdClient.phone} już istnieje - zlecenie przypisano do: ${createdClient.first_name} ${createdClient.last_name}`, { duration: 6000 });
         }
+        // Od teraz formularz pracuje na zapisanym kliencie - gdyby samo zlecenie się nie
+        // zapisało, ponowna próba nie zakłada go drugi raz.
+        setFoundClient({ ...createdClient, bikes: createdClient.bikes || [] });
+        setSelectedClientId(String(createdClient.id));
+        setIsNewClient(false);
       }
 
-      if (isNewClient || isNewBike) {
-        const newBikeData = equipmentPayload({
-          customer: parseInt(finalCustomerId),
-          category: equipmentCategory,
-          brand: formData.get('brand'),
-          model: formData.get('model'),
-          bike_type: formData.get('bike_type'),
-        });
-        const createdBike = await createBike(newBikeData);
-        finalBikeId = createdBike.id; 
-      }
+      // Każda zapisana sztuka od razu przechodzi z "nowych" do zaznaczonych (bez duplikatów przy ponownej próbie).
+      const createdIds = await saveNewEquipment(parseInt(finalCustomerId), newItems, createBike, (bike, item) => {
+        setScannedBikes((prev) => [...prev, bike]);
+        setSelectedBikeIds((prev) => [...prev, bike.id]);
+        setNewItems((prev) => prev.filter((i) => i.key !== item.key));
+      });
 
       const newOrder = {
         customer: parseInt(finalCustomerId),
-        bike: parseInt(finalBikeId),
+        bikes: [...selectedBikeIds, ...createdIds],
         bike_tag_number: parseInt(formData.get('bike_tag_number'), 10),
         description: formData.get('description'),
         priority: formData.get('priority') || 'normal',
@@ -326,6 +351,14 @@ export default function OrdersPage() {
 
   const handleAddOrder = (e) => {
     e.preventDefault();
+    if (!isNewClient && !selectedClientId) {
+      toast.error('Wybierz klienta albo zaznacz "Nowy klient".');
+      return;
+    }
+    if (piecesCount === 0) {
+      toast.error('Wybierz albo dodaj co najmniej jedną sztukę sprzętu.');
+      return;
+    }
     const formData = new FormData(e.target);
     mutation.mutate(formData);
   };
@@ -666,10 +699,11 @@ export default function OrdersPage() {
                     <input
                         type="checkbox" id="newClientCheckbox" checked={isNewClient}
                         onChange={(e) => {
-                          setIsNewClient(e.target.checked);
                           if (e.target.checked) {
-                            setIsNewBike(true);
-                            setSelectedBikeId("");
+                            startNewClient();
+                          } else {
+                            setIsNewClient(false);
+                            setNewItems([]);
                           }
                         }}
                         className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
@@ -713,64 +747,32 @@ export default function OrdersPage() {
                 </div>
 
                 <div className="p-5 bg-[var(--color-paper)] border border-[var(--color-line)] rounded-xl shadow-sm transition-all">
-                <div className="flex justify-between items-center mb-4">
-                    <h4 className="text-sm font-semibold text-[var(--color-ink)]">
-                    {(isNewClient || isNewBike) ? "Nowy sprzęt" : "Sprzęt klienta"}
-                    </h4>
-                    
-                    <div className="flex items-center gap-3">
-                        {!isNewClient && !isNewBike && (
-                            <button
-                                type="button"
-                                onClick={() => setIsScannerOpen(true)}
-                                className="flex items-center gap-1.5 text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
-                                title="Zeskanuj kod QR sprzętu"
-                            >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                                </svg>
-                                <span>Skanuj QR sprzętu</span>
-                            </button>
-                        )}
-
-                        {!isNewClient && (
-                        <div className="flex items-center gap-2">
-                            <input
-                            type="checkbox" id="newBikeCheckbox" checked={isNewBike}
-                            onChange={(e) => {
-                                setIsNewBike(e.target.checked);
-                                if (e.target.checked) setSelectedBikeId("");
-                            }}
-                            className="w-4 h-4 text-[var(--color-accent)] bg-[var(--color-paper-2)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
-                            />
-                            <label htmlFor="newBikeCheckbox" className="text-sm font-medium text-[var(--color-ink-2)] cursor-pointer">Nowy sprzęt</label>
-                        </div>
-                        )}
-                    </div>
-                </div>
-
                 <div className="mb-4">
                   <CategorySwitch value={equipmentCategory} onChange={handleCategoryChange} hint={categorySource} />
                 </div>
 
-                {(!isNewClient && !isNewBike) ? (
-                    <Select
-                      name="bike"
-                      label="Sprzęt przypisany do klienta"
-                      groups={equipmentGroups}
-                      placeholder="Wybierz sprzęt..."
-                      value={selectedBikeId}
-                      onChange={(e) => handleEquipmentPicked(e.target.value)}
-                      required={(!isNewClient && !isNewBike)}
-                      disabled={!selectedClientId || clientEquipment.length === 0}
+                {(selectedClientId || isNewClient) ? (
+                    <EquipmentPicker
+                      title="Sprzęt na zlecenie"
+                      equipment={isNewClient ? [] : clientEquipment}
+                      selectedIds={selectedBikeIds}
+                      onSelectedChange={handleSelectedEquipmentChange}
+                      newItems={newItems}
+                      onNewItemsChange={setNewItems}
+                      primaryCategory={equipmentCategory}
+                      onScan={isNewClient ? undefined : () => setIsScannerOpen(true)}
+                      disabled={mutation.isPending}
                     />
                 ) : (
-                    <div className={`grid grid-cols-1 gap-4 ${equipmentCategory === 'bike' ? 'lg:grid-cols-3' : 'lg:grid-cols-2'}`}>
-                    <Input name="brand" label="Producent" placeholder={EQUIPMENT_PLACEHOLDERS[equipmentCategory].brand} required={true} />
-                    <Input name="model" label="Model" placeholder={EQUIPMENT_PLACEHOLDERS[equipmentCategory].model} required={true} />
-                    {equipmentCategory === 'bike' && (
-                      <Select name="bike_type" label="Typ roweru" required={true} options={BIKE_TYPE_OPTIONS} />
-                    )}
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm text-[var(--color-ink-3)]">Najpierw wybierz klienta - albo zeskanuj QR sprzętu.</p>
+                      <button
+                        type="button"
+                        onClick={() => setIsScannerOpen(true)}
+                        className="text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
+                      >
+                        Skanuj QR sprzętu
+                      </button>
                     </div>
                 )}
                 </div>

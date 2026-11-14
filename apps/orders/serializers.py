@@ -149,11 +149,45 @@ class BikesWriteMixin:
 
     def _validate_bikes(self, attrs):
         bikes = attrs.get('bikes')
+        if bikes is None and attrs.get('bike') is not None:
+            bikes = [attrs['bike']]
         if bikes is not None and len(bikes) != len({bike.pk for bike in bikes}):
             raise serializers.ValidationError(
                 {'bikes': 'Ten sam sprzet nie moze byc przypiety do zlecenia dwa razy.'}
             )
+
+        instance = getattr(self, 'instance', None)
+        customer = attrs.get('customer') or (instance.customer if instance else None)
+        # A changed customer must own the equipment the order keeps, not only new items.
+        checked = bikes if bikes is not None else (list(instance.bikes.all()) if instance else [])
+        foreign = [bike for bike in checked if customer and bike.customer_id != customer.pk]
+        if foreign:
+            raise serializers.ValidationError({'bikes': (
+                'Sprzet nie nalezy do klienta zlecenia: '
+                + ', '.join(str(bike) for bike in foreign) + '.'
+            )})
+
+        if instance and bikes is not None:
+            self._validate_removed_bikes(instance, bikes)
         return attrs
+
+    def _validate_removed_bikes(self, instance, bikes):
+        """Equipment with a storage booking on this order cannot be detached from it.
+
+        StorageBooking requires its bike to be one of the order's items, so dropping it
+        would leave the booking pointing outside the order (and its tag number).
+        """
+        kept = {bike.pk for bike in bikes}
+        booked = [
+            booking.bike for booking in instance.storage_bookings.select_related('bike')
+            if booking.bike_id not in kept
+        ]
+        if booked:
+            names = ', '.join(sorted({str(bike) for bike in booked}))
+            raise serializers.ValidationError({'bikes': (
+                f'Nie mozna odpiac sprzetu z rezerwacja w przechowalni: {names}. '
+                'Najpierw obsluz rezerwacje w przechowalni.'
+            )})
 
 
 class RepairOrderCreateSerializer(BikesWriteMixin, serializers.ModelSerializer):

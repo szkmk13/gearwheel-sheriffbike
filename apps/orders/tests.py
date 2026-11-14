@@ -127,6 +127,61 @@ class OrderEquipmentTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(list(order.bikes.all()), [self.bike])
 
+    def _foreign_bike(self):
+        other = Customer.objects.create(first_name='Piotr', last_name='Zielinski', phone='500100300')
+        return Bike.objects.create(customer=other, brand='Giant', model='Talon')
+
+    def test_create_rejects_equipment_of_another_customer(self):
+        response = self._create_order(bikes=[self.bike.pk, self._foreign_bike().pk])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Giant Talon', str(response.data['bikes']))
+        self.assertFalse(RepairOrder.objects.exists())
+
+    def test_create_rejects_legacy_bike_of_another_customer(self):
+        response = self._create_order(bike=self._foreign_bike().pk)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('bikes', response.data)
+
+    def test_update_rejects_equipment_of_another_customer(self):
+        order = self._order_with(self.bike)
+        response = self.client.patch(
+            reverse('order-detail', args=[order.pk]),
+            {'bikes': [self.bike.pk, self._foreign_bike().pk]}, format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(list(order.bikes.all()), [self.bike])
+
+    def test_changing_customer_checks_kept_equipment(self):
+        order = self._order_with(self.bike)
+        other = self._foreign_bike().customer
+        response = self.client.patch(
+            reverse('order-detail', args=[order.pk]), {'customer': other.pk}, format='json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('Trek Marlin 5', str(response.data['bikes']))
+
+    def test_update_cannot_detach_equipment_with_storage_booking(self):
+        from apps.storage import services as storage_services
+
+        order = self._order_with(self.bike, self.skis_left)
+        storage_services.create_booking(
+            repair_order=order, bike=self.skis_left, user=self.user,
+            start_date=timezone.localdate(), end_date=timezone.localdate() + timedelta(days=90),
+        )
+        url = reverse('order-detail', args=[order.pk])
+
+        response = self.client.patch(url, {'bikes': [self.bike.pk]}, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('przechowalni', str(response.data['bikes']))
+        self.assertEqual(order.bikes.count(), 2)
+
+        # Adding more equipment next to the booked one is fine.
+        response = self.client.patch(
+            url, {'bikes': [self.bike.pk, self.skis_left.pk, self.skis_right.pk]}, format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(order.bikes.count(), 3)
+
     def test_create_stores_estimated_pickup_date(self):
         pickup = timezone.localdate() + timedelta(days=3)
         response = self._create_order(bike=self.bike.pk, estimated_pickup_date=str(pickup))

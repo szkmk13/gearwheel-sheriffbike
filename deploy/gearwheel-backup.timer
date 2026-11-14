@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily gearwheel-sherifbike database backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+# Catch up on the next boot if the server was down at 03:00.
+Persistent=true
+RandomizedDelaySec=10min
+
+[Install]
+WantedBy=timers.target

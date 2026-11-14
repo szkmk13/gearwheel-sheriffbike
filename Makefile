@@ -6,6 +6,7 @@ deploy:
 	git pull
 	.venv/bin/pip install --upgrade pip
 	.venv/bin/pip install -r requirements.txt
+	.venv/bin/python manage.py backup_db --predeploy --settings=config.settings.dev
 	.venv/bin/python manage.py migrate --settings=config.settings.dev --noinput
 	.venv/bin/python manage.py collectstatic --settings=config.settings.dev --noinput
 	systemctl --user restart gearwheel.service

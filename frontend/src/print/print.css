@@ -49,7 +49,8 @@
 .intake-grid {
   display: grid;
   grid-template-columns: 45% 27% 28%;
-  grid-auto-rows: 18mm;
+  /* 18 mm jak na kartce; wiersz z lista kilku sztuk sprzetu moze byc wyzszy. */
+  grid-auto-rows: minmax(18mm, auto);
 }
 
 .field {
@@ -75,6 +76,18 @@
 
 .field-value.bold {
   font-weight: 700;
+}
+
+/* Lista kilku sztuk sprzetu: rosnie w dol, zakres uslug ponizej (flex: 1) oddaje miejsce. */
+.field-value.grow {
+  height: auto;
+  min-height: 12mm;
+  padding-bottom: 2mm;
+}
+
+.field-value .line.more {
+  font-style: italic;
+  color: #444;
 }
 
 .field-value .line {
@@ -214,6 +227,19 @@
 
 .stub-value.strong {
   font-weight: 700;
+}
+
+/* Lista kilku sztuk sprzetu na odcinku: caly wiersz, najwyzej 2 linie. */
+.stub-row.wide {
+  grid-column: 1 / -1;
+}
+
+.stub-value.clamp-2 {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
 }
 
 @media print {
