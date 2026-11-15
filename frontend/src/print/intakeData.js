@@ -32,7 +32,7 @@ export function toIntakeData(order) {
     const customer = order.customer || {};
     return {
         category: intakeCategory(order.bikes || []),
-        order: { tagNumber: order.bike_tag_number },
+        order: { tagNumbers: order.tag_numbers || [] },
         receivedAt: order.accepted_at || order.created_at,
         plannedPickupAt: order.estimated_pickup_date,
         customer: {
@@ -42,6 +42,7 @@ export function toIntakeData(order) {
         bikes: (order.bikes || []).map((bike) => ({
             model: [bike.brand, bike.model].filter(Boolean).join(" "),
             serialNumber: bike.serial_no,
+            tag: bike.tag_number,
         })),
         services: (order.items || []).map((item) => ({
             name: Number(item.quantity) === 1 ? item.description : `${item.description} x${Number(item.quantity)}`,

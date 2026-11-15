@@ -26,8 +26,15 @@ def build_ready_for_pickup_message(order) -> str:
     It uses Polish characters, which switches the SMS to UCS-2 encoding: 70 characters for
     a single message, 67 per part once it is split - so this text is usually billed as 2 SMS.
     """
-    parts = [f'{SHOP_NAME}: Dzień dobry! Państwa sprzęt (zawieszka #{order.bike_tag_number}) '
-             'jest gotowy do odbioru.']
+    # Bez powtorzen - zlecenia sprzed zawieszek per sztuka maja jeden numer na kazdej sztuce.
+    tags = list(dict.fromkeys(order.tag_numbers))
+    # Each piece has its own claim tag, so the customer gets all of them to bring along.
+    if tags:
+        label = 'zawieszki' if len(tags) > 1 else 'zawieszka'
+        equipment = f'Państwa sprzęt ({label} {", ".join(f"#{tag}" for tag in tags)})'
+    else:
+        equipment = 'Państwa sprzęt'
+    parts = [f'{SHOP_NAME}: Dzień dobry! {equipment} jest gotowy do odbioru.']
     amount = order.final_cost if order.final_cost is not None else order.estimated_cost
     if amount is not None:
         parts.append(f'Do zapłaty: {_format_amount(amount)}.')

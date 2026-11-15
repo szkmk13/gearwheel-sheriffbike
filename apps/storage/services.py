@@ -18,7 +18,9 @@ from rest_framework.exceptions import ValidationError
 from apps.inventory.catalog import STORAGE_SERVICE_SKU
 from apps.inventory.models import Part
 from apps.orders.models import RepairOrder
-from apps.orders.services import ITEMS_LOCKED_STATUSES, add_item, remove_item, update_item
+from apps.orders.services import (
+    ITEMS_LOCKED_STATUSES, add_item, remove_item, set_order_equipment, update_item,
+)
 
 from .models import StorageBooking, StorageEvent
 
@@ -114,23 +116,32 @@ def create_booking(*, user=None, **fields):
     return booking
 
 
-def intake(*, customer, bikes, bike_tag_number, end_date, start_date=None, price=None,
+def intake(*, customer, equipment, end_date, start_date=None, price=None,
            description='', notes='', user=None):
     """Przyjecie sprzetu na przechowanie - zlecenie i pobyty powstaja w jednym kroku.
 
     Serwis nie przyjmuje rezerwacji z wyprzedzeniem: zlecenie (z naklejka przypieta na
     sprzet) zaklada sie dopiero, gdy klient fizycznie przynosi sprzet. Jedno zlecenie
-    obejmuje wszystkie przyniesione sztuki pod jedna naklejka, a kazda sztuka dostaje
-    wlasny pobyt od razu w statusie `stored`, a zlecenie pozycje "Przechowanie zimowe"
+    obejmuje wszystkie przyniesione sztuki, kazda z wlasna zawieszka (`equipment` to
+    [{bike, tag_number}]), i kazda dostaje wlasny pobyt od razu w statusie `stored`, a
+    zlecenie pozycje "Przechowanie zimowe"
     (ilosc = liczba sztuk, `price` to cena za sztuke). Wszystko albo nic - kolizja
     terminu jednej sztuki cofa cale przyjecie.
     """
     start_date = start_date or timezone.localdate()
-    bikes = list(bikes)
+    equipment = list(equipment)
+    bikes = [entry['bike'] for entry in equipment]
     if not bikes:
         raise ValidationError({'bikes': 'Wybierz co najmniej jedna sztuke sprzetu.'})
     if len(bikes) != len({bike.pk for bike in bikes}):
         raise ValidationError({'bikes': 'Ta sama sztuka sprzetu zostala wybrana dwa razy.'})
+    tags = [entry['tag_number'] for entry in equipment]
+    repeated = sorted({tag for tag in tags if tags.count(tag) > 1})
+    if repeated:
+        raise ValidationError({'bikes': (
+            'Kazda sztuka musi miec inny numer zawieszki. Powtarza sie: '
+            + ', '.join(f'#{tag}' for tag in repeated) + '.'
+        )})
     foreign = [str(bike) for bike in bikes if bike.customer_id != customer.pk]
     if foreign:
         raise ValidationError({'bikes': f'Sprzet nie nalezy do tego klienta: {", ".join(foreign)}.'})
@@ -143,11 +154,10 @@ def intake(*, customer, bikes, bike_tag_number, end_date, start_date=None, price
     with transaction.atomic():
         order = RepairOrder.objects.create(
             customer=customer,
-            bike_tag_number=bike_tag_number,
             description=description or STORAGE_ITEM_DESCRIPTION,
             estimated_pickup_date=end_date,
         )
-        order.bikes.set(bikes)
+        set_order_equipment(order, equipment)
 
         bookings = []
         for bike in bikes:

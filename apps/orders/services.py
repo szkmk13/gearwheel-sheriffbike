@@ -7,8 +7,51 @@ from rest_framework.exceptions import ValidationError
 
 from apps.inventory.models import Part
 
-from .models import RepairOrder, RepairOrderItem, StatusHistory
+from .models import RepairOrder, RepairOrderEquipment, RepairOrderItem, StatusHistory
 from .sms import build_ready_for_pickup_message, send_sms
+
+# Statuses in which the equipment is still in the shop, so its claim tag is taken.
+OPEN_STATUSES = ('accepted', 'estimating', 'waiting_parts', 'in_progress', 'done')
+
+
+@transaction.atomic
+def set_order_equipment(order, entries):
+    """Makes `entries` ([{bike, tag_number}]) the order's full equipment set.
+
+    Pieces already on the order keep their row (and its position) and only get the new
+    tag; new pieces are appended in the given order; pieces left out are detached.
+    Validation (ownership, distinct tags, storage bookings) is the caller's job.
+    """
+    existing = {row.bike_id: row for row in order.equipment.all()}
+    kept = set()
+    for entry in entries:
+        bike, tag = entry['bike'], entry['tag_number']
+        row = existing.get(bike.pk)
+        if row is None:
+            RepairOrderEquipment.objects.create(repair_order=order, bike=bike, tag_number=tag)
+        elif row.tag_number != tag:
+            row.tag_number = tag
+            row.save(update_fields=['tag_number'])
+        kept.add(bike.pk)
+    order.equipment.exclude(bike_id__in=kept).delete()
+    # A prefetched `equipment` / `bikes` on this instance would now be stale.
+    cache = getattr(order, '_prefetched_objects_cache', None)
+    if cache:
+        cache.pop('equipment', None)
+        cache.pop('bikes', None)
+
+
+def open_tag_numbers(exclude_order=None):
+    """{tag: [order ids]} for claim tags hanging on equipment of not-yet-collected orders."""
+    rows = RepairOrderEquipment.objects.filter(repair_order__status__in=OPEN_STATUSES)
+    if exclude_order is not None:
+        rows = rows.exclude(repair_order_id=exclude_order)
+    taken = {}
+    for tag, order_id in rows.values_list('tag_number', 'repair_order_id').order_by('repair_order_id'):
+        orders = taken.setdefault(tag, [])
+        if order_id not in orders:
+            orders.append(order_id)
+    return taken
 
 READY_FOR_PICKUP = 'done'
 

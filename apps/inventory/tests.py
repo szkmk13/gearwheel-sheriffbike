@@ -71,8 +71,8 @@ class PopularPartsApiTests(APITestCase):
     def setUp(self):
         self.client.force_authenticate(User.objects.create_user('serwisant', is_staff=True))
         customer = Customer.objects.create(first_name='Jan', last_name='Kowalski', phone='500100200')
-        self.order = RepairOrder.objects.create(customer=customer, bike_tag_number=1, description='Przegląd')
-        self.order.bikes.set([Bike.objects.create(customer=customer, brand='Kross')])
+        self.order = RepairOrder.objects.create(customer=customer, description='Przegląd')
+        self.order.bikes.set([Bike.objects.create(customer=customer, brand='Kross')], through_defaults={'tag_number': 1})
 
     def use(self, sku, times=1, days_ago=0):
         part = Part.objects.get(sku=sku)

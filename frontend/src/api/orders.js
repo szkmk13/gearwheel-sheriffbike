@@ -25,7 +25,13 @@ export const fetchOrdersCalendar = async ({ start, end, status }) => {
   return fetcher(`/api/orders/calendar/?${params.toString()}`);
 };
 
-// Tworzy nowe zlecenie naprawy
+// GET /api/orders/open-tags/ - zawieszki wiszące na sprzęcie nieodebranych zleceń: {"12": [5, 9]}
+export const fetchOpenTags = async (excludeOrder) => {
+  const query = excludeOrder ? `?exclude_order=${excludeOrder}` : '';
+  return fetcher(`/api/orders/open-tags/${query}`);
+};
+
+// Tworzy nowe zlecenie naprawy. Sprzęt: `equipment: [{bike, tag_number}]` - każda sztuka z własną zawieszką.
 export const createOrder = async (newOrderData) => {
   return post('/api/orders/', newOrderData);
 };

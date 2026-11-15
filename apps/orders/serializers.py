@@ -10,20 +10,41 @@ from apps.inventory.models import Part
 from apps.customers.serializers import BikeNestedSerializer, BikeSerializer, CustomerListSerializer
 
 from .models import RepairOrder, RepairOrderItem, StatusHistory
+from .services import set_order_equipment
 
 
-class LegacyBikeFieldsMixin:
-    """Keeps the pre-multi-equipment API fields alive.
+class OrderEquipmentSerializer(BikeNestedSerializer):
+    """One piece of equipment on an order: the bike's own fields plus its claim tag."""
+    tag_number = serializers.IntegerField(read_only=True)
 
-    `bike` and `bike_label` used to come from a single ForeignKey. An order can now hold
-    several pieces of equipment, so they are derived from `bikes`: `bike` is the first
-    item, `bike_label` lists them all. New clients should read `bikes` instead.
-    (`bike_tag_number` is untouched - one claim tag still covers the whole order.)
+    class Meta(BikeNestedSerializer.Meta):
+        pass
+
+
+class OrderEquipmentFieldsMixin:
+    """Read side of the order's equipment.
+
+    `bikes` lists every piece with its own `tag_number`; `tag_numbers` is just the tags,
+    in the same order. `bike` (first piece) and `bike_label` (all names) are the older
+    single-equipment fields, kept for existing readers.
     """
+
+    @extend_schema_field(OrderEquipmentSerializer(many=True))
+    def get_bikes(self, obj):
+        bikes = []
+        for row in obj.equipment_list:
+            # The bike comes from the row's select_related, so it is this row's own instance.
+            row.bike.tag_number = row.tag_number
+            bikes.append(row.bike)
+        return OrderEquipmentSerializer(bikes, many=True).data
+
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
+    def get_tag_numbers(self, obj):
+        return obj.tag_numbers
 
     @extend_schema_field(serializers.CharField())
     def get_bike_label(self, obj):
-        return ', '.join(str(bike) for bike in obj.bikes.all())
+        return ', '.join(str(row.bike) for row in obj.equipment_list)
 
 
 class RepairOrderItemSerializer(serializers.ModelSerializer):
@@ -71,17 +92,18 @@ class StatusHistorySerializer(serializers.ModelSerializer):
         read_only_fields = ('changed_at',)
 
 
-class RepairOrderListSerializer(LegacyBikeFieldsMixin, serializers.ModelSerializer):
+class RepairOrderListSerializer(OrderEquipmentFieldsMixin, serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     bike = serializers.SerializerMethodField()
     bike_label = serializers.SerializerMethodField()
-    bikes = BikeNestedSerializer(many=True, read_only=True)
+    bikes = serializers.SerializerMethodField()
+    tag_numbers = serializers.SerializerMethodField()
     cost = serializers.SerializerMethodField()
 
     class Meta:
         model = RepairOrder
         fields = (
-            'id', 'customer', 'customer_name', 'bike', 'bike_label', 'bike_tag_number',
+            'id', 'customer', 'customer_name', 'bike', 'bike_label', 'tag_numbers',
             'bikes', 'status', 'priority', 'estimated_cost', 'final_cost', 'cost', 'created_at',
             'estimated_pickup_date',
         )
@@ -100,11 +122,12 @@ class RepairOrderListSerializer(LegacyBikeFieldsMixin, serializers.ModelSerializ
         return obj.final_cost if obj.final_cost is not None else obj.estimated_cost
 
 
-class RepairOrderDetailSerializer(LegacyBikeFieldsMixin, serializers.ModelSerializer):
+class RepairOrderDetailSerializer(OrderEquipmentFieldsMixin, serializers.ModelSerializer):
     customer = CustomerListSerializer(read_only=True)
     bike = serializers.SerializerMethodField()
     bike_label = serializers.SerializerMethodField()
-    bikes = BikeNestedSerializer(many=True, read_only=True)
+    bikes = serializers.SerializerMethodField()
+    tag_numbers = serializers.SerializerMethodField()
     items = RepairOrderItemSerializer(many=True, read_only=True)
     items_summary = serializers.SerializerMethodField()
     status_history = StatusHistorySerializer(many=True, read_only=True)
@@ -112,7 +135,7 @@ class RepairOrderDetailSerializer(LegacyBikeFieldsMixin, serializers.ModelSerial
     class Meta:
         model = RepairOrder
         fields = (
-            'id', 'customer', 'bike', 'bike_label', 'bike_tag_number', 'bikes',
+            'id', 'customer', 'bike', 'bike_label', 'tag_numbers', 'bikes',
             'status', 'priority', 'description', 'estimated_cost', 'final_cost',
             'accepted_at', 'estimated_pickup_date', 'delivered_at', 'created_at', 'updated_at',
             'items', 'items_summary', 'status_history',
@@ -136,74 +159,80 @@ class RepairOrderDetailSerializer(LegacyBikeFieldsMixin, serializers.ModelSerial
         return BikeSerializer(bike).data if bike else None
 
 
-class BikesWriteMixin:
-    """Accepts equipment either as `bikes` (a list of IDs) or as the legacy single `bike`."""
+class EquipmentEntrySerializer(serializers.Serializer):
+    """One piece of equipment to put on an order, with the claim tag hung on it."""
+    bike = serializers.PrimaryKeyRelatedField(queryset=Bike.objects.all())
+    tag_number = serializers.IntegerField(min_value=0, max_value=2147483647)
 
-    def _pop_bikes(self, validated_data):
-        """Returns the equipment to attach, or None when the payload does not mention it."""
-        bikes = validated_data.pop('bikes', None)
-        legacy_bike = validated_data.pop('bike', None)
-        if bikes is None and legacy_bike is None:
-            return None
-        return bikes if bikes is not None else [legacy_bike]
 
-    def _validate_bikes(self, attrs):
-        bikes = attrs.get('bikes')
-        if bikes is None and attrs.get('bike') is not None:
-            bikes = [attrs['bike']]
-        if bikes is not None and len(bikes) != len({bike.pk for bike in bikes}):
+class EquipmentWriteMixin:
+    """`equipment: [{bike, tag_number}]` - the order's full equipment set, each piece
+    with its own tag. On update it replaces the set; leave it out to keep it as is."""
+
+    def _validate_equipment(self, attrs, required):
+        entries = attrs.get('equipment')
+        if (entries is None and required) or (entries is not None and not entries):
             raise serializers.ValidationError(
-                {'bikes': 'Ten sam sprzet nie moze byc przypiety do zlecenia dwa razy.'}
+                {'equipment': 'Zlecenie musi miec przypiety co najmniej jeden sprzet.'}
             )
+
+        if entries is not None:
+            bikes = [entry['bike'] for entry in entries]
+            if len(bikes) != len({bike.pk for bike in bikes}):
+                raise serializers.ValidationError(
+                    {'equipment': 'Ten sam sprzet nie moze byc przypiety do zlecenia dwa razy.'}
+                )
+            tags = [entry['tag_number'] for entry in entries]
+            repeated = sorted({tag for tag in tags if tags.count(tag) > 1})
+            if repeated:
+                raise serializers.ValidationError({'equipment': (
+                    'Kazda sztuka na zleceniu musi miec inny numer zawieszki. Powtarza sie: '
+                    + ', '.join(f'#{tag}' for tag in repeated) + '.'
+                )})
 
         instance = getattr(self, 'instance', None)
         customer = attrs.get('customer') or (instance.customer if instance else None)
         # A changed customer must own the equipment the order keeps, not only new items.
-        checked = bikes if bikes is not None else (list(instance.bikes.all()) if instance else [])
+        if entries is not None:
+            checked = [entry['bike'] for entry in entries]
+        else:
+            checked = [row.bike for row in instance.equipment_list] if instance else []
         foreign = [bike for bike in checked if customer and bike.customer_id != customer.pk]
         if foreign:
-            raise serializers.ValidationError({'bikes': (
+            raise serializers.ValidationError({'equipment': (
                 'Sprzet nie nalezy do klienta zlecenia: '
                 + ', '.join(str(bike) for bike in foreign) + '.'
             )})
 
-        if instance and bikes is not None:
-            self._validate_removed_bikes(instance, bikes)
+        if instance and entries is not None:
+            self._validate_removed_bikes(instance, {entry['bike'].pk for entry in entries})
         return attrs
 
-    def _validate_removed_bikes(self, instance, bikes):
+    def _validate_removed_bikes(self, instance, kept):
         """Equipment with a storage booking on this order cannot be detached from it.
 
-        StorageBooking requires its bike to be one of the order's items, so dropping it
-        would leave the booking pointing outside the order (and its tag number).
+        StorageBooking requires its bike to be one of the order's items (its tag comes
+        from there), so dropping it would leave the booking pointing outside the order.
         """
-        kept = {bike.pk for bike in bikes}
         booked = [
             booking.bike for booking in instance.storage_bookings.select_related('bike')
             if booking.bike_id not in kept
         ]
         if booked:
             names = ', '.join(sorted({str(bike) for bike in booked}))
-            raise serializers.ValidationError({'bikes': (
+            raise serializers.ValidationError({'equipment': (
                 f'Nie mozna odpiac sprzetu z rezerwacja w przechowalni: {names}. '
                 'Najpierw obsluz rezerwacje w przechowalni.'
             )})
 
 
-class RepairOrderCreateSerializer(BikesWriteMixin, serializers.ModelSerializer):
-    bikes = serializers.PrimaryKeyRelatedField(
-        queryset=Bike.objects.all(), many=True, required=False, write_only=True,
-    )
-    # Legacy single-equipment input, kept so existing clients keep working.
-    bike = serializers.PrimaryKeyRelatedField(
-        queryset=Bike.objects.all(), required=False, write_only=True,
-    )
+class RepairOrderCreateSerializer(EquipmentWriteMixin, serializers.ModelSerializer):
+    equipment = EquipmentEntrySerializer(many=True, write_only=True)
 
     class Meta:
         model = RepairOrder
         fields = (
-            'customer', 'bike', 'bikes', 'bike_tag_number', 'priority', 'description', 'estimated_cost',
-            'estimated_pickup_date',
+            'customer', 'equipment', 'priority', 'description', 'estimated_cost', 'estimated_pickup_date',
         )
         # The model allows null only for orders created before the field existed.
         extra_kwargs = {'estimated_pickup_date': {'required': True, 'allow_null': False}}
@@ -215,32 +244,23 @@ class RepairOrderCreateSerializer(BikesWriteMixin, serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        if not attrs.get('bikes') and not attrs.get('bike'):
-            raise serializers.ValidationError(
-                {'bikes': 'Zlecenie musi miec przypiety co najmniej jeden sprzet.'}
-            )
-        return self._validate_bikes(attrs)
+        return self._validate_equipment(attrs, required=True)
 
     @transaction.atomic
     def create(self, validated_data):
-        bikes = self._pop_bikes(validated_data)
+        entries = validated_data.pop('equipment')
         order = super().create(validated_data)
-        order.bikes.set(bikes)
+        set_order_equipment(order, entries)
         return order
 
 
-class RepairOrderWriteSerializer(BikesWriteMixin, serializers.ModelSerializer):
-    bikes = serializers.PrimaryKeyRelatedField(
-        queryset=Bike.objects.all(), many=True, required=False, write_only=True,
-    )
-    bike = serializers.PrimaryKeyRelatedField(
-        queryset=Bike.objects.all(), required=False, write_only=True,
-    )
+class RepairOrderWriteSerializer(EquipmentWriteMixin, serializers.ModelSerializer):
+    equipment = EquipmentEntrySerializer(many=True, write_only=True, required=False)
 
     class Meta:
         model = RepairOrder
         fields = (
-            'id', 'customer', 'bike', 'bikes', 'bike_tag_number', 'status', 'priority',
+            'id', 'customer', 'equipment', 'status', 'priority',
             'description', 'estimated_cost', 'final_cost', 'accepted_at', 'estimated_pickup_date',
             'delivered_at', 'created_at', 'updated_at',
         )
@@ -248,18 +268,14 @@ class RepairOrderWriteSerializer(BikesWriteMixin, serializers.ModelSerializer):
         read_only_fields = ('final_cost', 'created_at', 'updated_at')
 
     def validate(self, attrs):
-        if 'bikes' in attrs and not attrs['bikes']:
-            raise serializers.ValidationError(
-                {'bikes': 'Zlecenie musi miec przypiety co najmniej jeden sprzet.'}
-            )
-        return self._validate_bikes(attrs)
+        return self._validate_equipment(attrs, required=False)
 
     @transaction.atomic
     def update(self, instance, validated_data):
-        bikes = self._pop_bikes(validated_data)
+        entries = validated_data.pop('equipment', None)
         order = super().update(instance, validated_data)
-        if bikes is not None:
-            order.bikes.set(bikes)
+        if entries is not None:
+            set_order_equipment(order, entries)
         return order
 
     def to_representation(self, instance):

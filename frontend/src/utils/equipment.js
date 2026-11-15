@@ -71,20 +71,20 @@ export const equipmentName = (bike) => {
 // a panel bywa otwierany z telefonu po adresie IP w sieci lokalnej.
 let nextNewItemKey = 0;
 
-// Wiersz "nowego sprzetu" w formularzu - jeszcze niezapisana sztuka.
+// Wiersz "nowego sprzetu" w formularzu - jeszcze niezapisana sztuka (z wlasna zawieszka).
 export const newEquipmentItem = (category = 'bike') => ({
-  key: ++nextNewItemKey, category, brand: '', model: '', bike_type: 'other',
+  key: ++nextNewItemKey, category, brand: '', model: '', bike_type: 'other', tag: '',
 });
 
 /**
- * Rejestruje po kolei nowe sztuki sprzetu klienta i zwraca ich id.
+ * Rejestruje po kolei nowe sztuki sprzetu klienta i zwraca liste {bike, tag_number}.
  *
  * `onCreated(bike, item)` wola sie po kazdej zapisanej sztuce - formularz przenosi ja wtedy
- * z "nowych" do zaznaczonych, wiec gdy cos dalej sie nie uda (np. samo zlecenie), ponowna
- * proba nie zarejestruje tego sprzetu drugi raz.
+ * z "nowych" do zaznaczonych (razem z zawieszka), wiec gdy cos dalej sie nie uda (np. samo
+ * zlecenie), ponowna proba nie zarejestruje tego sprzetu drugi raz.
  */
 export async function saveNewEquipment(customerId, items, createBike, onCreated) {
-  const ids = [];
+  const entries = [];
   for (const item of items) {
     const bike = await createBike(equipmentPayload({
       customer: customerId,
@@ -93,8 +93,49 @@ export async function saveNewEquipment(customerId, items, createBike, onCreated)
       model: item.model.trim(),
       bike_type: item.bike_type,
     }));
-    ids.push(bike.id);
+    entries.push({ bike: bike.id, tag_number: parseInt(item.tag, 10) });
     onCreated?.(bike, item);
   }
-  return ids;
+  return entries;
 }
+
+// --- Zawieszki: kazda sztuka na zleceniu ma wlasny numer --------------------------------
+
+// Bez powtorzen: zlecenia sprzed zawieszek per sztuka maja ten sam numer na kazdej sztuce.
+export const uniqueTags = (tags = []) => [...new Set(tags)];
+
+// [12, 13] -> "#12, #13"
+export const formatTags = (tags = []) => uniqueTags(tags).map((tag) => `#${tag}`).join(', ');
+
+// Krotko do list i kalendarza: "#12", "#12, #13", "#12 +3".
+export const shortTags = (tags = []) => {
+  const unique = uniqueTags(tags);
+  if (unique.length <= 2) return formatTags(unique);
+  return `#${unique[0]} +${unique.length - 1}`;
+};
+
+const TAG_RE = /^\d+$/;
+
+// Numery wpisane w formularzu (stringi) -> komunikat bledu albo null.
+export function tagError(values) {
+  if (values.some((value) => !TAG_RE.test(String(value ?? '').trim()))) {
+    return 'Wpisz numer zawieszki przy każdej sztuce sprzętu.';
+  }
+  const numbers = values.map((value) => parseInt(value, 10));
+  const repeated = [...new Set(numbers.filter((n, i) => numbers.indexOf(n) !== i))];
+  if (repeated.length) {
+    return `Każda sztuka musi mieć inną zawieszkę - powtarza się ${formatTags(repeated)}.`;
+  }
+  return null;
+}
+
+// Liczba wystapien kazdego numeru w formularzu - do podswietlenia powtorzen.
+export const tagCounts = (values) => values.reduce((counts, value) => {
+  const key = String(value ?? '').trim();
+  if (key) counts[key] = (counts[key] || 0) + 1;
+  return counts;
+}, {});
+
+// Wpisy {bike, tag_number} dla zaznaczonego, juz zapisanego sprzetu.
+export const selectedEquipmentEntries = (selectedIds, tags) =>
+  selectedIds.map((id) => ({ bike: id, tag_number: parseInt(tags[id], 10) }));

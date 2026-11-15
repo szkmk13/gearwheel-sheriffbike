@@ -23,7 +23,7 @@ class StorageBooking(models.Model):
 
     Serwis nie ma ponumerowanych miejsc postojowych - pojemnosc jest miekka, pracownik
     widzi ja na miejscu - wiec model nie trzyma zadnego `location`. Fizycznie sztuke
-    identyfikuje `bike_tag_number` ze zlecenia, stad `repair_order` jest obowiazkowe
+    identyfikuje jej zawieszka na zleceniu, stad `repair_order` jest obowiazkowe
     (kazdy sprzet jest w trakcie przechowania serwisowany i tak).
 
     Jedno zlecenie moze objac kilka sztuk naraz (rower i dwie pary nart), dlatego
@@ -48,7 +48,7 @@ class StorageBooking(models.Model):
     repair_order = models.ForeignKey(
         'orders.RepairOrder', on_delete=models.PROTECT, related_name='storage_bookings',
         verbose_name='Zlecenie',
-        help_text='Zlecenie obslugujace ten sprzet - zrodlo numeru naklejki (bike_tag_number).',
+        help_text='Zlecenie obslugujace ten sprzet - zrodlo numeru zawieszki tej sztuki.',
     )
     bike = models.ForeignKey(
         'customers.Bike', on_delete=models.PROTECT, related_name='storage_bookings',
@@ -100,8 +100,8 @@ class StorageBooking(models.Model):
 
     @property
     def tag(self):
-        """Numer naklejki przypietej do sprzetu - fizyczny identyfikator w magazynie."""
-        return self.repair_order.bike_tag_number
+        """Zawieszka tej sztuki na zleceniu - fizyczny identyfikator w magazynie."""
+        return self.repair_order.tag_for(self.bike_id)
 
     @property
     def is_overdue(self):

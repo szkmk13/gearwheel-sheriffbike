@@ -8,14 +8,16 @@ import Button from "../Button";
 import CategoryIcon from "../equipment/CategoryIcon";
 import EquipmentPicker from "../equipment/EquipmentPicker";
 import { createBike, fetchClientDetails } from "../../api/clients";
-import { updateOrder } from "../../api/orders";
+import { fetchOpenTags, updateOrder } from "../../api/orders";
 import { fetchStorageBookings } from "../../api/storage";
 import { formatDate, isOrderOverdue } from "../../utils/dates";
-import { bikeTypeShortLabel, saveNewEquipment } from "../../utils/equipment";
+import {
+  bikeTypeShortLabel, saveNewEquipment, selectedEquipmentEntries, tagError,
+} from "../../utils/equipment";
 
 const badgeClass = "inline-block px-2.5 py-0.5 rounded text-xs font-semibold border";
 
-// Sprzęt zlecenia: wszystkie sztuki, jedna zawieszka i termin odbioru dla całości.
+// Sprzęt zlecenia: każda sztuka z własną zawieszką, termin odbioru dla całości.
 export default function OrderEquipmentSection({ order, locked }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const bikes = order.bikes || [];
@@ -24,7 +26,7 @@ export default function OrderEquipmentSection({ order, locked }) {
     <div className="flex-1 min-w-0">
       <div className="flex items-center justify-between mb-2 sm:mb-3">
         <h3 className="text-xs sm:text-sm font-semibold text-[var(--color-ink-3)] uppercase tracking-wider">
-          Sprzęt i zawieszka {bikes.length > 1 && <span className="normal-case">({bikes.length} szt.)</span>}
+          Sprzęt i zawieszki {bikes.length > 1 && <span className="normal-case">({bikes.length} szt.)</span>}
         </h3>
         {!locked && (
           <button
@@ -39,6 +41,12 @@ export default function OrderEquipmentSection({ order, locked }) {
       <ul className="divide-y divide-[var(--color-line)]">
         {bikes.map((bike) => (
           <li key={bike.id} className="py-2 first:pt-0 flex items-start gap-2.5">
+            <span
+              className="shrink-0 mt-0.5 min-w-[2.75rem] px-1.5 py-0.5 rounded bg-[var(--color-ink)] text-white text-xs font-bold text-center tabular-nums"
+              title="Numer zawieszki"
+            >
+              #{bike.tag_number ?? '-'}
+            </span>
             <CategoryIcon category={bike.category || 'bike'} className="w-4 h-4 mt-1 text-[var(--color-ink-3)]" />
             <div className="min-w-0">
               <Link
@@ -63,9 +71,6 @@ export default function OrderEquipmentSection({ order, locked }) {
       </ul>
 
       <div className="pt-3 flex flex-wrap gap-2">
-        <span className={`${badgeClass} bg-[var(--color-paper)] text-[var(--color-ink-2)] border-[var(--color-line)]`}>
-          Zawieszka: #{order.bike_tag_number || '-'}
-        </span>
         <span className={`${badgeClass} ${isOrderOverdue(order) ? 'bg-red-50 text-red-700 border-red-200' : 'bg-[var(--color-paper)] text-[var(--color-ink-2)] border-[var(--color-line)]'}`}>
           Planowany odbiór: {formatDate(order.estimated_pickup_date)}{isOrderOverdue(order) && ' - po terminie'}
         </span>
@@ -76,11 +81,14 @@ export default function OrderEquipmentSection({ order, locked }) {
   );
 }
 
-// Zmiana zestawu sprzętu istniejącego zlecenia (PATCH `bikes`). Zawieszka zostaje ta sama.
+// Zmiana sprzętu istniejącego zlecenia i jego zawieszek (PATCH `equipment`).
 function EditEquipmentModal({ order, onClose }) {
   const queryClient = useQueryClient();
   const customerId = order.customer?.id;
   const [selectedIds, setSelectedIds] = useState(() => (order.bikes || []).map((b) => b.id));
+  const [tags, setTags] = useState(() => Object.fromEntries(
+    (order.bikes || []).map((b) => [b.id, b.tag_number != null ? String(b.tag_number) : ''])
+  ));
   const [newItems, setNewItems] = useState([]);
   const [created, setCreated] = useState([]);
 
@@ -88,6 +96,12 @@ function EditEquipmentModal({ order, onClose }) {
     queryKey: ['client', String(customerId)],
     queryFn: () => fetchClientDetails(customerId),
     enabled: !!customerId,
+  });
+
+  // Zawieszki innych nieodebranych zleceń - ostrzeżenie przy wpisywaniu numeru.
+  const { data: takenTags } = useQuery({
+    queryKey: ['orders', 'open-tags', { exclude: order.id }],
+    queryFn: () => fetchOpenTags(order.id),
   });
 
   // Sztuka z rezerwacją w przechowalni tego zlecenia musi na nim zostać (backend też tego pilnuje).
@@ -110,12 +124,16 @@ function EditEquipmentModal({ order, onClose }) {
 
   const mutation = useMutation({
     mutationFn: async () => {
-      const createdIds = await saveNewEquipment(customerId, newItems, createBike, (bike, item) => {
+      const createdEntries = await saveNewEquipment(customerId, newItems, createBike, (bike, item) => {
         setCreated((prev) => [...prev, bike]);
+        setTags((prev) => ({ ...prev, [bike.id]: item.tag }));
         setSelectedIds((prev) => [...prev, bike.id]);
         setNewItems((prev) => prev.filter((i) => i.key !== item.key));
       });
-      return updateOrder({ id: order.id, orderData: { bikes: [...selectedIds, ...createdIds] } });
+      return updateOrder({
+        id: order.id,
+        orderData: { equipment: [...selectedEquipmentEntries(selectedIds, tags), ...createdEntries] },
+      });
     },
     onSuccess: (updated) => {
       queryClient.setQueryData(['order', String(order.id)], updated);
@@ -136,6 +154,11 @@ function EditEquipmentModal({ order, onClose }) {
       toast.error('Zlecenie musi mieć co najmniej jedną sztukę sprzętu.');
       return;
     }
+    const problem = tagError([...selectedIds.map((id) => tags[id]), ...newItems.map((item) => item.tag)]);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
     mutation.mutate();
   };
 
@@ -148,15 +171,18 @@ function EditEquipmentModal({ order, onClose }) {
             equipment={equipment}
             selectedIds={selectedIds}
             onSelectedChange={setSelectedIds}
+            tags={tags}
+            onTagsChange={setTags}
             newItems={newItems}
             onNewItemsChange={setNewItems}
             primaryCategory={order.bikes?.[0]?.category || 'bike'}
             lockedIds={lockedIds}
+            takenTags={takenTags}
             disabled={mutation.isPending}
           />
         </div>
         <p className="text-xs text-[var(--color-ink-3)]">
-          Cała lista dalej ma jedną zawieszkę #{order.bike_tag_number}. Sprzęt odznaczony tutaj zostaje na karcie klienta.
+          Każda sztuka ma własną zawieszkę. Sprzęt odznaczony tutaj zostaje na karcie klienta.
         </p>
         <div className="flex justify-end gap-3 pt-4 border-t border-[var(--color-line)]">
           <button

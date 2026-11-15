@@ -9,14 +9,16 @@ function StubRow({ label, children, strong = false, wide = false }) {
     );
 }
 
-// Odcinek do oderwania i oddania klientowi. "Numer" to sam numer zawieszki - po nim
-// warsztat odnajduje sprzet przy odbiorze.
+// Odcinek do oderwania i oddania klientowi. "Numer" / "Numery" to same numery zawieszek -
+// po nich warsztat odnajduje sprzet przy odbiorze.
 export default function CustomerStub({ data }) {
     const names = data.bikes.map((bike) => bike.model).join(', ');
     const isMulti = data.bikes.length > 1;
 
     const customer = <StubRow label="Imię i nazwisko klienta">{data.customer.fullName}</StubRow>;
-    const number = <StubRow label="Numer" strong>{data.order.tagNumber}</StubRow>;
+    // Numery wszystkich zawieszek - po nich warsztat odnajduje kazda sztuke przy odbiorze.
+    const tags = [...new Set(data.order.tagNumbers)];
+    const number = <StubRow label={tags.length > 1 ? "Numery" : "Numer"} strong>{tags.join(', ')}</StubRow>;
     const pickup = (
         <StubRow label="Planowany termin odbioru">
             {data.plannedPickupAt && formatDate(data.plannedPickupAt)}

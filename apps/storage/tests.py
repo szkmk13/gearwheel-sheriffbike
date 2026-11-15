@@ -23,9 +23,11 @@ class StorageTestCase(TestCase):
         self.bike = Bike.objects.create(customer=self.customer, brand='Trek', model='Marlin')
         self.skis = Bike.objects.create(customer=self.customer, brand='Atomic', category='winter')
         self.order = RepairOrder.objects.create(
-            customer=self.customer, bike_tag_number=42, description='Zimowanie + przeglad',
+            customer=self.customer, description='Zimowanie + przeglad',
         )
-        self.order.bikes.set([self.bike, self.skis])
+        # Kazda sztuka ma wlasna zawieszke: rower #42, narty #43.
+        self.order.bikes.add(self.bike, through_defaults={'tag_number': 42})
+        self.order.bikes.add(self.skis, through_defaults={'tag_number': 43})
 
     def make_booking(self, *, bike=None, start='2026-11-01', end='2027-03-31', **kwargs):
         return services.create_booking(
@@ -138,7 +140,7 @@ class StorageServiceTests(StorageTestCase):
         self.make_booking(bike=self.bike, start='2026-11-01', end='2027-03-31')
         self.make_booking(bike=self.skis, start='2026-12-01', end='2027-01-31')
         cancelled = Bike.objects.create(customer=self.customer, brand='Cube')
-        self.order.bikes.add(cancelled)
+        self.order.bikes.add(cancelled, through_defaults={'tag_number': 1})
         services.cancel(self.make_booking(bike=cancelled, start='2026-12-01', end='2027-01-31'),
                         user=self.user)
 
@@ -290,8 +292,8 @@ class StorageBookingEditTests(StorageTestCase):
     def test_order_and_equipment_are_fixed_after_creation(self):
         other = Customer.objects.create(first_name='Jan', last_name='Kowal', phone='600700800')
         other_bike = Bike.objects.create(customer=other, brand='Kross')
-        other_order = RepairOrder.objects.create(customer=other, bike_tag_number=7, description='x')
-        other_order.bikes.set([other_bike])
+        other_order = RepairOrder.objects.create(customer=other, description='x')
+        other_order.bikes.set([other_bike], through_defaults={'tag_number': 1})
 
         self.patch({'repair_order': other_order.pk, 'bike': other_bike.pk})
         self.booking.refresh_from_db()
@@ -313,11 +315,12 @@ class StorageIntakeTests(StorageTestCase):
         super().setUp()
         self.client.force_login(self.user)
 
-    def post(self, **overrides):
+    def post(self, bikes=None, **overrides):
+        bikes = [self.bike, self.skis] if bikes is None else bikes
         data = {
             'customer': self.customer.pk,
-            'bikes': [self.bike.pk, self.skis.pk],
-            'bike_tag_number': 77,
+            # Kolejne zawieszki od #77: rower #77, narty #78.
+            'equipment': [{'bike': bike.pk, 'tag_number': 77 + i} for i, bike in enumerate(bikes)],
             'start_date': '2026-11-01',
             'end_date': '2027-03-31',
             **overrides,
@@ -332,7 +335,8 @@ class StorageIntakeTests(StorageTestCase):
 
         order = RepairOrder.objects.get(pk=body['repair_order'])
         self.assertEqual(order.customer, self.customer)
-        self.assertEqual(order.bike_tag_number, 77)
+        self.assertEqual((order.tag_for(self.bike.pk), order.tag_for(self.skis.pk)), (77, 78))
+        self.assertEqual(sorted(b['tag'] for b in body['bookings']), [77, 78])
         self.assertEqual(order.estimated_pickup_date, date(2027, 3, 31))
         self.assertEqual(set(order.bikes.all()), {self.bike, self.skis})
 
@@ -346,7 +350,6 @@ class StorageIntakeTests(StorageTestCase):
                 list(booking.events.values_list('event_type', flat=True)),
                 [StorageEvent.EVENT_CHECK_IN],
             )
-        self.assertEqual({b['tag'] for b in body['bookings']}, {77})
 
         # Cena trafia na zlecenie jako jedna pozycja na wszystkie sztuki.
         item = order.items.get()
@@ -359,7 +362,7 @@ class StorageIntakeTests(StorageTestCase):
     def test_defaults_start_date_to_today_and_price_to_catalogue(self):
         # `None` usuwa pole z payloadu - sprawdzamy wartosci domyslne.
         Part.objects.filter(sku=STORAGE_SERVICE_SKU).update(sell_price=Decimal('600.00'))
-        response = self.post(start_date=None, bikes=[self.bike.pk], end_date='2099-03-31')
+        response = self.post(start_date=None, bikes=[self.bike], end_date='2099-03-31')
         self.assertEqual(response.status_code, 201, response.content)
         booking = StorageBooking.objects.get(bike=self.bike)
         self.assertEqual(booking.start_date, date.today())
@@ -418,13 +421,18 @@ class StorageIntakeTests(StorageTestCase):
         other_bike = Bike.objects.create(customer=other, brand='Kross')
         orders_before = RepairOrder.objects.count()
 
-        response = self.post(bikes=[self.bike.pk, other_bike.pk])
+        response = self.post(bikes=[self.bike, other_bike])
         self.assertEqual(response.status_code, 400)
         self.assertIn('bikes', response.json())
         self.assertEqual(RepairOrder.objects.count(), orders_before)
 
     def test_requires_at_least_one_piece_and_valid_dates(self):
         self.assertEqual(self.post(bikes=[]).status_code, 400)
+        repeated = self.post(equipment=[
+            {'bike': self.bike.pk, 'tag_number': 5}, {'bike': self.skis.pk, 'tag_number': 5},
+        ])
+        self.assertEqual(repeated.status_code, 400)
+        self.assertIn('#5', str(repeated.json()))
         response = self.post(start_date='2027-04-01', end_date='2027-03-31')
         self.assertEqual(response.status_code, 400)
         self.assertIn('end_date', response.json())

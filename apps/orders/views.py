@@ -17,10 +17,11 @@ from rest_framework.viewsets import ModelViewSet
 from apps.customers.models import Bike, Customer
 
 from .filters import RepairOrderFilter
-from .models import RepairOrder, RepairOrderItem
+from .models import RepairOrder, RepairOrderEquipment, RepairOrderItem
 from .services import (
     SmsNotAllowed,
     add_item,
+    open_tag_numbers,
     change_order_status,
     remove_item,
     update_item,
@@ -102,8 +103,8 @@ STATUS_ORDER = ['done', 'in_progress', 'estimating', 'waiting_parts', 'accepted'
                 'search', str, OpenApiParameter.QUERY,
                 description=_(
                     'Free-text search over `description`, the customer\'s first/last name and the '
-                    'equipment brand/model. Also matches the claim-tag number '
-                    '(`bike_tag_number`) partially, e.g. `search=9` finds tags 9, 19 and 91.'
+                    'equipment brand/model. Also matches the claim-tag number of any piece '
+                    'of equipment partially, e.g. `search=9` finds tags 9, 19 and 91.'
                 ),
             ),
             OpenApiParameter(
@@ -125,12 +126,10 @@ STATUS_ORDER = ['done', 'in_progress', 'estimating', 'waiting_parts', 'accepted'
         summary=_('Create a repair order'),
         description=_(
             'Opens a new repair order for the given customer and equipment. An order can cover '
-            'several pieces of equipment at once (e.g. two pairs of skis) - pass them as `bikes`, '
-            'a list of equipment IDs. The legacy single-item form (`bike`) is still accepted and '
-            'creates a one-item order. `bike_tag_number` is the physical claim-tag number (a plain '
-            'integer) attached to the equipment while it is in the shop; one tag covers the whole '
-            'order, however many items it holds. It is not a unique identifier and may repeat '
-            'across different orders. '
+            'several pieces of equipment at once (e.g. two pairs of skis) - pass them as '
+            '`equipment: [{bike, tag_number}]`. `tag_number` is the physical claim tag hung on that '
+            'piece while it is in the shop: every piece on the order gets its own, different tag. '
+            'Tags are not unique identifiers and come back on later orders. '
             '`priority` is optional and defaults to `normal`. `status` is not an input here - '
             'new orders always start as `accepted` (change it afterwards via the status endpoint). '
             '`estimated_pickup_date` is required and cannot be in the past. '
@@ -160,9 +159,9 @@ STATUS_ORDER = ['done', 'in_progress', 'estimating', 'waiting_parts', 'accepted'
 )
 class RepairOrderViewSet(ModelViewSet):
     queryset = RepairOrder.objects.select_related('customer').prefetch_related(
-        # Ordered by id so `bike` (the legacy single-equipment field) is the item that
-        # was attached first, not whichever sorts first alphabetically.
-        Prefetch('bikes', queryset=Bike.objects.select_related('customer').order_by('id')),
+        # Rows are ordered by id, i.e. by when each piece was attached, so `bike` (the
+        # legacy single-equipment field) is the first piece, not the alphabetically first.
+        Prefetch('equipment', queryset=RepairOrderEquipment.objects.select_related('bike')),
     ).annotate(
         status_order=Case(
             *[When(status=status_value, then=position) for position, status_value in enumerate(STATUS_ORDER)],
@@ -173,10 +172,10 @@ class RepairOrderViewSet(ModelViewSet):
         cost=Coalesce(F('final_cost'), F('estimated_cost')),
     ).order_by('status_order', '-created_at')
     filterset_class = RepairOrderFilter
-    # `bike_tag_number` is an integer, but icontains casts it to text - `9` matches tags 9, 19, 91...
+    # `tag_number` is an integer, but icontains casts it to text - `9` matches tags 9, 19, 91...
     search_fields = [
         'description', 'customer__first_name', 'customer__last_name', 'bikes__brand', 'bikes__model',
-        'bike_tag_number',
+        'equipment__tag_number',
     ]
     ordering_fields = ['created_at', 'updated_at', 'priority', 'estimated_cost', 'final_cost', 'cost',
         'estimated_pickup_date',
@@ -263,10 +262,30 @@ class RepairOrderViewSet(ModelViewSet):
     def calendar(self, request):
         date_range = CalendarRangeSerializer(data=request.query_params)
         date_range.is_valid(raise_exception=True)
-        orders = self.filter_queryset(self.get_queryset()).filter(
+        orders = list(self.filter_queryset(self.get_queryset()).filter(
             estimated_pickup_date__range=(date_range.validated_data['start'], date_range.validated_data['end']),
-        ).order_by('estimated_pickup_date', 'status_order', 'bike_tag_number')
+        ))
+        # Lowest tag of each order as the last key - sorted here, since an aggregate over
+        # the equipment rows would fight the filters' joins.
+        orders.sort(key=lambda o: (o.estimated_pickup_date, o.status_order, min(o.tag_numbers, default=0)))
         return Response(RepairOrderListSerializer(orders, many=True).data)
+
+    @extend_schema(
+        summary=_('Claim tags in use'),
+        description=_(
+            'Claim tags hanging on equipment of orders that are not collected yet (any status '
+            'except `delivered` and `cancelled`), as `{"<tag>": [order ids]}`. The panel uses '
+            'it to warn when a tag being entered is already taken. `exclude_order` leaves one '
+            'order out (the one being edited).'
+        ),
+        parameters=[OpenApiParameter('exclude_order', int, OpenApiParameter.QUERY)],
+        responses={200: OpenApiTypes.OBJECT},
+    )
+    @action(detail=False, methods=['get'], url_path='open-tags')
+    def open_tags(self, request):
+        exclude = request.query_params.get('exclude_order')
+        exclude = int(exclude) if exclude and exclude.isdigit() else None
+        return Response({str(tag): ids for tag, ids in open_tag_numbers(exclude).items()})
 
     @extend_schema(
         summary=_('Send the ready-for-pickup SMS'),

@@ -101,6 +101,8 @@ class StorageBookingViewSet(ModelViewSet):
     queryset = (
         StorageBooking.objects
         .select_related('bike', 'repair_order', 'repair_order__customer')
+        # `tag` czyta zawieszke tej sztuki z wierszy sprzetu zlecenia.
+        .prefetch_related('repair_order__equipment')
     )
     filterset_class = StorageBookingFilter
     search_fields = [

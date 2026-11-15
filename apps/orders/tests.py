@@ -14,7 +14,7 @@ from rest_framework.test import APITestCase
 from apps.customers.models import Bike, Customer
 from apps.inventory.models import Part
 
-from .models import RepairOrder, StatusHistory
+from .models import RepairOrder, RepairOrderEquipment, StatusHistory
 
 User = get_user_model()
 
@@ -36,62 +36,98 @@ class OrderEquipmentTests(APITestCase):
             customer=self.customer, category='winter', brand='Head', model='Supershape',
         )
 
+    @staticmethod
+    def _eq(*bikes, first_tag=10):
+        """`equipment` payload: each piece with its own tag (10, 11, ...)."""
+        return [{'bike': bike.pk, 'tag_number': first_tag + i} for i, bike in enumerate(bikes)]
+
     def _create_order(self, **payload):
         payload.setdefault('customer', self.customer.pk)
-        payload.setdefault('bike_tag_number', 42)
         payload.setdefault('description', 'Serwis.')
         payload.setdefault('estimated_pickup_date', str(timezone.localdate() + timedelta(days=3)))
         return self.client.post(reverse('order-list'), payload, format='json')
 
-    def _order_with(self, *bikes, tag=42):
-        order = RepairOrder.objects.create(
-            customer=self.customer, bike_tag_number=tag, description='Serwis.',
-        )
-        order.bikes.set(bikes)
+    def _order_with(self, *bikes, first_tag=10):
+        order = RepairOrder.objects.create(customer=self.customer, description='Serwis.')
+        for i, bike in enumerate(bikes):
+            RepairOrderEquipment.objects.create(repair_order=order, bike=bike, tag_number=first_tag + i)
         return order
 
-    def test_create_with_multiple_equipment(self):
+    def _tags(self, order):
+        return list(order.equipment.values_list('bike_id', 'tag_number'))
+
+    def test_create_with_multiple_equipment_and_own_tags(self):
         response = self._create_order(
-            bikes=[self.skis_left.pk, self.skis_right.pk],
+            equipment=[
+                {'bike': self.skis_left.pk, 'tag_number': 12},
+                {'bike': self.skis_right.pk, 'tag_number': 13},
+            ],
             description='Ostrzenie krawedzi, dwie pary nart.',
         )
         self.assertEqual(response.status_code, 201, response.data)
         order = RepairOrder.objects.get(pk=response.data['id'])
-        self.assertEqual(order.bikes.count(), 2)
-        # One claim tag covers the whole order, however many items it holds.
-        self.assertEqual(order.bike_tag_number, 42)
-
-    def test_create_with_legacy_single_bike_payload(self):
-        """The pre-multi-equipment payload still works and lands in the equipment set."""
-        response = self._create_order(bike=self.bike.pk, bike_tag_number=7)
-        self.assertEqual(response.status_code, 201, response.data)
-        order = RepairOrder.objects.get(pk=response.data['id'])
-        self.assertEqual(list(order.bikes.all()), [self.bike])
-        self.assertEqual(order.bike_tag_number, 7)
+        self.assertEqual(self._tags(order), [(self.skis_left.pk, 12), (self.skis_right.pk, 13)])
+        self.assertEqual(response.data['tag_numbers'], [12, 13])
+        self.assertEqual(
+            [(b['id'], b['tag_number']) for b in response.data['bikes']],
+            [(self.skis_left.pk, 12), (self.skis_right.pk, 13)],
+        )
 
     def test_create_requires_equipment(self):
         response = self._create_order()
         self.assertEqual(response.status_code, 400)
-        self.assertIn('bikes', response.data)
+        self.assertIn('equipment', response.data)
+
+    def test_create_rejects_empty_equipment(self):
+        response = self._create_order(equipment=[])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('equipment', response.data)
+
+    def test_create_requires_tag_for_each_piece(self):
+        response = self._create_order(equipment=[{'bike': self.bike.pk}])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('equipment', response.data)
 
     def test_create_rejects_duplicate_equipment(self):
-        response = self._create_order(bikes=[self.skis_left.pk, self.skis_left.pk])
+        response = self._create_order(equipment=[
+            {'bike': self.skis_left.pk, 'tag_number': 1}, {'bike': self.skis_left.pk, 'tag_number': 2},
+        ])
         self.assertEqual(response.status_code, 400)
-        self.assertIn('bikes', response.data)
+        self.assertIn('equipment', response.data)
+
+    def test_create_rejects_repeated_tag_within_order(self):
+        response = self._create_order(equipment=[
+            {'bike': self.skis_left.pk, 'tag_number': 5}, {'bike': self.skis_right.pk, 'tag_number': 5},
+        ])
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('#5', str(response.data['equipment']))
+        self.assertFalse(RepairOrder.objects.exists())
+
+    def test_same_tag_may_repeat_across_orders(self):
+        self._order_with(self.bike, first_tag=7)
+        response = self._create_order(equipment=[{'bike': self.skis_left.pk, 'tag_number': 7}])
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_old_single_tag_fields_are_gone(self):
+        """`bike`, `bikes` and `bike_tag_number` are no longer accepted as input."""
+        response = self._create_order(bike=self.bike.pk, bike_tag_number=7)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('equipment', response.data)
 
     def test_legacy_fields_mirror_equipment_set(self):
-        """`bike` and `bike_label` keep the shape the panel reads."""
-        order = self._order_with(self.skis_left, self.skis_right, tag=7)
+        """`bike` and `bike_label` keep the shape older readers expect."""
+        order = self._order_with(self.skis_left, self.skis_right, first_tag=7)
 
         detail = self.client.get(reverse('order-detail', args=[order.pk])).data
         self.assertEqual(detail['bike']['id'], self.skis_left.pk)
         self.assertEqual(detail['bike_label'], 'Atomic Redster X5, Head Supershape')
-        self.assertEqual(detail['bike_tag_number'], 7)
-        self.assertEqual([item['id'] for item in detail['bikes']], [self.skis_left.pk, self.skis_right.pk])
+        self.assertEqual(detail['tag_numbers'], [7, 8])
+        self.assertNotIn('bike_tag_number', detail)
 
         row = self.client.get(reverse('order-list')).data['results'][0]
         self.assertEqual(row['bike'], self.skis_left.pk)
-        self.assertEqual(row['bike_tag_number'], 7)
+        self.assertEqual(row['tag_numbers'], [7, 8])
+        self.assertEqual([b['tag_number'] for b in row['bikes']], [7, 8])
 
     def test_legacy_bike_follows_attachment_order(self):
         """`bike` is the item attached first, not the alphabetically first one."""
@@ -105,51 +141,74 @@ class OrderEquipmentTests(APITestCase):
         order = self._order_with(self.bike)
         response = self.client.patch(
             reverse('order-detail', args=[order.pk]),
-            {'bikes': [self.skis_left.pk]},
+            {'equipment': [{'bike': self.skis_left.pk, 'tag_number': 30}]},
             format='json',
         )
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(list(order.bikes.all()), [self.skis_left])
+        self.assertEqual(self._tags(order), [(self.skis_left.pk, 30)])
+        self.assertEqual(response.data['tag_numbers'], [30])
 
-    def test_update_without_bikes_keeps_equipment(self):
+    def test_update_changes_tag_and_keeps_position(self):
+        order = self._order_with(self.bike, self.skis_left)
+        response = self.client.patch(
+            reverse('order-detail', args=[order.pk]),
+            {'equipment': [
+                {'bike': self.skis_right.pk, 'tag_number': 3},
+                {'bike': self.skis_left.pk, 'tag_number': 99},
+                {'bike': self.bike.pk, 'tag_number': 10},
+            ]},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        # Pieces already on the order keep their place; the new one is appended.
+        self.assertEqual(
+            self._tags(order), [(self.bike.pk, 10), (self.skis_left.pk, 99), (self.skis_right.pk, 3)],
+        )
+
+    def test_update_can_swap_tags_between_pieces(self):
+        order = self._order_with(self.bike, self.skis_left)
+        response = self.client.patch(
+            reverse('order-detail', args=[order.pk]),
+            {'equipment': [{'bike': self.bike.pk, 'tag_number': 11}, {'bike': self.skis_left.pk, 'tag_number': 10}]},
+            format='json',
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(self._tags(order), [(self.bike.pk, 11), (self.skis_left.pk, 10)])
+
+    def test_update_without_equipment_keeps_it(self):
         order = self._order_with(self.bike)
         response = self.client.patch(
             reverse('order-detail', args=[order.pk]), {'priority': 'high'}, format='json',
         )
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(list(order.bikes.all()), [self.bike])
+        self.assertEqual(self._tags(order), [(self.bike.pk, 10)])
 
     def test_update_rejects_empty_equipment_set(self):
         order = self._order_with(self.bike)
         response = self.client.patch(
-            reverse('order-detail', args=[order.pk]), {'bikes': []}, format='json',
+            reverse('order-detail', args=[order.pk]), {'equipment': []}, format='json',
         )
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(list(order.bikes.all()), [self.bike])
+        self.assertEqual(self._tags(order), [(self.bike.pk, 10)])
 
     def _foreign_bike(self):
         other = Customer.objects.create(first_name='Piotr', last_name='Zielinski', phone='500100300')
         return Bike.objects.create(customer=other, brand='Giant', model='Talon')
 
     def test_create_rejects_equipment_of_another_customer(self):
-        response = self._create_order(bikes=[self.bike.pk, self._foreign_bike().pk])
+        response = self._create_order(equipment=self._eq(self.bike, self._foreign_bike()))
         self.assertEqual(response.status_code, 400)
-        self.assertIn('Giant Talon', str(response.data['bikes']))
+        self.assertIn('Giant Talon', str(response.data['equipment']))
         self.assertFalse(RepairOrder.objects.exists())
-
-    def test_create_rejects_legacy_bike_of_another_customer(self):
-        response = self._create_order(bike=self._foreign_bike().pk)
-        self.assertEqual(response.status_code, 400)
-        self.assertIn('bikes', response.data)
 
     def test_update_rejects_equipment_of_another_customer(self):
         order = self._order_with(self.bike)
         response = self.client.patch(
             reverse('order-detail', args=[order.pk]),
-            {'bikes': [self.bike.pk, self._foreign_bike().pk]}, format='json',
+            {'equipment': self._eq(self.bike, self._foreign_bike())}, format='json',
         )
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(list(order.bikes.all()), [self.bike])
+        self.assertEqual(self._tags(order), [(self.bike.pk, 10)])
 
     def test_changing_customer_checks_kept_equipment(self):
         order = self._order_with(self.bike)
@@ -158,7 +217,7 @@ class OrderEquipmentTests(APITestCase):
             reverse('order-detail', args=[order.pk]), {'customer': other.pk}, format='json',
         )
         self.assertEqual(response.status_code, 400)
-        self.assertIn('Trek Marlin 5', str(response.data['bikes']))
+        self.assertIn('Trek Marlin 5', str(response.data['equipment']))
 
     def test_update_cannot_detach_equipment_with_storage_booking(self):
         from apps.storage import services as storage_services
@@ -170,55 +229,72 @@ class OrderEquipmentTests(APITestCase):
         )
         url = reverse('order-detail', args=[order.pk])
 
-        response = self.client.patch(url, {'bikes': [self.bike.pk]}, format='json')
+        response = self.client.patch(url, {'equipment': self._eq(self.bike)}, format='json')
         self.assertEqual(response.status_code, 400)
-        self.assertIn('przechowalni', str(response.data['bikes']))
+        self.assertIn('przechowalni', str(response.data['equipment']))
         self.assertEqual(order.bikes.count(), 2)
 
-        # Adding more equipment next to the booked one is fine.
+        # Adding more equipment next to the booked one (and retagging it) is fine.
         response = self.client.patch(
-            url, {'bikes': [self.bike.pk, self.skis_left.pk, self.skis_right.pk]}, format='json',
+            url, {'equipment': self._eq(self.bike, self.skis_left, self.skis_right, first_tag=50)},
+            format='json',
         )
         self.assertEqual(response.status_code, 200, response.data)
         self.assertEqual(order.bikes.count(), 3)
 
+    def test_search_matches_tag_of_any_piece(self):
+        order = self._order_with(self.bike, self.skis_left, first_tag=41)
+        self._order_with(self.skis_right, first_tag=7)
+        results = self.client.get(reverse('order-list'), {'search': '42'}).data['results']
+        self.assertEqual([row['id'] for row in results], [order.pk])
+
+    def test_open_tags_lists_tags_of_uncollected_orders(self):
+        open_order = self._order_with(self.bike, self.skis_left, first_tag=5)
+        collected = self._order_with(self.skis_right, first_tag=9)
+        collected.status = 'delivered'
+        collected.save()
+
+        data = self.client.get(reverse('order-open-tags')).data
+        self.assertEqual(data, {'5': [open_order.pk], '6': [open_order.pk]})
+        data = self.client.get(reverse('order-open-tags'), {'exclude_order': open_order.pk}).data
+        self.assertEqual(data, {})
+
     def test_create_stores_estimated_pickup_date(self):
         pickup = timezone.localdate() + timedelta(days=3)
-        response = self._create_order(bike=self.bike.pk, estimated_pickup_date=str(pickup))
+        response = self._create_order(equipment=self._eq(self.bike), estimated_pickup_date=str(pickup))
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(RepairOrder.objects.get(pk=response.data['id']).estimated_pickup_date, pickup)
 
     def test_create_stores_priority(self):
-        response = self._create_order(bike=self.bike.pk, priority='urgent')
+        response = self._create_order(equipment=self._eq(self.bike), priority='urgent')
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(RepairOrder.objects.get(pk=response.data['id']).priority, 'urgent')
 
     def test_create_defaults_priority_to_normal(self):
-        response = self._create_order(bike=self.bike.pk)
+        response = self._create_order(equipment=self._eq(self.bike))
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(RepairOrder.objects.get(pk=response.data['id']).priority, 'normal')
 
     def test_create_requires_estimated_pickup_date(self):
         response = self.client.post(reverse('order-list'), {
-            'customer': self.customer.pk, 'bike': self.bike.pk,
-            'bike_tag_number': 42, 'description': 'Serwis.',
+            'customer': self.customer.pk, 'equipment': self._eq(self.bike), 'description': 'Serwis.',
         }, format='json')
         self.assertEqual(response.status_code, 400)
         self.assertIn('estimated_pickup_date', response.data)
 
     def test_create_rejects_null_estimated_pickup_date(self):
-        response = self._create_order(bike=self.bike.pk, estimated_pickup_date=None)
+        response = self._create_order(equipment=self._eq(self.bike), estimated_pickup_date=None)
         self.assertEqual(response.status_code, 400)
         self.assertIn('estimated_pickup_date', response.data)
 
     def test_create_rejects_past_estimated_pickup_date(self):
         yesterday = timezone.localdate() - timedelta(days=1)
-        response = self._create_order(bike=self.bike.pk, estimated_pickup_date=str(yesterday))
+        response = self._create_order(equipment=self._eq(self.bike), estimated_pickup_date=str(yesterday))
         self.assertEqual(response.status_code, 400)
         self.assertIn('estimated_pickup_date', response.data)
 
     def test_create_accepts_today_as_pickup_date(self):
-        response = self._create_order(bike=self.bike.pk, estimated_pickup_date=str(timezone.localdate()))
+        response = self._create_order(equipment=self._eq(self.bike), estimated_pickup_date=str(timezone.localdate()))
         self.assertEqual(response.status_code, 201, response.data)
 
     def test_update_can_move_pickup_date_into_the_past(self):
@@ -287,39 +363,39 @@ class OrderEquipmentTests(APITestCase):
         return {row['id'] for row in response.data['results']}
 
     def test_search_matches_tag_number_partially(self):
-        tag_9 = self._order_with(self.bike, tag=9)
-        tag_19 = self._order_with(self.skis_left, tag=19)
-        tag_91 = self._order_with(self.skis_right, tag=91)
-        self._order_with(self.bike, tag=42)
+        tag_9 = self._order_with(self.bike, first_tag=9)
+        tag_19 = self._order_with(self.skis_left, first_tag=19)
+        tag_91 = self._order_with(self.skis_right, first_tag=91)
+        self._order_with(self.bike, first_tag=42)
         self.assertEqual(self._search_ids('9'), {tag_9.pk, tag_19.pk, tag_91.pk})
         self.assertEqual(self._search_ids('91'), {tag_91.pk})
 
     def test_search_by_tag_does_not_duplicate_multi_equipment_orders(self):
-        order = self._order_with(self.skis_left, self.skis_right, tag=7)
+        order = self._order_with(self.skis_left, self.skis_right, first_tag=7)
         response = self.client.get(reverse('order-list'), {'search': '7'})
         self.assertEqual([row['id'] for row in response.data['results']], [order.pk])
 
     def test_text_search_still_works_alongside_tag_search(self):
-        order = self._order_with(self.bike, tag=42)
+        order = self._order_with(self.bike, first_tag=42)
         self.assertEqual(self._search_ids('Nowak'), {order.pk})
         self.assertEqual(self._search_ids('Kowalski'), set())
 
     def test_numeric_term_still_matches_text_fields(self):
         """A number in the description is found too - the tag is an extra field, not a replacement."""
-        order = self._order_with(self.bike, tag=1)
+        order = self._order_with(self.bike, first_tag=1)
         order.description = 'Wymiana lancucha 11 rzedow.'
         order.save()
         self.assertEqual(self._search_ids('11'), {order.pk})
 
     def test_tag_combines_with_other_terms(self):
         """Every term must match somewhere, the tag counting as one of the fields."""
-        order = self._order_with(self.bike, tag=42)
+        order = self._order_with(self.bike, first_tag=42)
         self.assertEqual(self._search_ids('Nowak 42'), {order.pk})
         self.assertEqual(self._search_ids('Kowalski 42'), set())
 
 
 class BikeDeletionGuardTests(APITestCase):
-    """`bikes` is a plain M2M, so deletion protection has to be enforced by hand."""
+    """Equipment on an order is protected by RepairOrderEquipment.bike (PROTECT)."""
 
     def setUp(self):
         self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
@@ -327,9 +403,9 @@ class BikeDeletionGuardTests(APITestCase):
 
     def test_bike_on_an_order_cannot_be_deleted(self):
         order = RepairOrder.objects.create(
-            customer=self.customer, bike_tag_number=1, description='Serwis.',
+            customer=self.customer, description='Serwis.',
         )
-        order.bikes.add(self.bike)
+        order.bikes.add(self.bike, through_defaults={'tag_number': 1})
         # delete() runs in its own transaction, which the raise marks as broken - the
         # atomic block here keeps the assertion below queryable.
         with transaction.atomic():
@@ -349,20 +425,20 @@ class BikeDeletionGuardTests(APITestCase):
         from apps.customers.admin import BikeAdmin
 
         order = RepairOrder.objects.create(
-            customer=self.customer, bike_tag_number=1, description='Serwis.',
+            customer=self.customer, description='Serwis.',
         )
-        order.bikes.add(self.bike)
+        order.bikes.add(self.bike, through_defaults={'tag_number': 1})
 
         request = RequestFactory().get('/')
         request.user = User.objects.create_superuser(username='admin')
         *_, protected = BikeAdmin(Bike, AdminSite()).get_deleted_objects([self.bike], request)
-        self.assertEqual(protected, [str(order)])
+        self.assertIn(str(order), protected)
 
     def test_bike_can_be_deleted_once_the_order_is_gone(self):
         order = RepairOrder.objects.create(
-            customer=self.customer, bike_tag_number=1, description='Serwis.',
+            customer=self.customer, description='Serwis.',
         )
-        order.bikes.add(self.bike)
+        order.bikes.add(self.bike, through_defaults={'tag_number': 1})
         order.delete()
         self.bike.delete()
         self.assertFalse(Bike.objects.filter(pk=self.bike.pk).exists())
@@ -429,6 +505,7 @@ class RenameDiagnosingToEstimatingMigrationTests(TransactionTestCase):
         StatusHistory = apps.get_model('orders', 'StatusHistory')
         customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
         order = RepairOrder.objects.create(
+            # Historical model (0010/0011): the order still carries the order-wide tag.
             customer=customer, bike_tag_number=1, description='Serwis.', status=status,
         )
         StatusHistory.objects.create(repair_order=order, old_status='accepted', new_status=status)
@@ -466,9 +543,9 @@ class StatusHistoryAdminInlineTests(APITestCase):
         customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
         self.bike = Bike.objects.create(customer=customer, brand='Trek', model='Marlin 5', bike_type='mtb')
         self.order = RepairOrder.objects.create(
-            customer=customer, bike_tag_number=5, description='Serwis.', status='estimating',
+            customer=customer, description='Serwis.', status='estimating',
         )
-        self.order.bikes.add(self.bike)
+        self.order.bikes.add(self.bike, through_defaults={'tag_number': 1})
         self.entry = StatusHistory.objects.create(
             repair_order=self.order, old_status='accepted', new_status='estimating', note='Stara notatka',
         )
@@ -477,8 +554,11 @@ class StatusHistoryAdminInlineTests(APITestCase):
     def _post(self, **history):
         data = {
             'customer': self.order.customer_id,
-            'bikes': [self.bike.pk],
-            'bike_tag_number': 5,
+            'equipment-TOTAL_FORMS': 1, 'equipment-INITIAL_FORMS': 1,
+            'equipment-0-id': self.order.equipment.get().pk,
+            'equipment-0-repair_order': self.order.pk,
+            'equipment-0-bike': self.bike.pk,
+            'equipment-0-tag_number': 5,
             'status': 'estimating',
             'priority': 'normal',
             'description': 'Serwis.',
@@ -522,9 +602,11 @@ class ReadyForPickupSmsTests(APITestCase):
         self.client.force_login(self.user)
         self.customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='600100200')
         self.order = RepairOrder.objects.create(
-            customer=self.customer, bike_tag_number=86, description='Serwis.', status='in_progress',
+            customer=self.customer, description='Serwis.', status='in_progress',
             final_cost=Decimal('250.00'),
         )
+        skis = Bike.objects.create(customer=self.customer, brand='Atomic', category='winter')
+        RepairOrderEquipment.objects.create(repair_order=self.order, bike=skis, tag_number=86)
 
     def _change_status(self, new_status, **extra):
         return self.client.post(
@@ -609,10 +691,10 @@ class OrderCalendarTests(APITestCase):
 
     def _order(self, pickup, tag=1, status='accepted'):
         order = RepairOrder.objects.create(
-            customer=self.customer, bike_tag_number=tag, description='Serwis.',
+            customer=self.customer, description='Serwis.',
             estimated_pickup_date=pickup, status=status,
         )
-        order.bikes.add(self.bike)
+        order.bikes.add(self.bike, through_defaults={'tag_number': tag})
         return order
 
     def _calendar(self, **params):
@@ -668,7 +750,7 @@ class OrderItemsTests(APITestCase):
     def setUp(self):
         self.client.force_login(User.objects.create_user(username='mechanik', is_staff=True))
         customer = Customer.objects.create(first_name='Anna', last_name='Nowak', phone='500100200')
-        self.order = RepairOrder.objects.create(customer=customer, bike_tag_number=3, description='Serwis')
+        self.order = RepairOrder.objects.create(customer=customer, description='Serwis')
         self.url = f'/api/orders/{self.order.pk}/items/'
         self.tube = Part.objects.create(
             kind=Part.KIND_PART, sku='TEST-DETKA-28', name='Dętka 28"', unit='szt.', sell_price=Decimal('20.00'),
@@ -786,6 +868,6 @@ class OrderItemsTests(APITestCase):
         self.assertEqual(self.client.delete(f'{self.url}{item_id}/').status_code, 400)
 
     def test_item_of_another_order_is_404(self):
-        other = RepairOrder.objects.create(customer=self.order.customer, bike_tag_number=4, description='x')
+        other = RepairOrder.objects.create(customer=self.order.customer, description='x')
         item_id = self.add(part=self.tube.pk).json()['id']
         self.assertEqual(self.client.delete(f'/api/orders/{other.pk}/items/{item_id}/').status_code, 404)

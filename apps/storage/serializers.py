@@ -28,7 +28,7 @@ class StorageBookingListSerializer(serializers.ModelSerializer):
     customer_name = serializers.SerializerMethodField()
     bike_label = serializers.CharField(source='bike.__str__', read_only=True)
     category = serializers.CharField(source='bike.category', read_only=True)
-    tag = serializers.IntegerField(source='repair_order.bike_tag_number', read_only=True)
+    tag = serializers.IntegerField(read_only=True, allow_null=True)
     status_display = serializers.CharField(source='get_status_display', read_only=True)
     is_overdue = serializers.BooleanField(read_only=True)
 
@@ -58,8 +58,8 @@ class StorageBookingDetailSerializer(StorageBookingListSerializer):
 
 
 class StorageBookingWriteSerializer(serializers.ModelSerializer):
-    """Zapis rezerwacji. `repair_order` jest obowiazkowe, bo naklejka na sprzecie
-    (`bike_tag_number`) i przeglad w cenie wisza wlasnie na zleceniu."""
+    """Zapis rezerwacji. `repair_order` jest obowiazkowe, bo zawieszka sztuki i przeglad
+    w cenie wisza wlasnie na zleceniu."""
 
     repair_order = serializers.PrimaryKeyRelatedField(queryset=RepairOrder.objects.all())
     bike = serializers.PrimaryKeyRelatedField(queryset=Bike.objects.all())
@@ -112,14 +112,17 @@ class StorageBookingWriteSerializer(serializers.ModelSerializer):
         return StorageBookingDetailSerializer(instance, context=self.context).data
 
 
+class IntakeEquipmentSerializer(serializers.Serializer):
+    """Jedna przyjmowana sztuka z zawieszka, ktora na niej wisi."""
+    bike = serializers.PrimaryKeyRelatedField(queryset=Bike.objects.all())
+    tag_number = serializers.IntegerField(min_value=0, max_value=2147483647)
+
+
 class IntakeSerializer(serializers.Serializer):
     """Przyjecie sprzetu: zlecenie i pobyty powstaja razem (patrz `services.intake`)."""
 
     customer = serializers.PrimaryKeyRelatedField(queryset=Customer.objects.all())
-    bikes = serializers.PrimaryKeyRelatedField(
-        queryset=Bike.objects.all(), many=True, allow_empty=False,
-    )
-    bike_tag_number = serializers.IntegerField(min_value=0)
+    equipment = IntakeEquipmentSerializer(many=True, allow_empty=False)
     start_date = serializers.DateField(
         required=False, help_text='Domyslnie dzisiaj - dzien, w ktorym sprzet trafia do serwisu.',
     )

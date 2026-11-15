@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import toast from 'react-hot-toast';
-import { fetchOrders, createOrder } from "../api/orders";
+import { fetchOrders, createOrder, fetchOpenTags } from "../api/orders";
 import { fetchClientDetails, createClient, createBike, fetchBikeDetails, lookupClientByPhone } from "../api/clients";
 
 import Button from "../components/Button";
@@ -22,6 +22,7 @@ import { CategoryIcons } from "../components/equipment/CategoryIcon";
 import EquipmentPicker from "../components/equipment/EquipmentPicker";
 import {
   defaultCategoryForDate, newEquipmentItem, orderCategories, saveNewEquipment,
+  formatTags, selectedEquipmentEntries, shortTags, tagError, uniqueTags,
 } from "../utils/equipment";
 
 const PRIORITY_OPTIONS = [
@@ -54,6 +55,8 @@ export default function OrdersPage() {
   const [selectedClientId, setSelectedClientId] = useState("");
   // Jedno zlecenie obejmuje kilka sztuk: zaznaczony sprzęt klienta + nowy, jeszcze niezapisany.
   const [selectedBikeIds, setSelectedBikeIds] = useState([]);
+  // Zawieszka każdej zaznaczonej sztuki: id sprzętu -> wpisany numer (nowy sprzęt trzyma ją w `tag`).
+  const [tags, setTags] = useState({});
   const [newItems, setNewItems] = useState([]);
   // Sprzęt z QR / z linku, widoczny na liście zanim dociągną się szczegóły klienta.
   const [scannedBikes, setScannedBikes] = useState([]);
@@ -209,6 +212,7 @@ export default function OrdersPage() {
     setIsNewClient(false);
     setSelectedClientId("");
     setSelectedBikeIds([]);
+    setTags({});
     setNewItems([]);
     setScannedBikes([]);
     setFoundClient(null);
@@ -287,6 +291,13 @@ export default function OrdersPage() {
 
   const piecesCount = selectedBikeIds.length + newItems.length;
 
+  // Zawieszki na nieodebranych zleceniach - tylko do ostrzeżenia przy wpisywaniu numeru.
+  const { data: takenTags } = useQuery({
+    queryKey: ['orders', 'open-tags'],
+    queryFn: () => fetchOpenTags(),
+    enabled: isAddOrderFormOpen,
+  });
+
   const mutation = useMutation({
     mutationFn: async (formData) => {
       let finalCustomerId = formData.get('customer') || selectedClientId;
@@ -318,7 +329,8 @@ export default function OrdersPage() {
       }
 
       // Każda zapisana sztuka od razu przechodzi z "nowych" do zaznaczonych (bez duplikatów przy ponownej próbie).
-      const createdIds = await saveNewEquipment(parseInt(finalCustomerId), newItems, createBike, (bike, item) => {
+      const createdEntries = await saveNewEquipment(parseInt(finalCustomerId), newItems, createBike, (bike, item) => {
+        setTags((prev) => ({ ...prev, [bike.id]: item.tag }));
         setScannedBikes((prev) => [...prev, bike]);
         setSelectedBikeIds((prev) => [...prev, bike.id]);
         setNewItems((prev) => prev.filter((i) => i.key !== item.key));
@@ -326,8 +338,7 @@ export default function OrdersPage() {
 
       const newOrder = {
         customer: parseInt(finalCustomerId),
-        bikes: [...selectedBikeIds, ...createdIds],
-        bike_tag_number: parseInt(formData.get('bike_tag_number'), 10),
+        equipment: [...selectedEquipmentEntries(selectedBikeIds, tags), ...createdEntries],
         description: formData.get('description'),
         priority: formData.get('priority') || 'normal',
         estimated_cost: formData.get('estimated_cost') || null,
@@ -353,6 +364,13 @@ export default function OrdersPage() {
     e.preventDefault();
     if (!isNewClient && !selectedClientId) {
       toast.error('Wybierz klienta albo zaznacz "Nowy klient".');
+      return;
+    }
+    const problem = piecesCount > 0 && tagError([
+      ...selectedBikeIds.map((id) => tags[id]), ...newItems.map((item) => item.tag),
+    ]);
+    if (problem) {
+      toast.error(problem);
       return;
     }
     if (piecesCount === 0) {
@@ -596,7 +614,7 @@ export default function OrdersPage() {
                     onClick={() => navigate(`/panel/orders/${order.id}`)}
                     className={`border-b border-[var(--color-line)] hover:bg-[var(--color-paper)] transition-colors cursor-pointer ${index === ordersList.length - 1 ? 'border-b-0' : '' }`}
                   >
-                    <td className="py-4 px-6 font-bold text-[var(--color-ink)]">#{order.bike_tag_number}</td>
+                    <td className="py-4 px-6 font-bold text-[var(--color-ink)] whitespace-nowrap" title={formatTags(order.tag_numbers)}>{shortTags(order.tag_numbers)}</td>
                     <td className="py-4 px-6 font-medium">{order.customer_name}</td>
                     <td className="py-4 px-6 text-[var(--color-ink-2)]">
                       <span className="inline-flex items-start gap-2">
@@ -641,7 +659,7 @@ export default function OrdersPage() {
             >
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-[var(--color-ink)]">Zawieszka #{order.bike_tag_number || '-'}</span>
+                  <span className="text-sm font-bold text-[var(--color-ink)]">{uniqueTags(order.tag_numbers).length > 1 ? 'Zawieszki' : 'Zawieszka'} {shortTags(order.tag_numbers) || '-'}</span>
                 </div>
                 <div className="flex items-center gap-2">
                   {order.priority && order.priority !== 'normal' && (
@@ -756,6 +774,9 @@ export default function OrdersPage() {
                       title="Sprzęt na zlecenie"
                       equipment={isNewClient ? [] : clientEquipment}
                       selectedIds={selectedBikeIds}
+                      tags={tags}
+                      onTagsChange={setTags}
+                      takenTags={takenTags}
                       onSelectedChange={handleSelectedEquipmentChange}
                       newItems={newItems}
                       onNewItemsChange={setNewItems}
@@ -778,10 +799,9 @@ export default function OrdersPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 border-t border-[var(--color-line)] pt-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 border-t border-[var(--color-line)] pt-4">
                 <DateInput name="accepted_at" label="Data przyjęcia" defaultValue={todayDate} disabled={true} />
                 <DateInput name="estimated_pickup_date" label="Planowany odbiór" defaultValue={defaultPickupDate()} min={todayDate} required={true} />
-                <Input name="bike_tag_number" label="Nr zawieszki" type="number" min="1" step="1" inputMode="numeric" placeholder="np. 12" required={true} />
                 <Select
                     name="priority"
                     label="Priorytet"

@@ -248,7 +248,9 @@ export default function BikeDetailsPage() {
 
             {repairOrders.length > 0 ? (
               <div className="space-y-3">
-                {repairOrders.map((order) => (
+                {repairOrders.map((order) => {
+                  const tag = order.bikes?.find((b) => b.id === bike.id)?.tag_number;
+                  return (
                   <div
                     key={order.id}
                     onClick={() => navigate(`/panel/orders/${order.id}`)}
@@ -257,9 +259,9 @@ export default function BikeDetailsPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="font-semibold text-gray-800 text-sm sm:text-base">#{order.id}</span>
-                        {order.bike_tag_number && (
+                        {tag != null && (
                           <span className="px-2 py-0.5 bg-gray-200/80 rounded text-xs font-semibold text-gray-700">
-                            Zawieszka #{order.bike_tag_number}
+                            Zawieszka #{tag}
                           </span>
                         )}
                       </div>
@@ -275,7 +277,8 @@ export default function BikeDetailsPage() {
                       <StatusBadge status={order.status} />
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="bg-gray-50 rounded-lg text-gray-500 text-sm p-6 text-center border border-gray-100">

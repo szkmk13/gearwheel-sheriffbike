@@ -1,6 +1,15 @@
 from django.contrib import admin
-from .models import RepairOrder, RepairOrderItem, StatusHistory
+from .models import RepairOrder, RepairOrderEquipment, RepairOrderItem, StatusHistory
 from .services import recalculate_final_cost
+
+
+class RepairOrderEquipmentInline(admin.TabularInline):
+    """Equipment on the order, each piece with its own claim tag."""
+
+    model = RepairOrderEquipment
+    extra = 0
+    fields = ('bike', 'tag_number')
+    autocomplete_fields = ('bike',)
 
 
 class RepairOrderItemInline(admin.TabularInline):
@@ -29,9 +38,8 @@ class StatusHistoryInline(admin.TabularInline):
 class RepairOrderAdmin(admin.ModelAdmin):
     list_display = ('id', 'customer', 'equipment', 'status', 'priority', 'created_at', 'estimated_pickup_date')
     list_filter = ('status', 'priority')
-    search_fields = ('customer__first_name', 'customer__last_name', 'description')
-    filter_horizontal = ('bikes',)
-    inlines = [RepairOrderItemInline, StatusHistoryInline]
+    search_fields = ('customer__first_name', 'customer__last_name', 'description', 'equipment__tag_number')
+    inlines = [RepairOrderEquipmentInline, RepairOrderItemInline, StatusHistoryInline]
     # Suma pozycji - przeliczana po zapisie pozycji (save_related), nie wpisywana ręcznie.
     readonly_fields = ('final_cost',)
 
@@ -40,8 +48,8 @@ class RepairOrderAdmin(admin.ModelAdmin):
         recalculate_final_cost(form.instance)
 
     def get_queryset(self, request):
-        return super().get_queryset(request).prefetch_related('bikes')
+        return super().get_queryset(request).prefetch_related('equipment__bike')
 
     @admin.display(description='Sprzet')
     def equipment(self, obj):
-        return ', '.join(str(bike) for bike in obj.bikes.all()) or '-'
+        return ', '.join(str(row) for row in obj.equipment.all()) or '-'

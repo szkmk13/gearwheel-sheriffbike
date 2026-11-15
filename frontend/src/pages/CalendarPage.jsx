@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { fetchOrdersCalendar } from "../api/orders";
+import { shortTags } from "../utils/equipment";
 
 import StatusBadge from "../components/StatusBadge";
 import StickyHeader from "../components/StickyHeader";
@@ -65,7 +66,7 @@ function OrderCard({ order }) {
     >
       <div className="min-w-0">
         <div className="flex items-center gap-2 text-sm font-semibold text-[var(--color-ink)]">
-          <span className="text-[var(--color-accent)]">#{order.bike_tag_number}</span>
+          <span className="text-[var(--color-accent)] whitespace-nowrap">{shortTags(order.tag_numbers)}</span>
           <span className="truncate">{order.customer_name}</span>
         </div>
         <p className="mt-0.5 text-sm text-[var(--color-ink-2)] truncate">{order.bike_label}</p>

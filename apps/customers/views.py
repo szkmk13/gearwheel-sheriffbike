@@ -26,7 +26,7 @@ class CustomerViewSet(ModelViewSet):
         'bikes',
         Prefetch(
             'repair_orders',
-            queryset=RepairOrder.objects.prefetch_related('bikes').order_by('-created_at'),
+            queryset=RepairOrder.objects.prefetch_related('equipment__bike').order_by('-created_at'),
         ),
     )
     filterset_fields = ['email']
@@ -93,7 +93,7 @@ class BikeCreateView(CreateAPIView):
 @extend_schema(responses=BikeDetailSerializer)
 class BikeDetailView(RetrieveUpdateDestroyAPIView):
     queryset = Bike.objects.select_related('customer').prefetch_related(
-        Prefetch('repair_orders', queryset=RepairOrder.objects.select_related('customer').prefetch_related('bikes').order_by('-created_at'))
+        Prefetch('repair_orders', queryset=RepairOrder.objects.select_related('customer').prefetch_related('equipment__bike').order_by('-created_at'))
     )
 
     def get_serializer_class(self):

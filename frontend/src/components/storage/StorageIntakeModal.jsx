@@ -4,19 +4,18 @@ import toast from 'react-hot-toast';
 
 import Modal from "../Modal";
 import Input from "../Input";
-import Select from "../Select";
 import DateInput from "../DateInput";
 import Button from "../Button";
 import ClientSearchSelect from "../ClientSearchSelect";
+import EquipmentPicker from "../equipment/EquipmentPicker";
 import { createBike, createClient, fetchClientDetails, lookupClientByPhone } from "../../api/clients";
+import { fetchOpenTags } from "../../api/orders";
 import { fetchStorageBookings, storageIntake } from "../../api/storage";
 import { STORAGE_SERVICE_SKU, fetchCatalogItems } from "../../api/inventory";
 import { todayISODate } from "../../utils/dates";
 import { decimalInputProps, isNonNegative } from "../../utils/decimalInput";
-import {
-  ACTIVE_STORAGE_STATUSES, BIKE_TYPE_OPTIONS, CATEGORY_OPTIONS, categoryLabel, defaultStorageEndDate, formatMoney,
-  storageKeys,
-} from "./storageData";
+import { newEquipmentItem, saveNewEquipment, selectedEquipmentEntries, tagError } from "../../utils/equipment";
+import { ACTIVE_STORAGE_STATUSES, defaultStorageEndDate, formatMoney, storageKeys } from "./storageData";
 
 // Puste pole ceny = cena usługi "Przechowanie zimowe" z katalogu (ustala ją backend);
 // tu pobieramy ją tylko, żeby pokazać podpowiedź i sumę.
@@ -31,13 +30,10 @@ const useCatalogStoragePrice = (enabled) => {
   return entry?.sell_price != null ? String(Number(entry.sell_price)) : null;
 };
 
-// Licznik zamiast crypto.randomUUID - ten działa tylko w bezpiecznym kontekście (HTTPS/localhost),
-// a panel bywa otwierany z telefonu po adresie IP w sieci lokalnej.
-let nextItemKey = 0;
-const emptyItem = () => ({ key: ++nextItemKey, category: 'bike', brand: '', model: '', bike_type: 'other' });
+const emptyItem = () => newEquipmentItem('bike');
 
 const emptyForm = () => ({
-  tag: '', startDate: todayISODate(), endDate: defaultStorageEndDate(), price: '', description: '', notes: '',
+  startDate: todayISODate(), endDate: defaultStorageEndDate(), price: '', description: '', notes: '',
 });
 
 const textareaClass = "w-full p-3 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-400 text-gray-800 focus:outline-none focus:ring-2 focus:ring-[var(--color-accent)]/50 focus:border-[var(--color-accent)] min-h-[80px] resize-y shadow-sm";
@@ -54,6 +50,8 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
   const [client, setClient] = useState(null);
   const [newClient, setNewClient] = useState({ fullName: '', phone: '', email: '', rodo: false });
   const [selectedBikeIds, setSelectedBikeIds] = useState([]);
+  // Zawieszka każdej zaznaczonej sztuki: id -> numer (nowy sprzęt trzyma ją w `tag`).
+  const [tags, setTags] = useState({});
   const [newItems, setNewItems] = useState([]);
   const [form, setForm] = useState(emptyForm);
 
@@ -64,6 +62,7 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
     setClient(null);
     setNewClient({ fullName: '', phone: '', email: '', rodo: false });
     setSelectedBikeIds([]);
+    setTags({});
     setNewItems([]);
     setForm(emptyForm());
   };
@@ -95,7 +94,14 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
     queryFn: () => fetchStorageBookings({ customer: client.id, status: ACTIVE_STORAGE_STATUSES.join(',') }),
     enabled: !!client?.id,
   });
-  const busyBikeIds = new Set((activeBookings?.results || []).map((b) => b.bike));
+  const busyBikeIds = new Map((activeBookings?.results || []).map((b) => [b.bike, 'już na przechowaniu']));
+
+  // Zawieszki na nieodebranych zleceniach - tylko do ostrzeżenia przy wpisywaniu numeru.
+  const { data: takenTags } = useQuery({
+    queryKey: ['orders', 'open-tags'],
+    queryFn: () => fetchOpenTags(),
+    enabled: isOpen,
+  });
 
   // Klient z bazy (z wyszukiwarki albo po numerze) - rowery wybiera się z jego listy,
   // a gdy żadnego nie ma, od razu pojawia się formularz nowego.
@@ -138,14 +144,6 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
     toast(`Klient z numerem ${found.phone} już istnieje: ${found.first_name} ${found.last_name} - wybierz jego rower.`, { duration: 6000 });
   };
 
-  const toggleBike = (id) => {
-    setSelectedBikeIds((prev) => (prev.includes(id) ? prev.filter((b) => b !== id) : [...prev, id]));
-  };
-
-  const updateItem = (key, name, value) => {
-    setNewItems((prev) => prev.map((item) => (item.key === key ? { ...item, [name]: value } : item)));
-  };
-
   const piecesCount = selectedBikeIds.length + newItems.length;
 
   const mutation = useMutation({
@@ -170,25 +168,16 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
 
       // Nowy sprzęt zapisujemy od razu w stanie formularza - gdyby samo przyjęcie się nie
       // powiodło (np. zła data), ponowna próba nie zarejestruje go drugi raz.
-      const createdIds = [];
-      for (const item of newItems) {
-        const bike = await createBike({
-          customer: customer.id,
-          category: item.category,
-          brand: item.brand.trim(),
-          model: item.model.trim(),
-          bike_type: item.category === 'winter' ? 'other' : item.bike_type,
-        });
-        createdIds.push(bike.id);
+      const createdEntries = await saveNewEquipment(customer.id, newItems, createBike, (bike, item) => {
         setClient((prev) => ({ ...prev, bikes: [...(prev?.bikes || []), bike] }));
+        setTags((prev) => ({ ...prev, [bike.id]: item.tag }));
         setSelectedBikeIds((prev) => [...prev, bike.id]);
         setNewItems((prev) => prev.filter((i) => i.key !== item.key));
-      }
+      });
 
       return storageIntake({
         customer: customer.id,
-        bikes: [...selectedBikeIds, ...createdIds],
-        bike_tag_number: parseInt(form.tag, 10),
+        equipment: [...selectedEquipmentEntries(selectedBikeIds, tags), ...createdEntries],
         start_date: form.startDate || undefined,
         end_date: form.endDate,
         // Puste (albo sama kropka) = cena z katalogu.
@@ -216,6 +205,11 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
     }
     if (piecesCount === 0) {
       toast.error('Wybierz albo dodaj co najmniej jedną sztukę sprzętu.');
+      return;
+    }
+    const problem = tagError([...selectedBikeIds.map((id) => tags[id]), ...newItems.map((item) => item.tag)]);
+    if (problem) {
+      toast.error(problem);
       return;
     }
     mutation.mutate();
@@ -280,96 +274,25 @@ export default function StorageIntakeModal({ isOpen, onClose, onCreated, scanned
         {/* SPRZĘT */}
         {(client || isNewClient) && (
           <div className={sectionClass}>
-            <div className="flex justify-between items-center mb-4">
-              <h4 className="text-sm font-semibold text-[var(--color-ink)]">Sprzęt do przechowania</h4>
-              <button
-                type="button"
-                onClick={() => setNewItems((prev) => [...prev, emptyItem()])}
-                className="text-xs font-semibold text-[var(--color-accent)] hover:underline cursor-pointer"
-              >
-                + Dodaj nowy sprzęt
-              </button>
-            </div>
-
-            {bikes.length > 0 && (
-              <div className="space-y-2 mb-4">
-                {bikes.map((bike) => {
-                  const busy = busyBikeIds.has(bike.id);
-                  return (
-                    <label
-                      key={bike.id}
-                      className={`flex items-center gap-3 p-3 border rounded-lg transition-colors ${
-                        busy
-                          ? 'border-[var(--color-line)] bg-gray-50 opacity-60 cursor-not-allowed'
-                          : selectedBikeIds.includes(bike.id)
-                            ? 'border-[var(--color-accent)] bg-[var(--color-accent-soft)] cursor-pointer'
-                            : 'border-[var(--color-line)] bg-[var(--color-paper-2)] hover:bg-white cursor-pointer'
-                      }`}
-                    >
-                      <input
-                        type="checkbox" disabled={busy}
-                        checked={selectedBikeIds.includes(bike.id)}
-                        onChange={() => toggleBike(bike.id)}
-                        className="w-4 h-4 text-[var(--color-accent)] border-[var(--color-line)] rounded focus:ring-[var(--color-accent)] cursor-pointer"
-                      />
-                      <span className="flex-1 min-w-0 text-sm">
-                        <span className="font-medium text-[var(--color-ink)]">{bike.brand} {bike.model}</span>
-                        <span className="text-[var(--color-ink-3)]"> - {categoryLabel(bike.category)}</span>
-                      </span>
-                      {busy && <span className="text-xs font-medium text-[var(--color-ink-3)] shrink-0">już na przechowaniu</span>}
-                    </label>
-                  );
-                })}
-              </div>
-            )}
-
-            {newItems.map((item, index) => (
-              <div key={item.key} className="p-4 mb-3 border border-dashed border-[var(--color-line)] rounded-lg bg-[var(--color-paper-2)]">
-                <div className="flex justify-between items-center mb-3">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-ink-3)]">Nowy sprzęt {index + 1}</span>
-                  <button
-                    type="button"
-                    onClick={() => setNewItems((prev) => prev.filter((i) => i.key !== item.key))}
-                    className="text-xs text-[var(--color-ink-3)] hover:text-red-600 cursor-pointer"
-                  >
-                    Usuń
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4">
-                  <Select
-                    label="Kategoria" required options={CATEGORY_OPTIONS}
-                    value={item.category} onChange={(e) => updateItem(item.key, 'category', e.target.value)}
-                  />
-                  <Input
-                    label="Producent" required placeholder={item.category === 'winter' ? 'np. Atomic' : 'np. Trek'}
-                    value={item.brand} onChange={(e) => updateItem(item.key, 'brand', e.target.value)}
-                  />
-                  <Input
-                    label="Model" placeholder={item.category === 'winter' ? 'np. Redster' : 'np. Marlin 7'}
-                    value={item.model} onChange={(e) => updateItem(item.key, 'model', e.target.value)}
-                  />
-                  {item.category === 'bike' && (
-                    <Select
-                      label="Typ roweru" options={BIKE_TYPE_OPTIONS}
-                      value={item.bike_type} onChange={(e) => updateItem(item.key, 'bike_type', e.target.value)}
-                    />
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {bikes.length === 0 && newItems.length === 0 && (
-              <p className="text-sm text-[var(--color-ink-3)]">Klient nie ma jeszcze sprzętu - dodaj nowy.</p>
-            )}
+            <EquipmentPicker
+              title="Sprzęt do przechowania"
+              equipment={bikes}
+              selectedIds={selectedBikeIds}
+              onSelectedChange={setSelectedBikeIds}
+              tags={tags}
+              onTagsChange={setTags}
+              newItems={newItems}
+              onNewItemsChange={setNewItems}
+              primaryCategory="winter"
+              unavailableIds={busyBikeIds}
+              takenTags={takenTags}
+              disabled={mutation.isPending}
+            />
           </div>
         )}
 
         {/* PRZECHOWANIE */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 border-t border-[var(--color-line)] pt-4">
-          <Input
-            label="Nr zawieszki" type="number" min="0" step="1" inputMode="numeric" placeholder="np. 12" required
-            value={form.tag} onChange={setField('tag')}
-          />
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-4 border-t border-[var(--color-line)] pt-4">
           <DateInput label="Od" value={form.startDate} onChange={setField('startDate')} required />
           <DateInput label="Do (odbiór)" value={form.endDate} onChange={setField('endDate')} min={form.startDate || undefined} required />
           <Input

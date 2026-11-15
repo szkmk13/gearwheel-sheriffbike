@@ -28,7 +28,8 @@ export default function PrintIntakeButton({ order, className }) {
         await document.fonts.ready;
         const previousTitle = document.title;
         // Tytul strony to domyslna nazwa pliku przy "Zapisz jako PDF".
-        document.title = `Przyjecie - zawieszka ${order.bike_tag_number}`;
+        const tags = [...new Set(order.tag_numbers || [])];
+        document.title = `Przyjecie - ${tags.length > 1 ? 'zawieszki' : 'zawieszka'} ${tags.join('-')}`;
         document.body.classList.add(PRINTING_CLASS);
         const cleanup = () => {
             document.body.classList.remove(PRINTING_CLASS);

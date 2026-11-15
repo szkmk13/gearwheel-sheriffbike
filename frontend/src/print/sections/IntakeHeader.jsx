@@ -34,15 +34,10 @@ export default function IntakeHeader({ data }) {
 
                 <Field label="Data odbioru" bold>{data.plannedPickupAt && formatDate(data.plannedPickupAt)}</Field>
                 <Field label={isMulti ? `${label} (${bikes.length} szt.)` : label} wide grow={isMulti}>
-                    {/* Jedna zawieszka obejmuje cale zlecenie, wiec tylko przed pierwsza pozycja. */}
-                    {bikes.length === 0 && data.order.tagNumber && (
-                        <span className="line"><strong>#{data.order.tagNumber}</strong></span>
-                    )}
+                    {/* Kazda sztuka ma wlasna zawieszke - numer na poczatku jej linii. */}
                     {listed.map((bike, i) => (
                         <span key={i} className="line">
-                            {i === 0 && data.order.tagNumber && (
-                                <><strong>#{data.order.tagNumber}</strong> - </>
-                            )}
+                            {bike.tag != null && <><strong>#{bike.tag}</strong> - </>}
                             {bike.model}
                             {isMulti && bike.serialNumber && `, nr ${bike.serialNumber}`}
                         </span>

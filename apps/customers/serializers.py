@@ -58,7 +58,7 @@ class RepairOrderHistorySerializer(serializers.Serializer):
     customer_name = serializers.CharField()
     bike = serializers.IntegerField(allow_null=True)
     bike_label = serializers.CharField()
-    bike_tag_number = serializers.IntegerField()
+    tag_numbers = serializers.ListField(child=serializers.IntegerField())
     bikes = serializers.ListField(child=serializers.DictField())
     status = serializers.CharField()
     priority = serializers.CharField()

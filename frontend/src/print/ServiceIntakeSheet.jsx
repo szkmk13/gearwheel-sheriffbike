@@ -6,10 +6,10 @@ import "./print.css";
 // Arkusz A4 "Przyjecie serwisowe" (rower / sprzet zimowy): czesc serwisowa + odcinek dla klienta.
 //
 // data: {
-//   order: { tagNumber },
+//   order: { tagNumbers },                 // zawieszki wszystkich sztuk
 //   receivedAt, plannedPickupAt,           // daty (Date | string | null)
 //   customer: { fullName, phone },
-//   bikes: [{ model, serialNumber }],      // zlecenie moze obejmowac kilka sztuk sprzetu
+//   bikes: [{ model, serialNumber, tag }], // kazda sztuka z wlasna zawieszka
 //   services: [{ name, price }],
 //   notes,
 //   estimatedCost,                         // sformatowana kwota ("250 zł") albo ""

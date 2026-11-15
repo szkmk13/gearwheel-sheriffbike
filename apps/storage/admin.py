@@ -19,7 +19,7 @@ class StorageBookingAdmin(admin.ModelAdmin):
     list_display = ('bike', 'customer_name', 'tag', 'start_date', 'end_date', 'status', 'is_overdue')
     list_filter = ('status', 'bike__category', 'start_date')
     search_fields = ('bike__brand', 'bike__model', 'repair_order__customer__last_name',
-                     'repair_order__bike_tag_number')
+                     'repair_order__equipment__tag_number')
     autocomplete_fields = ('repair_order', 'bike')
     readonly_fields = ('checked_in_at', 'checked_out_at', 'created_at', 'updated_at')
     inlines = [StorageEventInline]
@@ -31,13 +31,13 @@ class StorageBookingAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
             'bike', 'repair_order', 'repair_order__customer',
-        )
+        ).prefetch_related('repair_order__equipment')
 
     @admin.display(description='Klient', ordering='repair_order__customer__last_name')
     def customer_name(self, obj):
         return str(obj.customer)
 
-    @admin.display(description='Naklejka', ordering='repair_order__bike_tag_number')
+    @admin.display(description='Naklejka')
     def tag(self, obj):
         return obj.tag
 

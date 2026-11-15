@@ -2,11 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.db import models
-from django.db.models import ProtectedError
-from django.db.models.signals import pre_delete
-from django.dispatch import receiver
 
-from apps.customers.models import Bike
 from apps.inventory.models import Part
 
 User = get_user_model()
@@ -29,12 +25,11 @@ class RepairOrder(models.Model):
         ('urgent', 'Urgent'),
     ]
     customer = models.ForeignKey('customers.Customer', on_delete=models.PROTECT, related_name='repair_orders')
-    # One order can cover several pieces of equipment at once (e.g. two pairs of skis).
-    bikes = models.ManyToManyField('customers.Bike', related_name='repair_orders', blank=True)
-    # Physical tag number attached to the equipment while it's in the shop (e.g. a claim-ticket
-    # number) - not a unique identifier, it can be reused across different orders. One tag
-    # covers the whole order, however many pieces of equipment it holds.
-    bike_tag_number = models.PositiveIntegerField()
+    # One order can cover several pieces of equipment at once (e.g. two pairs of skis), and
+    # each piece carries its own claim tag - see RepairOrderEquipment.
+    bikes = models.ManyToManyField(
+        'customers.Bike', through='RepairOrderEquipment', related_name='repair_orders', blank=True,
+    )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='accepted', db_index=True)
     priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='normal')
     description = models.TextField()
@@ -55,32 +50,54 @@ class RepairOrder(models.Model):
         return f'Order #{self.pk} - {self.customer} ({self.status})'
 
     @property
-    def primary_bike(self):
-        """The order's first piece of equipment, backing the legacy `bike` API field.
+    def equipment_list(self):
+        """The order's equipment rows (bike + its tag), in the order they were attached.
 
-        Reads `.all()` so the viewset's Prefetch (ordered by id, i.e. by when the item
-        was attached) is reused instead of firing a fresh query.
+        Reads `.all()` so a viewset Prefetch of `equipment` is reused instead of firing a
+        fresh query per order.
         """
-        items = list(self.bikes.all())
-        return items[0] if items else None
+        return list(self.equipment.all())
+
+    @property
+    def primary_bike(self):
+        """The order's first piece of equipment, backing the legacy `bike` API field."""
+        rows = self.equipment_list
+        return rows[0].bike if rows else None
+
+    @property
+    def tag_numbers(self):
+        """Claim tags of all the order's equipment, in attachment order."""
+        return [row.tag_number for row in self.equipment_list]
+
+    def tag_for(self, bike_id):
+        """Claim tag of one piece of equipment on this order (None if it is not on it)."""
+        return next((row.tag_number for row in self.equipment_list if row.bike_id == bike_id), None)
 
 
-@receiver(pre_delete, sender=Bike)
-def protect_bike_used_by_orders(sender, instance, **kwargs):
-    """Keeps equipment that is attached to an order from being deleted.
+class RepairOrderEquipment(models.Model):
+    """One piece of equipment on an order, with the claim tag hung on it in the shop.
 
-    `RepairOrder.bikes` is a plain ManyToManyField, so it has no `on_delete=PROTECT`
-    of its own - without this, deleting a bike would silently drop it from every order
-    it appears on and leave the repair history pointing at nothing. Raising
-    ProtectedError mirrors what the old ForeignKey did, so the admin still renders its
-    usual "protected related objects" page and staff can detach the item first.
+    The tag is a physical, reusable number (a plastic tag on the bike or skis), not an
+    identifier: the same number comes back on later orders once the tag is free again.
+    Within one order every piece gets its own tag - the serializers enforce that for new
+    data. Orders from before per-item tags carry the old order-wide tag on every piece.
+
+    `bike` is PROTECT: equipment with repair history cannot be deleted from under it.
     """
-    orders = list(instance.repair_orders.all()[:20])
-    if orders:
-        raise ProtectedError(
-            f'Nie mozna usunac sprzetu "{instance}" - jest przypiety do zlecen.',
-            orders,
-        )
+    repair_order = models.ForeignKey(RepairOrder, on_delete=models.CASCADE, related_name='equipment')
+    bike = models.ForeignKey('customers.Bike', on_delete=models.PROTECT, related_name='order_equipment')
+    tag_number = models.PositiveIntegerField(db_index=True)
+
+    class Meta:
+        ordering = ['id']
+        constraints = [
+            models.UniqueConstraint(fields=['repair_order', 'bike'], name='order_equipment_unique_bike'),
+        ]
+        verbose_name = 'Sprzet zlecenia'
+        verbose_name_plural = 'Sprzet zlecenia'
+
+    def __str__(self):
+        return f'#{self.tag_number} {self.bike}'
 
 
 class RepairOrderItem(models.Model):

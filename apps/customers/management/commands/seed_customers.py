@@ -7,7 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.customers.models import Bike, Customer
-from apps.orders.models import RepairOrder, RepairOrderItem, StatusHistory
+from apps.orders.models import RepairOrder, RepairOrderEquipment, RepairOrderItem, StatusHistory
 
 FIRST_NAMES = [
     'Anna', 'Piotr', 'Katarzyna', 'Michał', 'Magdalena', 'Tomasz',
@@ -228,12 +228,13 @@ class Command(BaseCommand):
 
         order = RepairOrder.objects.create(
             customer=customer,
-            bike_tag_number=random.randint(1, 250),
             status=status,
             priority=random.choice([p[0] for p in RepairOrder.PRIORITY_CHOICES]),
             description=random.choice(REPAIR_DESCRIPTIONS),
         )
-        order.bikes.set(bikes)
+        # Każda sztuka ma własną zawieszkę - różne numery w obrębie zlecenia.
+        for bike, tag in zip(bikes, random.sample(range(1, 251), len(bikes))):
+            RepairOrderEquipment.objects.create(repair_order=order, bike=bike, tag_number=tag)
 
         items_total = self._create_items(order)
         timeline = self._status_timeline(statuses, order_date, now)
