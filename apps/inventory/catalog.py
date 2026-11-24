@@ -30,3 +30,7 @@ BASE_CATALOG_SKUS = [sku for sku, *_ in BASE_CATALOG]
 # komu się przydaje, a przechowanie dodaje się samo przy przyjęciu. Z rankingu użycia nie
 # są wykluczone.
 POPULAR_FILL_EXCLUDED_SKUS = {'USL-SERWIS', STORAGE_SERVICE_SKU}
+
+# Pozycje, na których opiera się logika aplikacji (przechowalnia) - panel nie pozwala ich
+# usunąć, nawet nieużytych.
+PROTECTED_SKUS = {STORAGE_SERVICE_SKU}

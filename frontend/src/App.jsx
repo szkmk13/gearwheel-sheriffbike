@@ -5,7 +5,7 @@ import DashboardPage from "./pages/DashboardPage";
 import OrdersPage from "./pages/OrdersPage";
 import CalendarPage from "./pages/CalendarPage";
 import StoragePage from "./pages/StoragePage";
-import InventoryPage from "./pages/InventoryPage";
+import CatalogPage from "./pages/CatalogPage";
 import ClientsPage from "./pages/ClientsPage";
 import ClientDetailsPage from "./pages/ClientDetailsPage"
 import OrderDetailsPage from './pages/OrderDetailsPage';
@@ -45,7 +45,7 @@ function App() {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="calendar" element={<CalendarPage />} />
             <Route path="storage" element={<StoragePage />} />
-            <Route path="inventory" element={<InventoryPage />} />
+            <Route path="catalog" element={<CatalogPage />} />
             <Route path="clients" element={<ClientsPage />} />
             <Route path="clients/:id" element={<ClientDetailsPage />} />
             <Route path="orders/:id" element={<OrderDetailsPage />} />

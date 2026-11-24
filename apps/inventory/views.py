@@ -1,13 +1,15 @@
 from datetime import timedelta
 
-from django.db.models import Count, Q
+from django.db.models import Count, Exists, OuterRef, Q
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from .catalog import BASE_CATALOG_SKUS, POPULAR_FILL_EXCLUDED_SKUS
+from apps.orders.models import RepairOrderItem
+
+from .catalog import BASE_CATALOG_SKUS, POPULAR_FILL_EXCLUDED_SKUS, PROTECTED_SKUS
 from .models import Category, Supplier, Part, Invoice, StockMovement
 from .serializers import (
     CategorySerializer, SupplierSerializer,
@@ -16,6 +18,7 @@ from .serializers import (
     StockMovementSerializer,
 )
 from .services import get_ocr_service
+
 
 
 class CategoryViewSet(ModelViewSet):
@@ -31,11 +34,14 @@ class SupplierViewSet(ModelViewSet):
 
 
 class PartViewSet(ModelViewSet):
-    queryset = Part.objects.select_related('category', 'supplier').all()
+    # `is_used`: pozycja trafila kiedys na zlecenie - wtedy zostaje w systemie (tylko ukrywanie).
+    queryset = Part.objects.select_related('category', 'supplier').annotate(
+        is_used=Exists(RepairOrderItem.objects.filter(part=OuterRef('pk'))),
+    )
     # `?search=` po nazwie i SKU zasila wyszukiwarkę pozycji na zleceniu (z `is_active=true`).
     filterset_fields = ['kind', 'is_active', 'category', 'supplier']
     search_fields = ['name', 'sku', 'barcode']
-    ordering_fields = ['name', 'stock_quantity']
+    ordering_fields = ['name', 'sell_price', 'sku', 'stock_quantity']
     POPULAR_LIMIT = 8
     POPULAR_DAYS = 90
 
@@ -43,6 +49,22 @@ class PartViewSet(ModelViewSet):
         if self.action == 'list':
             return PartListSerializer
         return PartDetailSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        """Usunac mozna tylko pozycje, ktorej nigdy nie uzyto na zleceniu - uzyta zostaje
+        w systemie i da sie ja najwyzej ukryc (`is_active=False`)."""
+        part = self.get_object()
+        if part.is_used:
+            return Response(
+                {'detail': 'Pozycja była użyta na zleceniu - nie można jej usunąć, można ją ukryć.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        if part.sku in PROTECTED_SKUS:
+            return Response(
+                {'detail': 'Tej pozycji nie można usunąć - korzysta z niej przechowalnia.'},
+                status=status.HTTP_409_CONFLICT,
+            )
+        return super().destroy(request, *args, **kwargs)
 
     @action(detail=False, methods=['get'], url_path='popular')
     def popular(self, request):
