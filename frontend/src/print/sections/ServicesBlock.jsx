@@ -4,11 +4,10 @@ const MAX_FONT_PT = 11;
 const MIN_FONT_PT = 9;
 const STEP_PT = 0.5;
 
-// Zakres uslug ma stala wysokosc (reszta kartki nad odcinkiem). Gdy tresc sie nie miesci,
-// zmniejszamy font do 9 pt, a dalej obcinamy z dopiskiem - dokument nie moze przejsc
-// na 2. strone, bo odcinek klienta musi zostac na dole.
-// `fitKey` wymusza ponowne dopasowanie, np. po doczytaniu fontu (inna szerokosc znakow).
-export default function ServicesBlock({ services, notes, estimatedCost, fitKey }) {
+// Pudelko o stalej wysokosci: gdy tresc sie nie miesci, zmniejszamy font do 9 pt, a dalej
+// obcinamy z dopiskiem - dokument nie moze przejsc na 2. strone, bo odcinek klienta musi
+// zostac na dole. `deps` wymuszaja ponowne dopasowanie (np. `fitKey` po doczytaniu fontu).
+function useFitFont(deps) {
     const boxRef = useRef(null);
     const [fontPt, setFontPt] = useState(MAX_FONT_PT);
     const [truncated, setTruncated] = useState(false);
@@ -26,32 +25,51 @@ export default function ServicesBlock({ services, notes, estimatedCost, fitKey }
         }
         setFontPt(size);
         setTruncated(overflows());
-    }, [services, notes, fitKey]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, deps);
+
+    return { boxRef, fontPt, truncated };
+}
+
+// Srodek kartki podzielony na pol: po lewej sam opis (opis zlecenia), po prawej
+// podsumowanie kosztow (pozycje z cenami + szacowany koszt naprawy).
+export default function ServicesBlock({ services, notes, estimatedCost, fitKey }) {
+    const fault = useFitFont([notes, fitKey]);
+    const costs = useFitFont([services, fitKey]);
 
     return (
-        <>
-            <h2 className="services-heading">Zakres usług</h2>
-            <div ref={boxRef} className="services" style={{ fontSize: `${fontPt}pt` }}>
-                {services.length > 0 && (
-                    <ul className="services-list">
-                        {services.map((service, i) => (
-                            <li key={i}>
-                                {service.name}
-                                {service.price != null && (
-                                    <span className="services-price"> - {service.price} zł</span>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                )}
-                {notes && <p className="services-notes">{notes}</p>}
-                {truncated && <div className="services-more">…ciąg dalszy w systemie</div>}
-            </div>
-            {/* Poza dopasowywanym pudelkiem, zeby kwota nigdy nie zostala obcieta. */}
-            <div className="services-cost">
-                <span>Szacowany koszt naprawy:</span>
-                <span className="services-cost-value">{estimatedCost}</span>
-            </div>
-        </>
+        <div className="services-split">
+            <section className="services-col">
+                <h2 className="services-heading">Opis:</h2>
+                <div ref={fault.boxRef} className="services" style={{ fontSize: `${fault.fontPt}pt` }}>
+                    {notes && <p className="services-notes">{notes}</p>}
+                    {fault.truncated && <div className="services-more">…ciąg dalszy w systemie</div>}
+                </div>
+            </section>
+
+            <section className="services-col costs-col">
+                <h2 className="services-heading">Podsumowanie kosztów</h2>
+                <div ref={costs.boxRef} className="services" style={{ fontSize: `${costs.fontPt}pt` }}>
+                    {services.length > 0 && (
+                        <ul className="costs-list">
+                            {services.map((service, i) => (
+                                <li key={i} className="costs-row">
+                                    <span className="costs-name">{service.name}</span>
+                                    <span className="costs-price">
+                                        {service.price != null ? `${service.price} zł` : ""}
+                                    </span>
+                                </li>
+                            ))}
+                        </ul>
+                    )}
+                    {costs.truncated && <div className="services-more">…ciąg dalszy w systemie</div>}
+                </div>
+                {/* Poza dopasowywanym pudelkiem, zeby kwota nigdy nie zostala obcieta. */}
+                <div className="services-cost">
+                    <span>Szacowany koszt naprawy:</span>
+                    <span className="services-cost-value">{estimatedCost}</span>
+                </div>
+            </section>
+        </div>
     );
 }

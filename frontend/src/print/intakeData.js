@@ -28,8 +28,21 @@ function intakeCategory(bikes) {
     return categories.size === 0 ? "bike" : "mixed";
 }
 
+// Suma cen pozycji zlecenia. Zadna pozycja bez ceny -> null (kwota zostaje do dopisania).
+function servicesTotal(services) {
+    const priced = services.filter((service) => service.price != null);
+    if (priced.length === 0) return null;
+    return Math.round(priced.reduce((sum, service) => sum + service.price, 0) * 100) / 100;
+}
+
 export function toIntakeData(order) {
     const customer = order.customer || {};
+    const services = (order.items || []).map((item) => ({
+        name: Number(item.quantity) === 1 ? item.description : `${item.description} x${Number(item.quantity)}`,
+        price: item.unit_price != null ? Number(item.unit_price) * Number(item.quantity) : null,
+    }));
+    // Szacowany koszt wpisany na zleceniu ma pierwszenstwo; bez niego - suma wybranych uslug.
+    const hasEstimate = order.estimated_cost !== null && order.estimated_cost !== undefined && order.estimated_cost !== "";
     return {
         category: intakeCategory(order.bikes || []),
         order: { tagNumbers: order.tag_numbers || [] },
@@ -44,11 +57,8 @@ export function toIntakeData(order) {
             serialNumber: bike.serial_no,
             tag: bike.tag_number,
         })),
-        services: (order.items || []).map((item) => ({
-            name: Number(item.quantity) === 1 ? item.description : `${item.description} x${Number(item.quantity)}`,
-            price: item.unit_price != null ? Number(item.unit_price) * Number(item.quantity) : null,
-        })),
+        services,
         notes: order.description,
-        estimatedCost: formatCost(order.estimated_cost),
+        estimatedCost: formatCost(hasEstimate ? order.estimated_cost : servicesTotal(services)),
     };
 }
