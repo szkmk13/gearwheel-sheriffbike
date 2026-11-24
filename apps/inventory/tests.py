@@ -142,3 +142,52 @@ class SeedInventoryTests(APITestCase):
         self._seed('--flush', '--noinput')
         self.assertEqual(Part.objects.filter(sku__in=DEMO_SKUS).count(), len(DEMO_SKUS))
         self.assertEqual(Part.objects.exclude(sku__in=DEMO_SKUS).count(), parts_before)
+
+
+class PartEditApiTests(APITestCase):
+    """Katalog w panelu: edycja jak w adminie, ale uzytej na zleceniu pozycji nie da sie usunac."""
+    url = '/api/inventory/parts/'
+
+    def setUp(self):
+        self.client.force_authenticate(User.objects.create_user('serwisant', is_staff=True))
+        self.part = Part.objects.create(kind=Part.KIND_PART, sku='TEST-LINKA', name='Testowa linka',
+                                        unit='szt.', sell_price=Decimal('15.00'))
+
+    def detail(self, part):
+        return f'{self.url}{part.pk}/'
+
+    def use_on_order(self, part):
+        customer = Customer.objects.create(first_name='Jan', last_name='Kowalski', phone='500100300')
+        order = RepairOrder.objects.create(customer=customer, description='Przegląd')
+        RepairOrderItem.objects.create(repair_order=order, part=part, item_type=part.kind,
+                                       description=part.name, quantity=1, unit_price=part.sell_price)
+
+    def test_create_and_edit(self):
+        response = self.client.post(self.url, {'kind': 'service', 'name': 'Test usługa', 'unit': 'szt.',
+                                               'sell_price': '40.00'})
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertFalse(response.data['is_used'])
+        response = self.client.patch(f"{self.url}{response.data['id']}/", {'sell_price': '45.00', 'is_active': False})
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual((response.data['sell_price'], response.data['is_active']), ('45.00', False))
+
+    def test_list_shows_usage(self):
+        self.use_on_order(self.part)
+        rows = self.client.get(self.url, {'search': 'testowa linka'}).data['results']
+        self.assertEqual([(row['sku'], row['is_used']) for row in rows], [('TEST-LINKA', True)])
+
+    def test_unused_part_can_be_deleted(self):
+        self.assertEqual(self.client.delete(self.detail(self.part)).status_code, 204)
+        self.assertFalse(Part.objects.filter(pk=self.part.pk).exists())
+
+    def test_used_part_cannot_be_deleted(self):
+        self.use_on_order(self.part)
+        response = self.client.delete(self.detail(self.part))
+        self.assertEqual(response.status_code, 409)
+        self.assertTrue(Part.objects.filter(pk=self.part.pk).exists())
+
+    def test_storage_service_cannot_be_deleted(self):
+        part = Part.objects.get(sku=STORAGE_SERVICE_SKU)
+        self.assertTrue(self.client.get(self.detail(part)).data['is_protected'])
+        self.assertEqual(self.client.delete(self.detail(part)).status_code, 409)
+        self.assertTrue(Part.objects.filter(pk=part.pk).exists())

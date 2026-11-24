@@ -12,7 +12,7 @@ import "./print.css";
 //   bikes: [{ model, serialNumber, tag }], // kazda sztuka z wlasna zawieszka
 //   services: [{ name, price }],
 //   notes,
-//   estimatedCost,                         // sformatowana kwota ("250 zł") albo ""
+//   estimatedCost,                         // "250 zł": szacunek ze zlecenia, bez niego suma uslug; albo ""
 // }
 export default function ServiceIntakeSheet({ data, fitKey }) {
     return (

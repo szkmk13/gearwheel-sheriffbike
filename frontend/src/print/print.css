@@ -112,6 +112,59 @@
   border-top: 0.5pt solid #999;
 }
 
+/* Srodek kartki na pol: zakres uslug po lewej, podsumowanie kosztow po prawej. */
+.services-split {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 60fr 40fr;
+}
+
+.services-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.services-col:first-child {
+  padding-right: 5mm;
+}
+
+.costs-col {
+  padding-left: 5mm;
+  border-left: 0.5pt solid #999;
+}
+
+.costs-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.costs-row {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  margin-bottom: 1mm;
+}
+
+/* Kolumna jest waska - nazwa sie zawija zamiast ucinac. */
+.costs-name {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.costs-price {
+  flex: none;
+  min-width: 14mm;
+  text-align: right;
+  white-space: nowrap;
+  /* Linia do dopisania dlugopisem, gdy pozycja nie ma ceny. */
+  border-bottom: 0.5pt dotted #999;
+}
+
 .services-heading {
   margin: 0 0 3mm;
   font-size: 11pt;
@@ -124,20 +177,6 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-}
-
-.services-list {
-  margin: 0 0 3mm;
-  padding-left: 5mm;
-  list-style: disc;
-}
-
-.services-list li {
-  margin-bottom: 1mm;
-}
-
-.services-price {
-  white-space: nowrap;
 }
 
 .services-notes {
@@ -157,19 +196,26 @@
   color: #444;
 }
 
-/* Szacowany koszt pod zakresem uslug - staly wiersz, nie bierze udzialu w dopasowaniu fontu. */
+/* Szacowany koszt na dole prawej kolumny - staly wiersz, nie bierze udzialu w dopasowaniu fontu. */
 .services-cost {
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 2mm;
+  justify-content: space-between;
+  gap: 1mm 2mm;
   margin-top: 3mm;
+  padding-top: 2mm;
+  border-top: 0.5pt solid #333;
   font-size: 11pt;
   font-weight: 600;
 }
 
 .services-cost-value {
-  min-width: 35mm;
+  min-width: 25mm;
+  /* Po zawinieciu kwota zostaje przy prawej krawedzi, pod cenami pozycji. */
+  margin-left: auto;
+  text-align: right;
   font-weight: 700;
   /* Linia do dopisania dlugopisem, gdy brak wyceny. */
   border-bottom: 0.5pt dotted #999;
